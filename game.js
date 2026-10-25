@@ -628,7 +628,12 @@ function stepZombie(e) {
   if (e.wt <= 0) {
     e.wt = rnd(2, 9);
     let tx = null;
-    if (Math.random() < .6) { const b = nearBuildings(e.x, e.y, 220, b => b.occ.length > 0); if (b) { tx = [b.ex, b.ey]; } }
+    if (Math.random() < (S.evac ? .25 : .6)) { const b = nearBuildings(e.x, e.y, 220, b => b.occ.length > 0); if (b) { tx = [b.ex, b.ey]; } }
+    if (!tx && S.evac) {
+      // Zufällige Richtung (8 Sektoren); die Richtung zum Evakuierungsort ist um 50 % wahrscheinlicher
+      const base = Math.atan2(S.evac.y - e.y, S.evac.x - e.x), r = Math.random() * 8.5, idx = r < 1.5 ? 0 : Math.min(7, 1 + Math.floor(r - 1.5)), an = base + idx * Math.PI / 4, d = rnd(30, 70);
+      tx = randWalk(e.x + Math.cos(an) * d, e.y + Math.sin(an) * d, 12);
+    }
     if (!tx) tx = randWalk(e.x, e.y, 50);
     if (tx) setPath(e, tx[0], tx[1], true);
   }
@@ -720,10 +725,30 @@ function computeEvacField() {
     }
   }
 }
+// Hängengebliebene (z. B. in abgeschnittenen Ecken) werden zur nächsten erreichbaren Zelle versetzt
+function unstick(e) {
+  const gx = e.x / CELL | 0, gy = e.y / CELL | 0;
+  for (let r = 1; r <= 25; r++) {
+    let best = -1, bd = 1e9;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const x = gx + dx, y = gy + dy; if (x < 0 || y < 0 || x >= GW || y >= GH) continue;
+      const i = y * GW + x; if (!cost(i, false) || evD[i] >= 1e8) continue;
+      if (evD[i] < bd) { bd = evD[i]; best = i; }
+    }
+    if (best >= 0) { e.x = (best % GW + .5) * CELL; e.y = ((best / GW | 0) + .5) * CELL; e.stk = 0; return true; }
+  }
+  return false;
+}
 function evacMove(e, sp) {
   if (!S.evac || !evD) return;
   const px = S.evac.x, py = S.evac.y;
-  if (Math.hypot(e.x - px, e.y - py) < 20) return;
+  if (Math.hypot(e.x - px, e.y - py) < 20) { e.stk = 0; return; }
+  if (Math.hypot(e.x - (e.sx || 0), e.y - (e.sy || 0)) < .03) {
+    e.stk = (e.stk || 0) + DT;
+    if (e.stk > 5 && !unstick(e) && e.stk > 25) { const q = randWalk(px, py, 25); if (q) { e.x = q[0]; e.y = q[1]; } e.stk = 0; }
+  } else e.stk = 0;
+  e.sx = e.x; e.sy = e.y;
   let ci = cellIdx(e.x, e.y);
   if (evD[ci] >= 1e8) { moveTo(e, px, py, sp, false); return; }
   let tx = 0, ty = 0;
@@ -753,6 +778,7 @@ function doEvac(x, y) {
     if (e.k === K_CIV) cand.push([0, d, e]); else if (S.evacUnits) cand.push([1, d, e]);
   }
   cand.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (cand.length < 20) for (const e of E) if (!e.dead && e.k === K_CIV && e.inc < 0 && e.st !== 4 && (e.stk || 0) > 10 && !cand.some(c => c[2] === e)) cand.push([0, 1e5, e]);   // Hubschrauber sammelt Festsitzende ein
   const take = cand.slice(0, 20);
   for (const [, , e] of take) { e.dead = true; S.ev[evKind(e)]++; }
   fx.push({ type: 'ring', x, y, r: 30, t: 1, T: 1, c: '255,255,255' });
@@ -1079,30 +1105,70 @@ $('sPat').onclick = () => { patrolArmed = !patrolArmed; $('sPat').classList.togg
 $('sAllM').onclick = () => { selected.clear(); for (const e of E) if ((e.k === K_SOL || e.k === K_SEN) && !e.dead) addSel(e); };
 $('sRel').onclick = () => { for (const u of selected) { if (u.ds > 0) { if (u.ds !== 3) { u.dt = u.ds === 1 ? 60 - u.dt : 0; u.ds = 3; } u.pend = { release: true }; } else { u.ord = false; u.path = null; u.patrol = null; } } toast('Einheiten wieder selbstständig (eingegrabene räumen zuerst)'); };
 $('sClr').onclick = () => selected.clear();
-const uRows = new Map(), uCnt = {};
-const UNAME = { [K_POL]: 'Polizist', [K_SOL]: 'Soldat', [K_SEN]: 'Garnison', [K_TRK]: 'Truck' }, UCOL = { [K_POL]: COL.pol, [K_SOL]: COL.sol, [K_SEN]: COL.sol, [K_TRK]: '#9fb23a' };
+const uEnt = new Map(), uCnt = {};
+const UNAME = { [K_POL]: 'Polizist', [K_SOL]: 'Soldat', [K_SEN]: 'Wache', [K_TRK]: 'Truck' }, UCOL = { [K_POL]: COL.pol, [K_SOL]: COL.sol, [K_SEN]: COL.sol, [K_TRK]: '#9fb23a' };
+const SQNAME = { [K_POL]: 'Polizei-Squad', [K_SOL]: 'Armee-Squad', [K_SEN]: 'Garnison' };
 function centerOn(u) { cam.x = u.x; cam.y = u.y; cam.z = Math.max(cam.z, 1.6); clampCam(); }
+function unitState(u) {
+  return u.evac ? 'Evakuierung' : u.inc >= 0 ? '☣ infiziert' : u.ds === 1 ? 'gräbt ' + Math.round(u.dt / .6) + '%' : u.ds === 2 ? 'eingegraben' : u.ds === 3 ? 'räumt ' + Math.round(u.dt / .6) + '%' : u.tgt && !u.tgt.dead && u.tgt.k === K_ZOM ? 'Kampf' : u.patrol ? (u.path ? 'Marsch' : 'Patrouille') : u.ord ? (u.path ? 'Marsch' : 'Position') : u.k === K_SEN ? 'Wache' : u.path ? 'Patrouille' : 'bereit';
+}
+function setTxt(el, t) { if (el.textContent !== t) el.textContent = t; }
 function updateUnitList() {
   const box = $('units'); if (phase !== 'run') { box.style.display = 'none'; return; }
   box.style.display = 'flex';
-  const us = E.filter(friendly), set = new Set(us);
-  for (const [u, row] of uRows) if (!set.has(u)) { row.remove(); uRows.delete(u); }
-  if (!uRows.size) for (const k in uCnt) delete uCnt[k];
+  const us = E.filter(friendly);
   us.sort((a, b) => a.k - b.k || a.id - b.id);
-  for (const u of us) {
-    let row = uRows.get(u);
-    if (!row) {
-      uCnt[u.k] = (uCnt[u.k] || 0) + 1;
-      row = document.createElement('div'); row.className = 'urow';
-      row.innerHTML = `<i style="background:${UCOL[u.k]}"></i>${UNAME[u.k]} ${uCnt[u.k]}<em></em><span></span>`;
-      row.onclick = ev => { if (!ev.shiftKey) selected.clear(); selected.has(u) && ev.shiftKey ? delSel(u) : addSel(u); };
-      row.ondblclick = () => { selected.clear(); addSel(u); centerOn(u); };
-      uRows.set(u, row); $('uList').appendChild(row);
+  const groups = new Map();
+  for (const u of us) { const key = u.sq && u.k !== K_TRK ? 's' + u.sq : 'u' + u.id; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(u); }
+  for (const [key, ent] of uEnt) if (!groups.has(key)) { ent.el.remove(); uEnt.delete(key); }
+  if (!uEnt.size) for (const k in uCnt) delete uCnt[k];
+  for (const [key, ms] of groups) {
+    let ent = uEnt.get(key);
+    const squad = key[0] === 's';
+    if (!ent) {
+      const k = ms[0].k; uCnt[squad ? 'q' + k : k] = (uCnt[squad ? 'q' + k : k] || 0) + 1;
+      const el = document.createElement('div'), head = document.createElement('div'), body = document.createElement('div');
+      head.className = 'urow'; body.className = 'ubody';
+      head.innerHTML = `${squad ? '<b class="plus">+</b>' : ''}<i style="background:${UCOL[k]}"></i><u></u><em></em><span></span>`;
+      const name = (squad ? SQNAME[k] : UNAME[k]) + ' ' + uCnt[squad ? 'q' + k : k];
+      head.children[squad ? 2 : 1].textContent = name;
+      el.append(head, body); $('uList').appendChild(el);
+      ent = { el, head, body, rows: new Map(), size: ms.length, open: false, squad };
+      if (squad) {
+        head.querySelector('.plus').onclick = ev => { ev.stopPropagation(); ent.open = !ent.open; el.classList.toggle('open', ent.open); ev.target.textContent = ent.open ? '−' : '+'; };
+      }
+      head.onclick = ev => { if (!ev.shiftKey) selected.clear(); const m = ent.cur[0]; ent.cur.some(x => selected.has(x)) && ev.shiftKey ? delSel(m) : addSel(m); };
+      head.ondblclick = () => { selected.clear(); addSel(ent.cur[0]); const c = ent.cur; centerOn({ x: c.reduce((a, u) => a + u.x, 0) / c.length, y: c.reduce((a, u) => a + u.y, 0) / c.length }); };
+      uEnt.set(key, ent);
     }
-    row.classList.toggle('sel', selected.has(u)); row.classList.toggle('inf', u.inc >= 0);
-    const gt = u.g ? (u.g === u.sq ? 'S' : 'G') + u.g : ''; if (row.children[1].textContent !== gt) row.children[1].textContent = gt;
-    const st = u.evac ? 'Evakuierung' : u.inc >= 0 ? '☣ infiziert' : u.ds === 1 ? 'gräbt ' + Math.round(u.dt / .6) + '%' : u.ds === 2 ? 'eingegraben' : u.ds === 3 ? 'räumt ' + Math.round(u.dt / .6) + '%' : u.tgt && !u.tgt.dead && u.tgt.k === K_ZOM ? 'Kampf' : u.patrol ? (u.path ? 'Marsch' : 'Patrouille') : u.ord ? (u.path ? 'Marsch' : 'Position') : u.k === K_SEN ? 'Wache' : u.path ? 'Patrouille' : 'bereit';
-    const sp = row.lastChild; if (sp.textContent !== st) sp.textContent = st;
+    ent.cur = ms; ent.size = Math.max(ent.size, ms.length);
+    // Kopfzeile
+    const anySel = ms.some(u => selected.has(u)), anyInf = ms.some(u => u.inc >= 0);
+    ent.head.classList.toggle('sel', anySel); ent.head.classList.toggle('inf', anyInf);
+    if (squad) {
+      const fight = ms.filter(u => u.tgt && !u.tgt.dead && u.tgt.k === K_ZOM).length;
+      setTxt(ent.head.children[3], ms[0].g && ms[0].g !== ms[0].sq ? 'G' + ms[0].g : '');
+      setTxt(ent.head.children[4], ms.length + '/' + ent.size + ' · ' + (fight ? 'Kampf' : unitState(ms[0])));
+    } else {
+      setTxt(ent.head.children[2], ms[0].g && ms[0].g !== ms[0].sq ? 'G' + ms[0].g : '');
+      setTxt(ent.head.children[3], unitState(ms[0]));
+    }
+    if (!squad) continue;
+    // Mitglieder
+    const set = new Set(ms);
+    for (const [u, row] of ent.rows) if (!set.has(u)) { row.remove(); ent.rows.delete(u); }
+    ms.forEach((u, i) => {
+      let row = ent.rows.get(u);
+      if (!row) {
+        row = document.createElement('div'); row.className = 'urow mem';
+        row.innerHTML = `<i style="background:${UCOL[u.k]}"></i><u>${UNAME[u.k]} ${i + 1}</u><span></span>`;
+        row.onclick = ev => { if (!ev.shiftKey) selected.clear(); addSel(u); };
+        row.ondblclick = () => { selected.clear(); addSel(u); centerOn(u); };
+        ent.rows.set(u, row); ent.body.appendChild(row);
+      }
+      row.classList.toggle('sel', selected.has(u)); row.classList.toggle('inf', u.inc >= 0);
+      if (ent.open) setTxt(row.lastChild, unitState(u) + ' · ' + Math.round((u.ae || u.acc) * 100) + '%');
+    });
   }
   $('uCnt').textContent = us.length;
 }
