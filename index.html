@@ -43,6 +43,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 .slot small{color:var(--mut);display:block}
 #toast{position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:8px 14px;background:#000c;border-radius:20px;display:none}
 .leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:6px}.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+#tools button.locked{opacity:.5}
 @media(max-width:700px){#setup{top:auto;height:58%;width:auto;left:8px}#hud{top:112px;min-width:0;font-size:12px;padding:6px 8px}#tools{bottom:auto;top:auto}#title small{display:none}}
 </style>
 </head>
@@ -54,7 +55,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <div class="panel grp">
     <button id="sp0" title="Pause">⏸</button><button id="sp1" class="on">1×</button><button id="sp2">2×</button><button id="sp4">4×</button>
     <span id="clock" style="min-width:56px;text-align:right;font-variant-numeric:tabular-nums">00:00</span>
-    <button id="bSave">💾 Speichern</button><button id="bLoad">📂 Laden</button><button id="bStats">📊 Analyse</button><button id="bMenu">⟲ Neu</button>
+    <button id="bMap" title="Kartenhintergrund wechseln">🛰 Satellit</button><button id="bSave">💾 Speichern</button><button id="bLoad">📂 Laden</button><button id="bStats">📊 Analyse</button><button id="bMenu">⟲ Neu</button>
   </div>
 </div>
 
@@ -71,18 +72,20 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 
 <div id="tools" class="panel">
   <button data-tool="pan" class="on">✋<span>Kamera</span></button>
+  <button data-tool="units">🎖<span>Einheiten</span></button>
   <button data-tool="infect">☣️<span>Zombie</span></button>
-  <button data-tool="barricade">🧱<span>Barrikade</span><div class="cd"></div></button>
-  <button data-tool="strike">💥<span>Luftschlag</span><div class="cd"></div></button>
-  <button data-tool="supply">📦<span>Versorgung</span><div class="cd"></div></button>
-  <button data-tool="garrison">🪖<span>Garnison</span><div class="cd"></div></button>
+  <button data-tool="barricade">🧱<span data-n="Barrikade">Barrikade</span><div class="cd"></div></button>
+  <button data-tool="strike">💥<span data-n="Luftschlag">Luftschlag</span><div class="cd"></div></button>
+  <button data-tool="supply">📦<span data-n="Versorgung">Versorgung</span><div class="cd"></div></button>
+  <button data-tool="garrison">🪖<span data-n="Garnison">Garnison</span><div class="cd"></div></button>
 </div>
 
 <div id="setup" class="panel">
   <h2>Konfiguration</h2>
   <p>Stelle den Ausbruch ein. Mit dem Werkzeug „Zombie“ markierst du auf der Karte die Ausbruchsorte (ohne Markierung: zufällig).</p>
-  <div class="row"><label>Zivilisten <b id="vPop"></b></label><input type="range" id="pop" min="100" max="2000" step="50"></div>
-  <div class="row"><label>Start-Infizierte <b id="vInf0"></b></label><input type="range" id="inf0" min="1" max="60"></div>
+  <div class="row"><label>Ausbruch beginnt <b></b></label><select id="origin" style="width:100%;background:#222c25;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px"><option value="edge">an den Kartenrändern</option><option value="center">in der Kartenmitte</option></select><div class="hint">Mit dem Werkzeug „Zombie“ gesetzte Markierungen haben Vorrang.</div></div>
+  <div class="row"><label>Zivilisten <b id="vPop"></b></label><input type="range" id="pop" min="100" max="5000" step="100"></div>
+  <div class="row"><label>Start-Infizierte <b id="vInf0"></b></label><input type="range" id="inf0" min="1" max="500"></div>
   <div class="row"><label>Bewaffnungsrate <b id="vArmed"></b></label><input type="range" id="armed" min="0" max="100"></div>
   <div class="row"><label>Treffsicherheit <b id="vAcc"></b></label><input type="range" id="acc" min="10" max="95"></div>
   <div class="row"><label>Polizei <b id="vPolice"></b></label><input type="range" id="police" min="0" max="60"></div>
@@ -92,9 +95,11 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <div class="row"><label>Zombie-Typ <b id="vZs"></b></label><input type="range" id="zs" min="0" max="100"><div class="hint">0 = klassisch (langsam) · 100 = modern (schnell, rennt Zivilisten nieder)</div></div>
   <div class="btns"><button class="big" id="bStart">▶ Simulation starten</button><button id="bResume" style="display:none">Autosave fortsetzen</button></div>
   <div class="leg"><span><i style="background:#f1f5f2"></i>Zivilist</span><span><i style="background:#ffe066"></i>bewaffnet</span><span><i style="background:#f0a030"></i>infiziert</span><span><i style="background:#58c24a"></i>Zombie</span><span><i style="background:#4a8bff"></i>Polizei</span><span><i style="background:#b9a24a"></i>Militär</span></div>
-  <p class="hint" style="margin-top:10px">Bedienung: Mausrad/Pinch = Zoom, ziehen = Karte verschieben (bei aktivem Werkzeug: rechte Maustaste oder zwei Finger). Barrikade: Linie ziehen.</p>
+  <p class="hint" style="margin-top:10px">Bedienung: Mausrad/Pinch = Zoom, ziehen = Karte verschieben (bei aktivem Werkzeug: rechte Maustaste oder zwei Finger). Barrikade: Linie ziehen. Einheiten: Werkzeug „Einheiten“, Einheit/Rahmen wählen, dann Ziel antippen (Desktop: rechte Maustaste). Garnison ab 25 %, Versorgung ab 35 %, Luftschlag ab 50 % Verlust/Umwandlung der Bevölkerung.</p>
 </div>
 
+<div id="selbar" class="panel" style="display:none;position:fixed;bottom:84px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:6px;align-items:center;white-space:nowrap"><span id="selTxt"></span><button id="sAllP">Alle Polizei</button><button id="sAllM">Alle Militär</button><button id="sRel">Freigeben</button><button id="sClr">Abwählen</button></div>
+<div id="attr" style="position:fixed;right:6px;bottom:2px;font-size:10px;color:#cfd8d2;text-shadow:0 0 3px #000;pointer-events:none"></div>
 <div id="toast"></div>
 <div id="modal"><div class="box panel" id="mbox"></div></div>
 <script src="map-data.js"></script>
