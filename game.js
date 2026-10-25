@@ -410,6 +410,7 @@ function noise(x, y, r) {
 }
 function shoot(e, z, rng, dmg) {
   S.shots++;
+  SFX.shot(e.x, e.y, e.k === K_TRK ? 'mg' : e.k === K_CIV ? 'civ' : e.k === K_POL ? 'pistol' : 'rifle');
   tracers.push({ x1: e.x, y1: e.y, x2: z.x, y2: z.y, t: .12 });
   if (!(e.k === K_TRK && simT - (e.nt || 0) < .8)) { e.nt = simT; noise(e.x, e.y, e.k === K_CIV ? 130 : e.k === K_POL ? 170 : e.k === K_TRK ? 260 : 230); }
   const d = Math.hypot(z.x - e.x, z.y - e.y);
@@ -420,7 +421,7 @@ function shoot(e, z, rng, dmg) {
 }
 function infect(e) {
   if (e.inc >= 0 || e.k === K_ZOM || e.k === K_TRK) return;
-  e.inc = cfg.infT * rnd(.7, 1.3); S.bites++;
+  e.inc = cfg.infT * rnd(.7, 1.3); S.bites++; SFX.bite(e.x, e.y); if (e.k === K_CIV) SFX.scream(e.x, e.y);
 }
 function alertAt(x, y, text) {
   const box = document.getElementById('alerts'); if (!box) return;
@@ -428,7 +429,7 @@ function alertAt(x, y, text) {
   const d = document.createElement('div'); d.className = 'alert';
   d.innerHTML = '<span>⚠ ' + text + '</span><button>Hinspringen</button>';
   d.querySelector('button').onclick = () => { cam.x = x; cam.y = y; cam.z = Math.max(cam.z, 1.3); clampCam(); d.remove(); };
-  box.appendChild(d); setTimeout(() => d.remove(), 14000);
+  box.appendChild(d); setTimeout(() => d.remove(), 14000); SFX.alarm();
 }
 function toZombie(e) {
   e.k = K_ZOM; e.hp = ZHP; e.inc = -1; e.st = 0; e.path = null; e.armed = false; e.tgt = null; e.wt = 0; S.zombified++;
@@ -699,7 +700,7 @@ function updateFx() {
       }
     } else if (f.type === 'jet') {
       f.x += f.vx * DT; f.y += f.vy * DT;
-      if (!f.dropped && Math.hypot(f.tx - f.x, f.ty - f.y) <= f.lead) { f.dropped = true; fx.push({ type: 'bomb', x0: f.x, y0: f.y, tx: f.tx, ty: f.ty, t: 1.2, T: 1.2 }); }
+      if (!f.dropped && Math.hypot(f.tx - f.x, f.ty - f.y) <= f.lead) { f.dropped = true; SFX.jet(f.x, f.y); SFX.whistle(f.tx, f.ty); fx.push({ type: 'bomb', x0: f.x, y0: f.y, tx: f.tx, ty: f.ty, t: 1.2, T: 1.2 }); }
       if (f.dropped && Math.hypot(f.tx - f.x, f.ty - f.y) > 1500) fx.splice(i, 1);
     } else if (f.type === 'bomb') {
       f.t -= DT; if (f.t <= 0) { explode(f.tx, f.ty, 30); f.type = 'boom'; f.t = .7; f.x = f.tx; f.y = f.ty; f.r = 30; }
@@ -782,7 +783,7 @@ function doEvac(x, y) {
   const take = cand.slice(0, 20);
   for (const [, , e] of take) { e.dead = true; S.ev[evKind(e)]++; }
   fx.push({ type: 'ring', x, y, r: 30, t: 1, T: 1, c: '255,255,255' });
-  if (take.length) toast('🚁 ' + take.length + ' evakuiert');
+  if (take.length) { toast('🚁 ' + take.length + ' evakuiert'); SFX.chime(x, y); }
 }
 function startUnitEvac() {
   if (!S.evac) return toast('Erst den Evakuierungsort festlegen (Werkzeug „Evakuierung“)');
@@ -826,6 +827,7 @@ function record() {
   }
 }
 function explode(x, y, r) {
+  SFX.boom(x, y);
   for (const e of E) if (!e.dead && e.st !== 4 && Math.hypot(e.x - x, e.y - y) < r) kill(e);
   for (const b of B) if (Math.hypot(b.x - x, b.y - y) < r * .8) { for (const o of b.occ) kill(o); b.occ = []; }
   for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (b && Math.hypot(b.x - x, b.y - y) < r) b.hp = 0; }
@@ -858,12 +860,12 @@ function useTool(tool, x, y, x2, y2) {
     let best = 0, bd = 12 * 12;
     for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (!b) continue; for (const c of b.cells) { const d = ((c % GW + .5) * CELL - x) ** 2 + (((c / GW | 0) + .5) * CELL - y) ** 2; if (d < bd) { bd = d; best = i; } } }
     if (!best) return toast('Hier ist keine Barrikade');
-    for (const c of BAR[best].cells) barId[c] = 0; BAR[best] = null; evacDirty = true; toast('Barrikade eingerissen'); return;
+    SFX.thud(x, y); for (const c of BAR[best].cells) barId[c] = 0; BAR[best] = null; evacDirty = true; toast('Barrikade eingerissen'); return;
   } else if (tool === 'evac') { setEvac(x, y); return;
   } else if (tool === 'truck') {
     if (Math.min(x, y, WW - x, WH - y) > 70) return toast('Trucks können nur am Kartenrand angefordert werden');
     const p = randWalk(x, y, 45, true) || randWalk(x, y, 70); if (!p) return toast('Hier kann kein Truck einfahren');
-    const e = mk(K_TRK, p[0], p[1]); e.acc = .7; e.armed = true; e.ord = true; e.hmx = p[0]; e.hmy = p[1]; e.hp = 8; E.push(e);
+    SFX.engine(p[0], p[1]); const e = mk(K_TRK, p[0], p[1]); e.acc = .7; e.armed = true; e.ord = true; e.hmx = p[0]; e.hmy = p[1]; e.hp = 8; E.push(e);
   } else if (tool === 'strike') {
     const an = Math.random() * 6.283, dx = Math.cos(an), dy = Math.sin(an);
     fx.push({ type: 'jet', x: x - dx * 1400, y: y - dy * 1400, vx: dx * 230, vy: dy * 230, a: an, tx: x, ty: y, lead: 276, dropped: false });
@@ -872,7 +874,7 @@ function useTool(tool, x, y, x2, y2) {
     const [sx, sy] = edgeEntry(x, y);
     fx.push({ type: 'heli', kind: tool, x: sx, y: sy, tx: x, ty: y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 });
   }
-  cooldown[tool] = CD_MAX[tool]; S.used[tool]++;
+  cooldown[tool] = CD_MAX[tool]; S.used[tool]++; if (tool === 'barricade') SFX.thud((x + x2) / 2, (y + y2) / 2); else SFX.ui();
 }
 
 // ───────────────────────── Speichern / Laden ─────────────────────────
@@ -1091,6 +1093,10 @@ for (const k in SL) $(k).addEventListener('input', () => { cfg[k] = +$(k).value;
 $('origin').addEventListener('change', () => { cfg.origin = $('origin').value; });
 const MAP_LABEL = { sat: '🛰 Satellit', osm: '🗺 OSM-Karte', vec: '▦ Vektor' };
 function applyMapMode() { preloadTiles(); $('bMap').textContent = MAP_LABEL[mapMode]; $('attr').textContent = mapMode === 'vec' ? 'Kartendaten © OpenStreetMap-Mitwirkende' : TILE_SRC[mapMode].attr; }
+const SND = { 1: '🔊', .5: '🔉', 0: '🔇' };
+$('bSnd').textContent = SND[SFX.level()];
+$('bSnd').onclick = () => { $('bSnd').textContent = SND[SFX.cycle()]; SFX.ui(); };
+addEventListener('pointerdown', SFX.resume); addEventListener('keydown', SFX.resume);
 $('bMap').onclick = () => { mapMode = mapMode === 'sat' ? 'osm' : mapMode === 'osm' ? 'vec' : 'sat'; try { localStorage.setItem('zos_mapmode', mapMode); } catch (e) {} applyMapMode(); };
 try { const m = localStorage.getItem('zos_mapmode'); if (MAP_LABEL[m]) mapMode = m; } catch (e) {}
 $('sAllP').onclick = () => { selected.clear(); for (const e of E) if (e.k === K_POL && !e.dead) addSel(e); };
@@ -1217,7 +1223,7 @@ function slotModal(mode) {
 $('bSave').onclick = () => { if (phase !== 'run') return toast('Erst die Simulation starten'); slotModal('save'); };
 $('bLoad').onclick = () => slotModal('load');
 function endGame(msg) {
-  finished = true; setSpeed(0); autosave();
+  finished = true; setSpeed(0); autosave(); SFX.end(msg.includes('eingedämmt'));
   showStats(msg);
 }
 function showStats(title) {
@@ -1266,6 +1272,12 @@ window.addEventListener('keydown', e => {
   else if (e.key === '1') setSpeed(1); else if (e.key === '2') setSpeed(2); else if (e.key === '3' || e.key === '4') setSpeed(4);
 });
 let hudT = 0;
+function ambience() {
+  if (phase !== 'run') { SFX.ambient([]); return; }
+  SFX.ambient(fx.filter(f => f.type === 'heli').map(f => ({ x: f.x, y: f.y })));
+  if (speed === 0) return;
+  for (let k = 0; k < 3; k++) { const z = E[Math.random() * E.length | 0]; if (z && z.k === K_ZOM && !z.dead) SFX.groan(z.x, z.y); }
+}
 function updateHud() {
   const c = counts(), g = (id, v) => { const el = $(id); if (el.textContent != v) el.textContent = v; };
   g('hTrk', c.trk); g('hEvac', S ? (S.ev.civ + S.ev.pol + S.ev.mil + S.ev.trk) : 0); { const show = phase === 'run' && S && c.civ === 0 && c.pol + c.mil + c.trk > 0 && !S.evacUnits; $('bEvacU').style.display = show ? '' : 'none'; if (show && !S.civNote) { S.civNote = 1; toast('Keine Zivilisten mehr – Einheiten können jetzt evakuiert werden'); } }
@@ -1288,7 +1300,8 @@ function frame(ts) {
     if (n >= 12) acc = 0;
   }
   try { draw(); } catch (err) { console.error(err); }
-  if (ts - hudT > 200) { hudT = ts; try { updateHud(); if (ts - (frame.ut || 0) > 500) { frame.ut = ts; updateUnitList(); } } catch (err) { console.error(err); } }
+  SFX.setPaused(!(phase === 'run' && speed > 0));
+  if (ts - hudT > 200) { hudT = ts; try { updateHud(); ambience(); if (ts - (frame.ut || 0) > 500) { frame.ut = ts; updateUnitList(); } } catch (err) { console.error(err); } }
   requestAnimationFrame(frame);
 }
 function init() {
