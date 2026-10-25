@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Zombie Outbreak Simulator – Moosburg</title>
+<style>
+:root{--bg:#0e1210;--panel:#171d19ee;--line:#2c3a31;--tx:#e4ece6;--mut:#8da294;--acc:#7bd36b;--warn:#e8a33d;--bad:#e5534b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:14px/1.35 system-ui,sans-serif;overflow:hidden;touch-action:none;user-select:none}
+canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab}
+button{font:inherit;color:var(--tx);background:#222c25;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+button:hover{background:#2c382f}button.on{background:#335a2d;border-color:var(--acc)}
+button:disabled{opacity:.45;cursor:default}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(6px)}
+#top{position:fixed;top:8px;left:8px;right:8px;display:flex;gap:8px;align-items:center;justify-content:space-between;pointer-events:none}
+#top>*{pointer-events:auto}
+#top .grp{display:flex;gap:6px;padding:6px;align-items:center;flex-wrap:wrap}
+#title{font-weight:700;letter-spacing:.04em;padding:4px 8px}
+#title small{display:block;font-weight:400;color:var(--mut);letter-spacing:0}
+#hud{position:fixed;top:70px;left:8px;padding:10px 12px;min-width:190px}
+#hud div{display:flex;justify-content:space-between;gap:14px;align-items:center}
+#hud i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px}
+#hud b{font-variant-numeric:tabular-nums}
+#hud hr{border:0;border-top:1px solid var(--line);margin:6px 0;width:100%}
+#tools{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px;max-width:calc(100% - 16px);overflow-x:auto}
+#tools button{display:flex;flex-direction:column;align-items:center;min-width:74px;position:relative;overflow:hidden}
+#tools button span{font-size:11px;color:var(--mut)}
+#tools .cd{position:absolute;left:0;bottom:0;height:3px;background:var(--warn);width:0}
+#setup{position:fixed;top:70px;right:8px;bottom:10px;width:340px;max-width:calc(100% - 16px);padding:14px;overflow-y:auto}
+#setup h2{margin:0 0 4px;font-size:16px}
+#setup p{color:var(--mut);margin:0 0 10px;font-size:12.5px}
+.row{margin:9px 0}.row label{display:flex;justify-content:space-between}.row label b{color:var(--acc);font-variant-numeric:tabular-nums}
+.row input{width:100%;accent-color:var(--acc)}
+.hint{font-size:11.5px;color:var(--mut)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btns .big{flex:1;background:#2f6a28;border-color:var(--acc);font-weight:700;padding:10px}
+#modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;padding:12px}
+#modal .box{max-width:640px;width:100%;max-height:100%;overflow:auto;padding:18px}
+#modal h2{margin:0 0 8px}
+table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px solid var(--line)}td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.slot{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px;border:1px solid var(--line);border-radius:8px;margin:6px 0}
+.slot small{color:var(--mut);display:block}
+#toast{position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:8px 14px;background:#000c;border-radius:20px;display:none}
+.leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:6px}.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+@media(max-width:700px){#setup{top:auto;height:58%;width:auto;left:8px}#hud{top:112px;min-width:0;font-size:12px;padding:6px 8px}#tools{bottom:auto;top:auto}#title small{display:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="top">
+  <div class="panel" id="title">ZOMBIE OUTBREAK SIMULATOR<small>Karte: Moosburg a. d. Isar (OpenStreetMap)</small></div>
+  <div class="panel grp">
+    <button id="sp0" title="Pause">⏸</button><button id="sp1" class="on">1×</button><button id="sp2">2×</button><button id="sp4">4×</button>
+    <span id="clock" style="min-width:56px;text-align:right;font-variant-numeric:tabular-nums">00:00</span>
+    <button id="bSave">💾 Speichern</button><button id="bLoad">📂 Laden</button><button id="bStats">📊 Analyse</button><button id="bMenu">⟲ Neu</button>
+  </div>
+</div>
+
+<div id="hud" class="panel">
+  <div><span><i style="background:#f1f5f2"></i>Zivilisten</span><b id="hCiv">0</b></div>
+  <div><span><i style="background:#f0a030"></i>Infizierte</span><b id="hInf">0</b></div>
+  <div><span><i style="background:#58c24a"></i>Zombies</span><b id="hZom">0</b></div>
+  <div><span><i style="background:#4a8bff"></i>Polizei</span><b id="hPol">0</b></div>
+  <div><span><i style="background:#b9a24a"></i>Militär</span><b id="hMil">0</b></div>
+  <hr>
+  <div><span>Eliminiert</span><b id="hKill">0</b></div>
+  <div><span>Verluste</span><b id="hLoss">0</b></div>
+</div>
+
+<div id="tools" class="panel">
+  <button data-tool="pan" class="on">✋<span>Kamera</span></button>
+  <button data-tool="infect">☣️<span>Zombie</span></button>
+  <button data-tool="barricade">🧱<span>Barrikade</span><div class="cd"></div></button>
+  <button data-tool="strike">💥<span>Luftschlag</span><div class="cd"></div></button>
+  <button data-tool="supply">📦<span>Versorgung</span><div class="cd"></div></button>
+  <button data-tool="garrison">🪖<span>Garnison</span><div class="cd"></div></button>
+</div>
+
+<div id="setup" class="panel">
+  <h2>Konfiguration</h2>
+  <p>Stelle den Ausbruch ein. Mit dem Werkzeug „Zombie“ markierst du auf der Karte die Ausbruchsorte (ohne Markierung: zufällig).</p>
+  <div class="row"><label>Zivilisten <b id="vPop"></b></label><input type="range" id="pop" min="100" max="2000" step="50"></div>
+  <div class="row"><label>Start-Infizierte <b id="vInf0"></b></label><input type="range" id="inf0" min="1" max="60"></div>
+  <div class="row"><label>Bewaffnungsrate <b id="vArmed"></b></label><input type="range" id="armed" min="0" max="100"></div>
+  <div class="row"><label>Treffsicherheit <b id="vAcc"></b></label><input type="range" id="acc" min="10" max="95"></div>
+  <div class="row"><label>Polizei <b id="vPolice"></b></label><input type="range" id="police" min="0" max="60"></div>
+  <div class="row"><label>Militär <b id="vMil"></b></label><input type="range" id="mil" min="0" max="80"></div>
+  <div class="row"><label>Patrouillen-Frequenz <b id="vPatrol"></b></label><input type="range" id="patrol" min="0" max="100"></div>
+  <div class="row"><label>Verwandlungszeit (Biss → Zombie) <b id="vInfT"></b></label><input type="range" id="infT" min="3" max="120"></div>
+  <div class="row"><label>Zombie-Typ <b id="vZs"></b></label><input type="range" id="zs" min="0" max="100"><div class="hint">0 = klassisch (langsam) · 100 = modern (schnell, rennt Zivilisten nieder)</div></div>
+  <div class="btns"><button class="big" id="bStart">▶ Simulation starten</button><button id="bResume" style="display:none">Autosave fortsetzen</button></div>
+  <div class="leg"><span><i style="background:#f1f5f2"></i>Zivilist</span><span><i style="background:#ffe066"></i>bewaffnet</span><span><i style="background:#f0a030"></i>infiziert</span><span><i style="background:#58c24a"></i>Zombie</span><span><i style="background:#4a8bff"></i>Polizei</span><span><i style="background:#b9a24a"></i>Militär</span></div>
+  <p class="hint" style="margin-top:10px">Bedienung: Mausrad/Pinch = Zoom, ziehen = Karte verschieben (bei aktivem Werkzeug: rechte Maustaste oder zwei Finger). Barrikade: Linie ziehen.</p>
+</div>
+
+<div id="toast"></div>
+<div id="modal"><div class="box panel" id="mbox"></div></div>
+<script src="map-data.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
