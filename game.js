@@ -83,7 +83,7 @@ function getTile(src, z, x, y) {
   if (!t) {
     t = { img: new Image(), ok: false }; t.img.onload = () => { t.ok = true; }; t.img.onerror = () => { t.err = true; };
     t.img.src = TILE_SRC[src].url(z, x, y); tiles.set(k, t);
-    if (tiles.size > 600) { const f = tiles.keys().next().value; tiles.delete(f); }
+    if (tiles.size > 3000) { const f = tiles.keys().next().value; tiles.delete(f); }
   }
   return t;
 }
@@ -93,9 +93,21 @@ function drawTiles(vx0, vy0, vx1, vy1) {
   const [la0, lo0] = w2ll(Math.max(0, vx0), Math.max(0, vy0)), [la1, lo1] = w2ll(Math.min(WW, vx1), Math.min(WH, vy1));
   const tx0 = Math.floor(lon2t(lo0, z)), tx1 = Math.floor(lon2t(lo1, z)), ty0 = Math.floor(lat2t(la0, z)), ty1 = Math.floor(lat2t(la1, z));
   for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
-    const t = getTile(mapMode, z, tx, ty); if (!t.ok) continue;
+    const t = getTile(mapMode, z, tx, ty);
     const [xa, ya] = ll2w(t2lat(ty, z), t2lon(tx, z)), [xb, yb] = ll2w(t2lat(ty + 1, z), t2lon(tx + 1, z));
-    ctx.drawImage(t.img, xa, ya, xb - xa + .5, yb - ya + .5);
+    if (t.ok) { ctx.drawImage(t.img, xa, ya, xb - xa + .5, yb - ya + .5); continue; }
+    // Platzhalter: Ausschnitt einer bereits geladenen gröberen Kachel
+    for (let k = 1; k <= z - 12; k++) {
+      const pz = z - k, px = tx >> k, py = ty >> k, pt = tiles.get(mapMode + pz + '/' + px + '/' + py);
+      if (pt && pt.ok) { const sz = 256 >> k, sx = (tx - (px << k)) * sz, sy = (ty - (py << k)) * sz; ctx.drawImage(pt.img, sx, sy, sz, sz, xa, ya, xb - xa + .5, yb - ya + .5); break; }
+    }
+  }
+}
+function preloadTiles() {
+  const src = TILE_SRC[mapMode]; if (!src) return;
+  for (let z = 13; z <= Math.min(17, src.max); z++) {
+    const [la0, lo0] = w2ll(0, 0), [la1, lo1] = w2ll(WW, WH);
+    for (let ty = Math.floor(lat2t(la0, z)); ty <= Math.floor(lat2t(la1, z)); ty++) for (let tx = Math.floor(lon2t(lo0, z)); tx <= Math.floor(lon2t(lo1, z)); tx++) getTile(mapMode, z, tx, ty);
   }
 }
 function renderMap() {
@@ -244,7 +256,8 @@ const K_CIV = 0, K_ZOM = 1, K_POL = 2, K_SOL = 3, K_SEN = 4;
 const ZHP = 4;
 
 function newStats() { return { kills: 0, loss: 0, shots: 0, bites: 0, breaches: 0, zombified: 0, peakZ: 0, peakZt: 0, hist: [], used: { barricade: 0, strike: 0, supply: 0, garrison: 0 }, histT: 0 }; }
-function mk(k, x, y) { return { k, x, y, hp: k === K_ZOM ? ZHP : 3, st: 0, path: null, pi: 0, th: rnd(0, .4), cd: 0, ammo: 0, acc: 0, armed: false, inc: -1, b: -1, brave: false, wt: rnd(0, 8), tgt: null, dead: false, inT: 0, hx: 0, hy: 0, ft: 0, hmx: x, hmy: y, pt: 0, bt: 0, ord: false }; }
+let uidN = 0;
+function mk(k, x, y) { return { id: ++uidN, k, x, y, hp: k === K_ZOM ? ZHP : 3, st: 0, path: null, pi: 0, th: rnd(0, .4), cd: 0, ammo: 0, acc: 0, armed: false, inc: -1, b: -1, brave: false, wt: rnd(0, 8), tgt: null, dead: false, inT: 0, hx: 0, hy: 0, ft: 0, hmx: x, hmy: y, pt: 0, bt: 0, ord: false }; }
 const zSpeed = () => 1.5 + cfg.zs / 100 * 6.8;
 const zVision = () => 60 + cfg.zs / 100 * 60;
 
@@ -887,13 +900,41 @@ function syncSliders() { $('origin').value = cfg.origin; for (const k in SL) { $
 for (const k in SL) $(k).addEventListener('input', () => { cfg[k] = +$(k).value; $(SL[k][0]).textContent = SL[k][1](cfg[k]); });
 $('origin').addEventListener('change', () => { cfg.origin = $('origin').value; });
 const MAP_LABEL = { sat: '🛰 Satellit', osm: '🗺 OSM-Karte', vec: '▦ Vektor' };
-function applyMapMode() { $('bMap').textContent = MAP_LABEL[mapMode]; $('attr').textContent = mapMode === 'vec' ? 'Kartendaten © OpenStreetMap-Mitwirkende' : TILE_SRC[mapMode].attr; }
+function applyMapMode() { preloadTiles(); $('bMap').textContent = MAP_LABEL[mapMode]; $('attr').textContent = mapMode === 'vec' ? 'Kartendaten © OpenStreetMap-Mitwirkende' : TILE_SRC[mapMode].attr; }
 $('bMap').onclick = () => { mapMode = mapMode === 'sat' ? 'osm' : mapMode === 'osm' ? 'vec' : 'sat'; try { localStorage.setItem('zos_mapmode', mapMode); } catch (e) {} applyMapMode(); };
 try { const m = localStorage.getItem('zos_mapmode'); if (MAP_LABEL[m]) mapMode = m; } catch (e) {}
 $('sAllP').onclick = () => { selected.clear(); for (const e of E) if (e.k === K_POL && !e.dead) selected.add(e); };
 $('sAllM').onclick = () => { selected.clear(); for (const e of E) if ((e.k === K_SOL || e.k === K_SEN) && !e.dead) selected.add(e); };
 $('sRel').onclick = () => { for (const u of selected) { u.ord = false; u.path = null; } toast('Einheiten wieder selbstständig'); };
 $('sClr').onclick = () => selected.clear();
+const uRows = new Map(), uCnt = {};
+const UNAME = { [K_POL]: 'Polizist', [K_SOL]: 'Soldat', [K_SEN]: 'Garnison' }, UCOL = { [K_POL]: COL.pol, [K_SOL]: COL.sol, [K_SEN]: COL.sol };
+function centerOn(u) { cam.x = u.x; cam.y = u.y; cam.z = Math.max(cam.z, 1.6); clampCam(); }
+function updateUnitList() {
+  const box = $('units'); if (phase !== 'run') { box.style.display = 'none'; return; }
+  box.style.display = 'flex';
+  const us = E.filter(friendly), set = new Set(us);
+  for (const [u, row] of uRows) if (!set.has(u)) { row.remove(); uRows.delete(u); }
+  if (!uRows.size) for (const k in uCnt) delete uCnt[k];
+  us.sort((a, b) => a.k - b.k || a.id - b.id);
+  for (const u of us) {
+    let row = uRows.get(u);
+    if (!row) {
+      uCnt[u.k] = (uCnt[u.k] || 0) + 1;
+      row = document.createElement('div'); row.className = 'urow';
+      row.innerHTML = `<i style="background:${UCOL[u.k]}"></i>${UNAME[u.k]} ${uCnt[u.k]}<span></span>`;
+      row.onclick = ev => { if (!ev.shiftKey) selected.clear(); selected.has(u) && ev.shiftKey ? selected.delete(u) : selected.add(u); };
+      row.ondblclick = () => { selected.clear(); selected.add(u); centerOn(u); };
+      uRows.set(u, row); $('uList').appendChild(row);
+    }
+    row.classList.toggle('sel', selected.has(u)); row.classList.toggle('inf', u.inc >= 0);
+    const st = u.inc >= 0 ? '☣ infiziert' : u.tgt && !u.tgt.dead && u.tgt.k === K_ZOM ? 'Kampf' : u.ord ? (u.path ? 'Marsch' : 'Position') : u.k === K_SEN ? 'Wache' : u.path ? 'Patrouille' : 'bereit';
+    const sp = row.lastChild; if (sp.textContent !== st) sp.textContent = st;
+  }
+  $('uCnt').textContent = us.length;
+}
+$('uHead').onclick = () => { const b = $('units'); b.classList.toggle('col'); $('uTog').textContent = b.classList.contains('col') ? '▸' : '▾'; };
+if (innerWidth < 700) { $('units').classList.add('col'); $('uTog').textContent = '▸'; }
 function setSpeed(s) { speed = s; for (const n of [0, 1, 2, 4]) $('sp' + n).classList.toggle('on', n === s); }
 for (const n of [0, 1, 2, 4]) $('sp' + n).onclick = () => setSpeed(n);
 document.querySelectorAll('#tools button').forEach(b => b.onclick = () => { toolSel = b.dataset.tool; document.querySelectorAll('#tools button').forEach(x => x.classList.toggle('on', x === b)); cv.style.cursor = toolSel === 'pan' ? 'grab' : 'crosshair'; });
@@ -1004,7 +1045,7 @@ function frame(ts) {
     if (n >= 12) acc = 0;
   }
   draw();
-  if (ts - hudT > 200) { hudT = ts; updateHud(); }
+  if (ts - hudT > 200) { hudT = ts; updateHud(); if (ts - (frame.ut || 0) > 500) { frame.ut = ts; updateUnitList(); } }
   requestAnimationFrame(frame);
 }
 function init() {

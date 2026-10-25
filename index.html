@@ -44,10 +44,17 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 #toast{position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:8px 14px;background:#000c;border-radius:20px;display:none}
 .leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:6px}.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
 #tools button.locked{opacity:.5}
+#units{position:fixed;left:8px;top:288px;bottom:92px;width:196px;display:flex;flex-direction:column;padding:6px}
+#uHead{display:flex;justify-content:space-between;padding:2px 6px 6px;cursor:pointer;font-weight:600}
+#uList{overflow-y:auto;flex:1}
+#units.col{bottom:auto}#units.col #uList{display:none}
+.urow{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:12.5px}
+.urow:hover{background:#26322a}.urow.sel{background:#335a2d}
+.urow i{width:9px;height:9px;border-radius:50%;flex:none}.urow span{margin-left:auto;color:var(--mut);font-size:11px}.urow.inf span{color:var(--warn)}
 #alerts{position:fixed;top:104px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:5;max-width:calc(100% - 16px)}
 .alert{display:flex;gap:10px;align-items:center;background:#3a1512ee;border:1px solid var(--bad);border-radius:10px;padding:7px 10px;box-shadow:0 2px 12px #0008}
 .alert button{background:#7a2a24;border-color:var(--bad);white-space:nowrap}
-@media(max-width:700px){#setup{top:auto;height:58%;width:auto;left:8px}#hud{top:112px;min-width:0;font-size:12px;padding:6px 8px}#tools{bottom:auto;top:auto}#title small{display:none}}
+@media(max-width:700px){#setup{top:auto;height:58%;width:auto;left:8px}#hud{top:112px;min-width:0;font-size:12px;padding:6px 8px}#units{top:auto;bottom:92px;height:34%;width:170px}#units.col{height:auto;bottom:92px}#tools{bottom:auto;top:auto}#title small{display:none}}
 </style>
 </head>
 <body>
@@ -72,6 +79,8 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <div><span>Eliminiert</span><b id="hKill">0</b></div>
   <div><span>Verluste</span><b id="hLoss">0</b></div>
 </div>
+
+<div id="units" class="panel" style="display:none"><div id="uHead">Einheiten <b id="uCnt">0</b><span id="uTog">▾</span></div><div id="uList"></div></div>
 
 <div id="tools" class="panel">
   <button data-tool="pan" class="on">✋<span>Kamera</span></button>
