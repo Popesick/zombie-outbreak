@@ -246,16 +246,16 @@ let UL = [];
 let E = [], BAR = [null], noises = [], tracers = [], fx = [], markers = [];
 let S = null;       // Sim-Statistik
 let phase = 'setup', speed = 1, acc = 0;
-let cooldown = { barricade: 0, strike: 0, supply: 0, garrison: 0 };
-const CD_MAX = { barricade: 3, strike: 35, supply: 20, garrison: 30 };
-const MAXUSE = { garrison: 4, strike: 10, supply: 5 };
-const UNLOCK = { garrison: 25, supply: 35, strike: 50 };
+let cooldown = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0 };
+const CD_MAX = { barricade: 3, strike: 0, supply: 20, garrison: 30, evac: 0, truck: 2 };
+const MAXUSE = { garrison: 4, strike: 10, supply: 5, truck: 2 };
+const UNLOCK = { garrison: 25, supply: 35, strike: 50, evac: 50, truck: 70 };
 const selected = new Set();
 let simT = 0, pathBudget = 0, finished = false;
-const K_CIV = 0, K_ZOM = 1, K_POL = 2, K_SOL = 3, K_SEN = 4;
+const K_CIV = 0, K_ZOM = 1, K_POL = 2, K_SOL = 3, K_SEN = 4, K_TRK = 5;
 const ZHP = 4;
 
-function newStats() { return { kills: 0, loss: 0, shots: 0, bites: 0, breaches: 0, zombified: 0, peakZ: 0, peakZt: 0, hist: [], used: { barricade: 0, strike: 0, supply: 0, garrison: 0 }, histT: 0 }; }
+function newStats() { return { kills: 0, loss: 0, shots: 0, bites: 0, breaches: 0, zombified: 0, peakZ: 0, peakZt: 0, hist: [], used: { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0 }, ev: { civ: 0, pol: 0, mil: 0, trk: 0 }, evac: null, evacT: 10, evacUnits: false, histT: 0 }; }
 let uidN = 0;
 function mk(k, x, y) { return { id: ++uidN, k, x, y, hp: k === K_ZOM ? ZHP : 3, st: 0, path: null, pi: 0, th: rnd(0, .4), cd: 0, ammo: 0, acc: 0, armed: false, inc: -1, b: -1, brave: false, wt: rnd(0, 8), tgt: null, dead: false, inT: 0, hx: 0, hy: 0, ft: 0, hmx: x, hmy: y, pt: 0, bt: 0, ord: false, g: 0, ds: 0, dt: 0, pend: null, patrol: null, gsp: 0, lx: x, ly: y, ae: 0 }; }
 const zSpeed = () => 1.5 + cfg.zs / 100 * 6.8;
@@ -307,7 +307,7 @@ function outbreakPoints() {
 function newSim() {
   E = []; BAR = [null]; barId.fill(0); noises = []; tracers = []; fx = []; simT = 0; finished = false;
   for (const b of B) { b.occ = []; b.siege = 0; }
-  S = newStats(); cooldown = { barricade: 0, strike: 0, supply: 0, garrison: 0 };
+  S = newStats(); cooldown = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0 }; evacDirty = false;
   const inside = Math.round(cfg.pop * .5);
   for (let i = 0; i < cfg.pop; i++) spawnCivilian(i < inside);
   const mp = markers.length ? markers : outbreakPoints();
@@ -400,7 +400,7 @@ function noise(x, y, r) {
 function shoot(e, z, rng, dmg) {
   S.shots++;
   tracers.push({ x1: e.x, y1: e.y, x2: z.x, y2: z.y, t: .12 });
-  noise(e.x, e.y, e.k === K_CIV ? 130 : e.k === K_POL ? 170 : 230);
+  if (!(e.k === K_TRK && simT - (e.nt || 0) < .8)) { e.nt = simT; noise(e.x, e.y, e.k === K_CIV ? 130 : e.k === K_POL ? 170 : e.k === K_TRK ? 260 : 230); }
   const d = Math.hypot(z.x - e.x, z.y - e.y);
   if (Math.random() < (e.ae || e.acc) * (1 - .45 * d / rng)) {
     z.hp -= dmg;
@@ -408,7 +408,7 @@ function shoot(e, z, rng, dmg) {
   }
 }
 function infect(e) {
-  if (e.inc >= 0 || e.k === K_ZOM) return;
+  if (e.inc >= 0 || e.k === K_ZOM || e.k === K_TRK) return;
   e.inc = cfg.infT * rnd(.7, 1.3); S.bites++;
 }
 function alertAt(x, y, text) {
@@ -458,6 +458,7 @@ function thinkCivilian(e) {
   }
   if (e.st === 5) { e.st = 0; e.wt = rnd(1, 4); }
   if (e.st === 2 && e.ft <= 0) { e.st = 0; e.wt = rnd(2, 6); }
+  if (S.evac && (e.st === 0 || e.st === 1)) { e.st = 6; e.path = null; }
 }
 function stepCivilian(e) {
   if (e.inc >= 0) { e.inc -= DT; if (e.inc <= 0) { toZombie(e); return; } }
@@ -486,7 +487,9 @@ function stepCivilian(e) {
       }
       break;
     }
+    case 6: evacMove(e, 3.6); break;
     case 4:
+      if (S.evac && !e.evk) { e.evk = 1; e.inT = Math.min(e.inT, rnd(1, 45)); }
       e.inT -= DT;
       if (e.inT <= 0) { const b = B[e.b]; if (b.siege < 1) { b.occ = b.occ.filter(o => o !== e); e.b = -1; e.x = b.ex; e.y = b.ey; e.st = 0; e.wt = rnd(0, 3); } else e.inT = 5; }
       break;
@@ -501,7 +504,13 @@ function stepCivilian(e) {
     }
   }
 }
+function countZAround(x, y, r) {
+  let n = 0; const x0 = Math.max(0, (x - r) / HS | 0), x1 = Math.min(HW - 1, (x + r) / HS | 0), y0 = Math.max(0, (y - r) / HS | 0), y1 = Math.min(HH - 1, (y + r) / HS | 0);
+  for (let gy = y0; gy <= y1; gy++) for (let gx = x0; gx <= x1; gx++) for (let i = hzHead[gy * HW + gx]; i >= 0; i = hzNxt[i]) { const z = E[i]; if (!z.dead && (z.x - x) ** 2 + (z.y - y) ** 2 <= r * r) n++; }
+  return n;
+}
 function giveMove(u, p, patrol) {
+  u.evac = false;
   if (u.ds > 0) {   // erst Stellung räumen, Befehl wird danach ausgeführt
     if (u.ds === 1) u.dt = 60 - u.dt; else if (u.ds === 2) u.dt = 0;
     u.ds = 3; u.pend = { x: p[0], y: p[1], patrol }; return;
@@ -512,16 +521,18 @@ function giveMove(u, p, patrol) {
 }
 function stepUnit(e) {
   if (e.inc >= 0) { e.inc -= DT; if (e.inc <= 0) { toZombie(e); return; } }
-  const rng = e.k === K_SOL || e.k === K_SEN ? 65 : 38, rate = e.k === K_POL ? 1.1 : .7, dmg = e.k === K_POL ? 1.5 : 2.5, mobile = e.k !== K_SEN;
+  const trk = e.k === K_TRK, rng = trk ? 70 : e.k === K_SOL || e.k === K_SEN ? 65 : 38, rate = trk ? .12 : e.k === K_POL ? 1.1 : .7, dmg = trk ? 1 : e.k === K_POL ? 1.5 : 2.5, mobile = e.k !== K_SEN;
   // Eingraben / Stellung räumen
   if (e.ds === 1) { e.dt += DT; if (e.dt >= 60) { e.ds = 2; e.dt = 0; } }
   else if (e.ds === 3) {
     e.dt += DT;
-    if (e.dt >= 60) { e.ds = 0; e.dt = 0; const pd = e.pend; e.pend = null; if (pd) { if (pd.release) { e.ord = false; e.path = null; e.patrol = null; } else giveMove(e, [pd.x, pd.y], pd.patrol); } }
+    if (e.dt >= 60) { e.ds = 0; e.dt = 0; const pd = e.pend; e.pend = null; if (pd) { if (pd.release) { e.ord = false; e.path = null; e.patrol = null; } else if (pd.evacu) e.evac = true; else giveMove(e, [pd.x, pd.y], pd.patrol); } }
   }
   const fixed = e.ds > 0;
   const mv = Math.hypot(e.x - e.lx, e.y - e.ly) > .02; e.lx = e.x; e.ly = e.y;
-  e.ae = e.ds === 2 ? Math.min(1, e.acc + .15) : mv ? Math.max(.1, e.acc - .2) : e.acc;
+  const ba = trk ? Math.max(.15, e.acc - .15) : e.acc;
+  if (trk) { if (mv) e.ang = Math.atan2(e.y - e.ly0, e.x - e.lx0); e.lx0 = e.x; e.ly0 = e.y; if ((e.nz = (e.nz || 0) - DT) <= 0 && (e.nz = .3) && countZAround(e.x, e.y, 5) >= 5) { e.dead = true; toast('🚛 Truck zerstört – von Zombies umlagert'); return; } }
+  e.ae = e.ds === 2 ? Math.min(1, ba + .15) : mv ? Math.max(trk ? .15 : .1, ba - .2) : ba;
   e.cd -= DT; e.th -= DT;
   if (e.th <= 0) { e.th = rnd(.2, .35); e.tgt = nearestZ(e.x, e.y, rng + 15); }
   const z = e.tgt;
@@ -531,7 +542,8 @@ function stepUnit(e) {
       if (d <= rng && e.cd <= 0 && seeLine(e.x, e.y, z.x, z.y)) { e.cd = rate; shoot(e, z, rng, dmg); }
     }
     if (!fixed) {
-      if (e.path) follow(e, e.gsp || (e.k === K_POL ? 4.4 : 4.8), false);
+      if (e.evac) evacMove(e, unitSpeed(e));
+      else if (e.path) follow(e, e.gsp || unitSpeed(e), false);
       else if (e.patrol) {
         e.wt -= DT;
         if (e.wt <= 0) { const q = randWalk(e.patrol.x, e.patrol.y, e.patrol.r, true); if (q) setPath(e, q[0], q[1], false); e.wt = rnd(2, 6) * (1.6 - cfg.patrol / 100 * 1.4) * 2; }
@@ -625,7 +637,13 @@ function step() {
     }
   }
   // Barrikaden
-  for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (b && b.hp <= 0) { for (const c of b.cells) barId[c] = 0; BAR[i] = null; } }
+  for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (b && b.hp <= 0) { for (const c of b.cells) barId[c] = 0; BAR[i] = null; evacDirty = true; } }
+  // Evakuierung
+  if (S.evac) {
+    S.evacT -= DT;
+    if (S.evacT <= 0) { S.evacT = 30; const [sx, sy] = edgeEntry(S.evac.x, S.evac.y); fx.push({ type: 'heli', kind: 'evac', x: sx, y: sy, tx: S.evac.x, ty: S.evac.y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); }
+    if (evacDirty && simT - evLast > 1.5) computeEvacField();
+  }
   // Effekte
   for (let i = noises.length - 1; i >= 0; i--) { noises[i].t -= DT; if (noises[i].t <= 0) noises.splice(i, 1); }
   for (let i = tracers.length - 1; i >= 0; i--) { tracers[i].t -= DT; if (tracers[i].t <= 0) tracers.splice(i, 1); }
@@ -644,13 +662,13 @@ function updateFx() {
     if (f.type === 'heli') {
       if (f.ph === 0) {
         const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy), sp = 48 * DT; f.a = Math.atan2(dy, dx);
-        if (d <= sp) { f.x = f.tx; f.y = f.ty; f.ph = 1; f.t = f.kind === 'garrison' ? 3.5 : 2.2; } else { f.x += dx / d * sp; f.y += dy / d * sp; }
+        if (d <= sp) { f.x = f.tx; f.y = f.ty; f.ph = 1; f.t = f.kind === 'garrison' ? 3.5 : f.kind === 'evac' ? 5 : 2.2; } else { f.x += dx / d * sp; f.y += dy / d * sp; }
       } else if (f.ph === 1) {
         f.t -= DT;
         if (f.t <= 0) {
           f.ph = 2;
-          if (f.kind === 'garrison') landGarrison(f.tx, f.ty); else drop(f.tx, f.ty);
-          fx.push({ type: 'ring', x: f.tx, y: f.ty, r: f.kind === 'garrison' ? 12 : 35, t: 1, T: 1, c: f.kind === 'garrison' ? '120,220,110' : '90,170,255' });
+          if (f.kind === 'garrison') landGarrison(f.tx, f.ty); else if (f.kind === 'evac') doEvac(f.tx, f.ty); else drop(f.tx, f.ty);
+          if (f.kind !== 'evac') fx.push({ type: 'ring', x: f.tx, y: f.ty, r: f.kind === 'garrison' ? 12 : 35, t: 1, T: 1, c: f.kind === 'garrison' ? '120,220,110' : '90,170,255' });
         }
       } else {
         const dx = f.ex - f.x, dy = f.ey - f.y, d = Math.hypot(dx, dy), sp = 60 * DT; f.a = Math.atan2(dy, dx);
@@ -665,16 +683,86 @@ function updateFx() {
     } else { f.t -= DT; if (f.t <= 0) fx.splice(i, 1); }
   }
 }
+let evD = null, evacDirty = false, evLast = -99;
+function computeEvacField() {
+  if (!S || !S.evac) return;
+  evacDirty = false; evLast = simT;
+  if (!evD) evD = new Float32Array(GW * GH);
+  evD.fill(1e9);
+  const s0 = cellIdx(S.evac.x, S.evac.y); hN = 0; evD[s0] = 0; hpush(s0, 0);
+  while (hN > 0) {
+    const f = hF[0], cur = hpop();
+    if (f > evD[cur] + .01) continue;
+    const cx = cur % GW, cy = cur / GW | 0;
+    for (const [dx, dy, m] of NB) {
+      const nx = cx + dx, ny = cy + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+      const ni = ny * GW + nx, c = cost(ni, false); if (!c) continue;
+      if (dx && dy && (!cost(cy * GW + nx, false) || !cost(ny * GW + cx, false))) continue;
+      const nd = f + c * m; if (nd < evD[ni]) { evD[ni] = nd; hpush(ni, nd); }
+    }
+  }
+}
+function evacMove(e, sp) {
+  if (!S.evac || !evD) return;
+  const px = S.evac.x, py = S.evac.y;
+  if (Math.hypot(e.x - px, e.y - py) < 20) return;
+  let ci = cellIdx(e.x, e.y);
+  if (evD[ci] >= 1e8) { moveTo(e, px, py, sp, false); return; }
+  let tx = 0, ty = 0;
+  for (let k = 0; k < 2; k++) {
+    const cx = ci % GW, cy = ci / GW | 0; let bi = ci, bd = evD[ci];
+    for (const [dx, dy] of NB) {
+      const nx = cx + dx, ny = cy + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+      const ni = ny * GW + nx; if (evD[ni] < bd && (!dx || !dy || (cost(cy * GW + nx, false) && cost(ny * GW + cx, false)))) { bd = evD[ni]; bi = ni; }
+    }
+    ci = bi; tx = (ci % GW + .5) * CELL; ty = ((ci / GW | 0) + .5) * CELL;
+  }
+  moveTo(e, tx, ty, sp, false);
+}
+function setEvac(x, y) {
+  const p = randWalk(x, y, 20) || randWalk(x, y, 60); if (!p) return toast('Hier ist kein Evakuierungsort möglich');
+  const first = !S.evac; S.evac = { x: p[0], y: p[1] }; if (first) S.evacT = 10;
+  computeEvacField(); toast(first ? 'Evakuierungsort festgelegt – erster Hubschrauber in ca. 10 s' : 'Evakuierungsort verlegt');
+}
+function evKind(e) { return e.k === K_CIV ? 'civ' : e.k === K_POL ? 'pol' : e.k === K_TRK ? 'trk' : 'mil'; }
+function doEvac(x, y) {
+  const cand = [];
+  for (const e of E) {
+    if (e.dead || e.k === K_ZOM || e.inc >= 0 || (e.k === K_CIV && e.st === 4)) continue;
+    const d = Math.hypot(e.x - x, e.y - y); if (d > 38) continue;
+    if (e.k === K_CIV) cand.push([0, d, e]); else if (S.evacUnits) cand.push([1, d, e]);
+  }
+  cand.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const take = cand.slice(0, 20);
+  for (const [, , e] of take) { e.dead = true; S.ev[evKind(e)]++; }
+  fx.push({ type: 'ring', x, y, r: 30, t: 1, T: 1, c: '255,255,255' });
+  if (take.length) toast('🚁 ' + take.length + ' evakuiert');
+}
+function startUnitEvac() {
+  if (!S.evac) return toast('Erst den Evakuierungsort festlegen (Werkzeug „Evakuierung“)');
+  S.evacUnits = true;
+  for (const u of E) if (friendly(u)) {
+    u.ord = true; u.path = null; u.patrol = null;
+    if (u.ds > 0) { if (u.ds === 1) u.dt = 60 - u.dt; else if (u.ds === 2) u.dt = 0; u.ds = 3; u.pend = { evacu: true }; } else u.evac = true;
+  }
+  toast('Einheiten rücken zum Evakuierungsort vor');
+}
+function score(withAlive) {
+  const ev = S.ev || { civ: 0, pol: 0, mil: 0, trk: 0 }; let civ = ev.civ, pol = ev.pol, mil = ev.mil;
+  if (withAlive) { const c = counts(); civ += c.civ; pol += c.pol; mil += c.mil; }
+  return { civ, pol, mil, pts: civ + pol * 5 + mil * 10 };
+}
 function landGarrison(x, y) {
   for (let i = 0; i < 6; i++) { const p = randWalk(x, y, 9) || randWalk(x, y, 30); if (!p) continue; const e = mk(K_SEN, p[0], p[1]); e.acc = .7; e.armed = true; E.push(e); }
 }
 function lostPct(c) { c = c || counts(); return clamp((cfg.pop - (c.civ - c.inf)) / cfg.pop * 100, 0, 100); }
 function counts() {
-  const c = { civ: 0, inf: 0, zom: 0, pol: 0, mil: 0 };
+  const c = { civ: 0, inf: 0, zom: 0, pol: 0, mil: 0, trk: 0 };
   for (const e of E) {
     if (e.dead) continue;
     if (e.k === K_ZOM) c.zom++;
     else if (e.k === K_CIV) { c.civ++; if (e.inc >= 0) c.inf++; }
+    else if (e.k === K_TRK) c.trk++;
     else if (e.k === K_POL) { c.pol++; if (e.inc >= 0) c.inf++; }
     else { c.mil++; if (e.inc >= 0) c.inf++; }
   }
@@ -686,7 +774,7 @@ function record() {
   if (c.zom > S.peakZ) { S.peakZ = c.zom; S.peakZt = simT; }
   if (S.hist.length > 4000) S.hist = S.hist.filter((_, i) => i % 2 === 0);
   if (phase === 'run' && !finished && simT > 5) {
-    if (c.civ + c.pol + c.mil === 0) endGame('Die Menschheit von Moosburg ist gefallen.');
+    if (c.civ + c.pol + c.mil + c.trk === 0) endGame('Es gibt keine Überlebenden mehr auf der Karte.');
     else if (c.zom === 0 && c.inf === 0) endGame('Der Ausbruch wurde eingedämmt!');
   }
 }
@@ -703,6 +791,7 @@ function drop(x, y) {
 // ───────────────────────── Interventionen ─────────────────────────
 function useTool(tool, x, y, x2, y2) {
   if (phase !== 'run' && tool !== 'infect') return;
+  if (tool === 'demolish') { /* kein Limit */ }
   if (UNLOCK[tool] && lostPct() < UNLOCK[tool]) return toast(`Erst verfügbar, wenn ${UNLOCK[tool]} % der Bevölkerung tot oder verwandelt sind (aktuell ${lostPct().toFixed(0)} %)`);
   if (MAXUSE[tool] && S.used[tool] >= MAXUSE[tool]) return toast('Keine weiteren Einsätze verfügbar (max. ' + MAXUSE[tool] + ')');
   if (tool !== 'infect' && cooldown[tool] > 0) return toast('Noch ' + Math.ceil(cooldown[tool]) + ' s Abklingzeit');
@@ -716,8 +805,18 @@ function useTool(tool, x, y, x2, y2) {
     const cells = new Set(), n = Math.ceil(Math.hypot(x2 - x, y2 - y) / 1.5);
     for (let i = 0; i <= n; i++) { const t = i / n, c = cellIdx(x + (x2 - x) * t, y + (y2 - y) * t); if (type[c] <= T_ROAD) cells.add(c); }
     if (!cells.size) return toast('Hier ist kein Platz für eine Barrikade');
-    const id = BAR.length; for (const c of cells) barId[c] = id;
+    evacDirty = true; const id = BAR.length; for (const c of cells) barId[c] = id;
     BAR.push({ cells: [...cells], hp: 60 + cells.size * 35, max: 60 + cells.size * 35, x: (x + x2) / 2, y: (y + y2) / 2 });
+  } else if (tool === 'demolish') {
+    let best = 0, bd = 12 * 12;
+    for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (!b) continue; for (const c of b.cells) { const d = ((c % GW + .5) * CELL - x) ** 2 + (((c / GW | 0) + .5) * CELL - y) ** 2; if (d < bd) { bd = d; best = i; } } }
+    if (!best) return toast('Hier ist keine Barrikade');
+    for (const c of BAR[best].cells) barId[c] = 0; BAR[best] = null; evacDirty = true; toast('Barrikade eingerissen'); return;
+  } else if (tool === 'evac') { setEvac(x, y); return;
+  } else if (tool === 'truck') {
+    if (Math.min(x, y, WW - x, WH - y) > 70) return toast('Trucks können nur am Kartenrand angefordert werden');
+    const p = randWalk(x, y, 45, true) || randWalk(x, y, 70); if (!p) return toast('Hier kann kein Truck einfahren');
+    const e = mk(K_TRK, p[0], p[1]); e.acc = .7; e.armed = true; e.ord = true; e.hmx = p[0]; e.hmy = p[1]; e.hp = 8; E.push(e);
   } else if (tool === 'strike') {
     const an = Math.random() * 6.283, dx = Math.cos(an), dy = Math.sin(an);
     fx.push({ type: 'jet', x: x - dx * 1400, y: y - dy * 1400, vx: dx * 230, vy: dy * 230, a: an, tx: x, ty: y, lead: 276, dropped: false });
@@ -740,7 +839,7 @@ function serialize() {
   };
 }
 function deserialize(d) {
-  cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; simT = d.simT; cooldown = d.cooldown; finished = false;
+  cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; S.used = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0, ...S.used }; S.ev = S.ev || { civ: 0, pol: 0, mil: 0, trk: 0 }; if (S.evacT == null) S.evacT = 10; evacDirty = !!S.evac; simT = d.simT; cooldown = d.cooldown; finished = false;
   noises = []; tracers = []; fx = d.fx || []; selected.clear(); barId.fill(0); BAR = [null];
   for (const b of B) { b.occ = []; b.siege = 0; }
   E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; if (e.g > gidN) gidN = e.g; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
@@ -799,6 +898,7 @@ function draw() {
   const x0 = cam.x - VW / 2 / cam.z - 5, x1 = cam.x + VW / 2 / cam.z + 5, y0 = cam.y - VH / 2 / cam.z - 5, y1 = cam.y + VH / 2 / cam.z + 5;
   for (const e of E) {
     if (e.dead || e.st === 4 && e.k !== K_ZOM || e.x < x0 || e.x > x1 || e.y < y0 || e.y > y1) continue;
+    if (e.k === K_TRK) continue;
     (e.k === K_ZOM ? groups.zom : e.inc >= 0 ? groups.inf : e.k === K_CIV ? (e.armed ? groups.armed : groups.civ) : e.k === K_POL ? groups.pol : groups.sol).push(e);
   }
   for (const g in groups) {
@@ -807,6 +907,15 @@ function draw() {
     ctx.fill();
     if (cam.z > 1.4 || mapMode !== 'vec') { ctx.strokeStyle = '#000b'; ctx.lineWidth = .35; ctx.stroke(); }
   }
+  // Trucks
+  for (const e of E) if (e.k === K_TRK && !e.dead) {
+    const L = Math.max(8, 13 / cam.z); ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.ang || 0);
+    ctx.fillStyle = '#6b7a3a'; ctx.strokeStyle = '#000b'; ctx.lineWidth = .6 / cam.z; ctx.fillRect(-L / 2, -L * .22, L, L * .44); ctx.strokeRect(-L / 2, -L * .22, L, L * .44);
+    ctx.fillStyle = '#9aab55'; ctx.fillRect(L * .2, -L * .2, L * .28, L * .4);
+    ctx.strokeStyle = '#111'; ctx.lineWidth = Math.max(.5, 1.4 / cam.z); ctx.beginPath(); ctx.moveTo(-L * .1, 0); ctx.lineTo(L * .55, 0); ctx.stroke(); ctx.restore();
+  }
+  // Evakuierungsort
+  if (S && S.evac) { const k = .5 + .5 * Math.sin(performance.now() / 300); ctx.strokeStyle = `rgba(255,255,255,${.5 + .4 * k})`; ctx.lineWidth = 2 / cam.z; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.arc(S.evac.x, S.evac.y, 30, 0, 6.283); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = `bold ${Math.max(14, 26 / cam.z)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('H', S.evac.x, S.evac.y); }
   // Schüsse
   ctx.lineWidth = 1.2 / cam.z + .15; ctx.strokeStyle = '#ffe9a0';
   ctx.beginPath(); for (const t of tracers) { ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); } ctx.stroke();
@@ -817,11 +926,11 @@ function draw() {
   const now = performance.now(), pul = .5 + .5 * Math.sin(now / 90), sz = Math.max(9, 18 / cam.z);
   for (const f of fx) {
     if (f.type === 'heli' || f.type === 'jet') {
-      const col = f.type === 'jet' ? '255,70,50' : f.kind === 'supply' ? '80,170,255' : '120,220,110', rr = f.type === 'jet' ? 30 : f.kind === 'supply' ? 35 : 9;
+      const col = f.type === 'jet' ? '255,70,50' : f.kind === 'supply' ? '80,170,255' : f.kind === 'evac' ? '255,255,255' : '120,220,110', rr = f.type === 'jet' ? 30 : f.kind === 'supply' ? 35 : f.kind === 'evac' ? 30 : 9;
       if (f.type === 'heli' && f.ph < 2 || f.type === 'jet' && !f.dropped) { ctx.strokeStyle = `rgba(${col},${.4 + .5 * pul})`; ctx.lineWidth = 2 / cam.z; ctx.beginPath(); ctx.arc(f.tx, f.ty, rr, 0, 6.283); ctx.stroke(); }
       ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a);
       if (f.type === 'heli') {
-        ctx.fillStyle = f.kind === 'supply' ? '#35557a' : '#3f4d33'; ctx.strokeStyle = '#000a'; ctx.lineWidth = .5 / cam.z;
+        ctx.fillStyle = f.kind === 'supply' ? '#35557a' : f.kind === 'evac' ? '#8a3333' : '#3f4d33'; ctx.strokeStyle = '#000a'; ctx.lineWidth = .5 / cam.z;
         ctx.beginPath(); ctx.ellipse(0, 0, sz * .42, sz * .16, 0, 0, 6.283); ctx.fill(); ctx.stroke();
         ctx.fillRect(-sz * .85, -sz * .03, sz * .5, sz * .06);
         ctx.rotate(now / 40); ctx.strokeStyle = 'rgba(235,235,235,.85)'; ctx.lineWidth = Math.max(.5, 1.5 / cam.z);
@@ -891,7 +1000,8 @@ cv.addEventListener('wheel', e => {
   cam.z = clamp(cam.z * Math.exp(-e.deltaY * .0015), minZ, 6);
   cam.x = wx - (e.clientX - VW / 2) / cam.z; cam.y = wy - (e.clientY - VH / 2) / cam.z; clampCam();
 }, { passive: false });
-const friendly = e => !e.dead && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN);
+const friendly = e => !e.dead && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN || e.k === K_TRK);
+const unitSpeed = u => u.k === K_POL ? 4.4 : u.k === K_TRK ? 8 : 4.8;
 let patrolArmed = false, gidN = 0;
 function addSel(u) { selected.add(u); if (u.g) for (const m of E) if (m.g === u.g && friendly(m)) selected.add(m); }
 function delSel(u) { selected.delete(u); if (u.g) for (const m of [...selected]) if (m.g === u.g) selected.delete(m); }
@@ -938,6 +1048,7 @@ $('bMap').onclick = () => { mapMode = mapMode === 'sat' ? 'osm' : mapMode === 'o
 try { const m = localStorage.getItem('zos_mapmode'); if (MAP_LABEL[m]) mapMode = m; } catch (e) {}
 $('sAllP').onclick = () => { selected.clear(); for (const e of E) if (e.k === K_POL && !e.dead) addSel(e); };
 const selU = () => [...selected].filter(friendly);
+$('bEvacU').onclick = () => startUnitEvac();
 $('sGrp').onclick = () => { const us = selU(); if (us.length < 2) return toast('Mindestens 2 Einheiten auswählen'); const id = ++gidN; for (const u of us) u.g = id; toast('Gruppe G' + id + ' gebildet (' + us.length + ' Einheiten)'); };
 $('sUng').onclick = () => { for (const u of selU()) u.g = 0; toast('Gruppe aufgelöst'); };
 $('sHold').onclick = () => { for (const u of selU()) { if (u.ds === 3) u.pend = null; u.ord = true; u.path = null; u.patrol = null; u.hmx = u.x; u.hmy = u.y; } toast('Stellung wird gehalten'); };
@@ -948,7 +1059,7 @@ $('sAllM').onclick = () => { selected.clear(); for (const e of E) if ((e.k === K
 $('sRel').onclick = () => { for (const u of selected) { if (u.ds > 0) { if (u.ds !== 3) { u.dt = u.ds === 1 ? 60 - u.dt : 0; u.ds = 3; } u.pend = { release: true }; } else { u.ord = false; u.path = null; u.patrol = null; } } toast('Einheiten wieder selbstständig (eingegrabene räumen zuerst)'); };
 $('sClr').onclick = () => selected.clear();
 const uRows = new Map(), uCnt = {};
-const UNAME = { [K_POL]: 'Polizist', [K_SOL]: 'Soldat', [K_SEN]: 'Garnison' }, UCOL = { [K_POL]: COL.pol, [K_SOL]: COL.sol, [K_SEN]: COL.sol };
+const UNAME = { [K_POL]: 'Polizist', [K_SOL]: 'Soldat', [K_SEN]: 'Garnison', [K_TRK]: 'Truck' }, UCOL = { [K_POL]: COL.pol, [K_SOL]: COL.sol, [K_SEN]: COL.sol, [K_TRK]: '#9fb23a' };
 function centerOn(u) { cam.x = u.x; cam.y = u.y; cam.z = Math.max(cam.z, 1.6); clampCam(); }
 function updateUnitList() {
   const box = $('units'); if (phase !== 'run') { box.style.display = 'none'; return; }
@@ -969,7 +1080,7 @@ function updateUnitList() {
     }
     row.classList.toggle('sel', selected.has(u)); row.classList.toggle('inf', u.inc >= 0);
     const gt = u.g ? 'G' + u.g : ''; if (row.children[1].textContent !== gt) row.children[1].textContent = gt;
-    const st = u.inc >= 0 ? '☣ infiziert' : u.ds === 1 ? 'gräbt ' + Math.round(u.dt / .6) + '%' : u.ds === 2 ? 'eingegraben' : u.ds === 3 ? 'räumt ' + Math.round(u.dt / .6) + '%' : u.tgt && !u.tgt.dead && u.tgt.k === K_ZOM ? 'Kampf' : u.patrol ? (u.path ? 'Marsch' : 'Patrouille') : u.ord ? (u.path ? 'Marsch' : 'Position') : u.k === K_SEN ? 'Wache' : u.path ? 'Patrouille' : 'bereit';
+    const st = u.evac ? 'Evakuierung' : u.inc >= 0 ? '☣ infiziert' : u.ds === 1 ? 'gräbt ' + Math.round(u.dt / .6) + '%' : u.ds === 2 ? 'eingegraben' : u.ds === 3 ? 'räumt ' + Math.round(u.dt / .6) + '%' : u.tgt && !u.tgt.dead && u.tgt.k === K_ZOM ? 'Kampf' : u.patrol ? (u.path ? 'Marsch' : 'Patrouille') : u.ord ? (u.path ? 'Marsch' : 'Position') : u.k === K_SEN ? 'Wache' : u.path ? 'Patrouille' : 'bereit';
     const sp = row.lastChild; if (sp.textContent !== st) sp.textContent = st;
   }
   $('uCnt').textContent = us.length;
@@ -1024,12 +1135,14 @@ function endGame(msg) {
 }
 function showStats(title) {
   if (!S) return;
-  const c = counts(), st = S;
+  const c = counts(), st = S, sc = score(finished && c.civ + c.pol + c.mil > 0);
   modal(`<h2>${title || 'Analyse'}</h2>
   <canvas id="chart" width="600" height="220" style="width:100%;height:auto;background:#10161200"></canvas>
   <div class="leg"><span><i style="background:#f1f5f2"></i>Zivilisten</span><span><i style="background:#f0a030"></i>Infizierte</span><span><i style="background:#58c24a"></i>Zombies</span><span><i style="background:#4a8bff"></i>Einsatzkräfte</span></div>
   <table style="margin-top:10px">
   <tr><td>Simulationsdauer</td><td>${fmtT(simT)}</td></tr>
+  <tr><td>Gerettet: Zivilisten / Polizisten / Armeeeinheiten</td><td>${sc.civ} / ${sc.pol} / ${sc.mil}</td></tr>
+  <tr><td><b>Punkte</b> (1 je Zivilist, 5 je Polizist, 10 je Armeeeinheit)</td><td><b>${sc.pts}</b></td></tr>
   <tr><td>Überlebende Zivilisten</td><td>${c.civ} von ${cfg.pop}</td></tr>
   <tr><td>Zombies aktuell / Spitzenwert</td><td>${c.zom} / ${st.peakZ} (bei ${fmtT(st.peakZt)})</td></tr>
   <tr><td>Verwandlungen insgesamt</td><td>${st.zombified}</td></tr>
@@ -1068,12 +1181,13 @@ window.addEventListener('keydown', e => {
 let hudT = 0;
 function updateHud() {
   const c = counts(), g = (id, v) => { const el = $(id); if (el.textContent != v) el.textContent = v; };
+  g('hTrk', c.trk); g('hEvac', S ? (S.ev.civ + S.ev.pol + S.ev.mil + S.ev.trk) : 0); { const show = phase === 'run' && S && c.civ === 0 && c.pol + c.mil + c.trk > 0 && !S.evacUnits; $('bEvacU').style.display = show ? '' : 'none'; if (show && !S.civNote) { S.civNote = 1; toast('Keine Zivilisten mehr – Einheiten können jetzt evakuiert werden'); } }
   g('hCiv', c.civ); g('hInf', c.inf); g('hZom', c.zom); g('hPol', c.pol); g('hMil', c.mil);
   g('hKill', S ? S.kills : 0); g('hLoss', S ? S.loss : 0); g('clock', fmtT(simT));
   for (const u of selected) if (!friendly(u)) selected.delete(u);
   $('selbar').style.display = selected.size ? 'flex' : 'none'; $('selTxt').textContent = selected.size + ' Einheit(en) ausgewählt – Ziel antippen (rechte Maustaste)';
   const pct = phase === 'run' ? lostPct(c) : 0;
-  document.querySelectorAll('#tools button').forEach(b => { const k = b.dataset.tool, el = b.querySelector('.cd'); if (UNLOCK[k]) { const lk = pct < UNLOCK[k]; b.classList.toggle('locked', lk); const sp = b.querySelector('span'); const left = S ? MAXUSE[k] - S.used[k] : MAXUSE[k]; const ex = left <= 0; b.classList.toggle('locked', lk || ex); const t = ex ? sp.dataset.n + ' 0/' + MAXUSE[k] : lk ? 'ab ' + UNLOCK[k] + ' % (' + pct.toFixed(0) + ')' : sp.dataset.n + ' ' + left + '/' + MAXUSE[k]; if (sp.textContent !== t) sp.textContent = t; } if (el) el.style.width = (cooldown[k] > 0 ? cooldown[k] / CD_MAX[k] * 100 : 0) + '%'; });
+  document.querySelectorAll('#tools button').forEach(b => { const k = b.dataset.tool, el = b.querySelector('.cd'); if (UNLOCK[k]) { const lk = pct < UNLOCK[k], mx = MAXUSE[k], left = mx ? (S ? mx - S.used[k] : mx) : 99, ex = left <= 0; b.classList.toggle('locked', lk || ex); const sp = b.querySelector('span'); const t = ex ? sp.dataset.n + ' 0/' + mx : lk ? 'ab ' + UNLOCK[k] + ' % (' + pct.toFixed(0) + ')' : sp.dataset.n + (mx ? ' ' + left + '/' + mx : ''); if (sp.textContent !== t) sp.textContent = t; } if (el) el.style.width = (cooldown[k] > 0 ? cooldown[k] / CD_MAX[k] * 100 : 0) + '%'; });
 }
 
 // ───────────────────────── Hauptschleife ─────────────────────────
