@@ -50,7 +50,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 #units.col{bottom:auto}#units.col #uList{display:none}
 .urow{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:12.5px}
 .urow:hover{background:#26322a}.urow.sel{background:#335a2d}
-.urow i{width:9px;height:9px;border-radius:50%;flex:none}.urow span{margin-left:auto;color:var(--mut);font-size:11px}.urow.inf span{color:var(--warn)}
+.urow i{width:9px;height:9px;border-radius:50%;flex:none}.urow em{font-style:normal;color:var(--acc);font-size:11px}.urow span{margin-left:auto;color:var(--mut);font-size:11px}.urow.inf span{color:var(--warn)}
 #alerts{position:fixed;top:104px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:5;max-width:calc(100% - 16px)}
 .alert{display:flex;gap:10px;align-items:center;background:#3a1512ee;border:1px solid var(--bad);border-radius:10px;padding:7px 10px;box-shadow:0 2px 12px #0008}
 .alert button{background:#7a2a24;border-color:var(--bad);white-space:nowrap}
@@ -98,7 +98,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <div class="row"><label>Ausbruch beginnt <b></b></label><select id="origin" style="width:100%;background:#222c25;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px"><option value="edge">an den Kartenrändern</option><option value="center">in der Kartenmitte</option></select><div class="hint">Mit dem Werkzeug „Zombie“ gesetzte Markierungen haben Vorrang.</div></div>
   <div class="row"><label>Zivilisten <b id="vPop"></b></label><input type="range" id="pop" min="100" max="5000" step="100"></div>
   <div class="row"><label>Start-Infizierte <b id="vInf0"></b></label><input type="range" id="inf0" min="1" max="500"></div>
-  <div class="row"><label>Bewaffnungsrate <b id="vArmed"></b></label><input type="range" id="armed" min="0" max="100"></div>
+  <div class="row"><label>Bewaffnungsrate <b id="vArmed"></b></label><input type="range" id="armed" min="0" max="100"><div class="hint">Deutschland: ca. 6 % der Einwohner besitzen eine Waffe.</div></div>
   <div class="row"><label>Treffsicherheit <b id="vAcc"></b></label><input type="range" id="acc" min="10" max="95"></div>
   <div class="row"><label>Polizei <b id="vPolice"></b></label><input type="range" id="police" min="0" max="60"></div>
   <div class="row"><label>Militär <b id="vMil"></b></label><input type="range" id="mil" min="0" max="80"></div>
@@ -110,7 +110,10 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <p class="hint" style="margin-top:10px">Bedienung: Mausrad/Pinch = Zoom, ziehen = Karte verschieben (bei aktivem Werkzeug: rechte Maustaste oder zwei Finger). Barrikade: Linie ziehen. Einheiten: Werkzeug „Einheiten“, Einheit/Rahmen wählen, dann Ziel antippen (Desktop: rechte Maustaste). Garnison (max. 4) ab 25 %, Versorgung (max. 5) ab 35 %, Luftschlag (max. 10) ab 50 % Verlust/Umwandlung der Bevölkerung.</p>
 </div>
 
-<div id="selbar" class="panel" style="display:none;position:fixed;bottom:84px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:6px;align-items:center;white-space:nowrap"><span id="selTxt"></span><button id="sAllP">Alle Polizei</button><button id="sAllM">Alle Militär</button><button id="sRel">Freigeben</button><button id="sClr">Abwählen</button></div>
+<div id="selbar" class="panel" style="display:none;position:fixed;bottom:84px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 16px)"><span id="selTxt" style="width:100%;text-align:center"></span>
+<button id="sGrp" title="Ausgewählte Einheiten zu einer Gruppe zusammenfassen">🔗 Gruppe</button><button id="sUng" title="Gruppe auflösen">✂ Auflösen</button>
+<button id="sHold" title="Stellung halten: stehen bleiben und auf Sicht schießen">🛡 Halten</button><button id="sDig" title="Eingraben (1 Min.): +15 % Treffsicherheit, aber unbeweglich">⛏ Eingraben</button><button id="sFree" title="Stellung räumen (1 Min.)">🏃 Räumen</button><button id="sPat" title="Danach Ziel antippen: Einheiten patrouillieren dort">🔁 Patrouille</button>
+<button id="sAllP">Alle Polizei</button><button id="sAllM">Alle Militär</button><button id="sRel">Freigeben</button><button id="sClr">Abwählen</button></div>
 <div id="attr" style="position:fixed;right:6px;bottom:2px;font-size:10px;color:#cfd8d2;text-shadow:0 0 3px #000;pointer-events:none"></div>
 <div id="alerts"></div>
 <div id="toast"></div>

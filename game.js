@@ -240,7 +240,7 @@ function nearBuildings(x, y, r, pred) {
 }
 
 // ───────────────────────── Zustand ─────────────────────────
-const DEFAULTS = { pop: 1000, inf0: 20, armed: 12, acc: 35, police: 8, mil: 0, patrol: 50, infT: 20, zs: 50, origin: 'edge' };
+const DEFAULTS = { pop: 1000, inf0: 20, armed: 6, acc: 35, police: 8, mil: 0, patrol: 50, infT: 20, zs: 50, origin: 'edge' };
 let cfg = { ...DEFAULTS };
 let UL = [];
 let E = [], BAR = [null], noises = [], tracers = [], fx = [], markers = [];
@@ -257,7 +257,7 @@ const ZHP = 4;
 
 function newStats() { return { kills: 0, loss: 0, shots: 0, bites: 0, breaches: 0, zombified: 0, peakZ: 0, peakZt: 0, hist: [], used: { barricade: 0, strike: 0, supply: 0, garrison: 0 }, histT: 0 }; }
 let uidN = 0;
-function mk(k, x, y) { return { id: ++uidN, k, x, y, hp: k === K_ZOM ? ZHP : 3, st: 0, path: null, pi: 0, th: rnd(0, .4), cd: 0, ammo: 0, acc: 0, armed: false, inc: -1, b: -1, brave: false, wt: rnd(0, 8), tgt: null, dead: false, inT: 0, hx: 0, hy: 0, ft: 0, hmx: x, hmy: y, pt: 0, bt: 0, ord: false }; }
+function mk(k, x, y) { return { id: ++uidN, k, x, y, hp: k === K_ZOM ? ZHP : 3, st: 0, path: null, pi: 0, th: rnd(0, .4), cd: 0, ammo: 0, acc: 0, armed: false, inc: -1, b: -1, brave: false, wt: rnd(0, 8), tgt: null, dead: false, inT: 0, hx: 0, hy: 0, ft: 0, hmx: x, hmy: y, pt: 0, bt: 0, ord: false, g: 0, ds: 0, dt: 0, pend: null, patrol: null, gsp: 0, lx: x, ly: y, ae: 0 }; }
 const zSpeed = () => 1.5 + cfg.zs / 100 * 6.8;
 const zVision = () => 60 + cfg.zs / 100 * 60;
 
@@ -400,9 +400,9 @@ function noise(x, y, r) {
 function shoot(e, z, rng, dmg) {
   S.shots++;
   tracers.push({ x1: e.x, y1: e.y, x2: z.x, y2: z.y, t: .12 });
-  noise(e.x, e.y, 170);
+  noise(e.x, e.y, e.k === K_CIV ? 130 : e.k === K_POL ? 170 : 230);
   const d = Math.hypot(z.x - e.x, z.y - e.y);
-  if (Math.random() < e.acc * (1 - .45 * d / rng)) {
+  if (Math.random() < (e.ae || e.acc) * (1 - .45 * d / rng)) {
     z.hp -= dmg;
     if (z.hp <= 0 && !z.dead) { z.dead = true; S.kills++; }
   }
@@ -501,21 +501,42 @@ function stepCivilian(e) {
     }
   }
 }
+function giveMove(u, p, patrol) {
+  if (u.ds > 0) {   // erst Stellung räumen, Befehl wird danach ausgeführt
+    if (u.ds === 1) u.dt = 60 - u.dt; else if (u.ds === 2) u.dt = 0;
+    u.ds = 3; u.pend = { x: p[0], y: p[1], patrol }; return;
+  }
+  const path = findPath(u.x, u.y, p[0], p[1], false, 9000);
+  u.ord = true; u.patrol = patrol || null; u.hmx = p[0]; u.hmy = p[1]; u.bt = 0; u.wt = 1;
+  if (path) { u.path = path; u.pi = 0; }
+}
 function stepUnit(e) {
   if (e.inc >= 0) { e.inc -= DT; if (e.inc <= 0) { toZombie(e); return; } }
   const rng = e.k === K_SOL || e.k === K_SEN ? 65 : 38, rate = e.k === K_POL ? 1.1 : .7, dmg = e.k === K_POL ? 1.5 : 2.5, mobile = e.k !== K_SEN;
-  e.cd -= DT; e.th -= DT;
-  if (e.th <= 0) {
-    e.th = rnd(.2, .35);
-    e.tgt = nearestZ(e.x, e.y, rng + 15);
+  // Eingraben / Stellung räumen
+  if (e.ds === 1) { e.dt += DT; if (e.dt >= 60) { e.ds = 2; e.dt = 0; } }
+  else if (e.ds === 3) {
+    e.dt += DT;
+    if (e.dt >= 60) { e.ds = 0; e.dt = 0; const pd = e.pend; e.pend = null; if (pd) { if (pd.release) { e.ord = false; e.path = null; e.patrol = null; } else giveMove(e, [pd.x, pd.y], pd.patrol); } }
   }
+  const fixed = e.ds > 0;
+  const mv = Math.hypot(e.x - e.lx, e.y - e.ly) > .02; e.lx = e.x; e.ly = e.y;
+  e.ae = e.ds === 2 ? Math.min(1, e.acc + .15) : mv ? Math.max(.1, e.acc - .2) : e.acc;
+  e.cd -= DT; e.th -= DT;
+  if (e.th <= 0) { e.th = rnd(.2, .35); e.tgt = nearestZ(e.x, e.y, rng + 15); }
   const z = e.tgt;
-  if (e.ord) {   // direkt gesteuert: unterwegs und am Ziel auf Sicht schießen, nicht selbstständig vorrücken
+  if (e.ord) {   // direkt gesteuert: auf Sicht schießen (auch in Bewegung), nicht selbstständig vorrücken
     if (z && !z.dead && z.k === K_ZOM) {
       const d = Math.hypot(z.x - e.x, z.y - e.y);
       if (d <= rng && e.cd <= 0 && seeLine(e.x, e.y, z.x, z.y)) { e.cd = rate; shoot(e, z, rng, dmg); }
     }
-    if (e.path) follow(e, e.k === K_POL ? 4.4 : 4.8, false);
+    if (!fixed) {
+      if (e.path) follow(e, e.gsp || (e.k === K_POL ? 4.4 : 4.8), false);
+      else if (e.patrol) {
+        e.wt -= DT;
+        if (e.wt <= 0) { const q = randWalk(e.patrol.x, e.patrol.y, e.patrol.r, true); if (q) setPath(e, q[0], q[1], false); e.wt = rnd(2, 6) * (1.6 - cfg.patrol / 100 * 1.4) * 2; }
+      }
+    }
     return;
   }
   if (z && !z.dead && z.k === K_ZOM) {
@@ -539,11 +560,14 @@ function thinkZombie(e) {
   const vis = zVision();
   const h = nearestH(e.x, e.y, vis);
   if (h) { e.tgt = h; e.st = 1; e.lost = 0; return; }
+  // Hören: gehende Zivilisten leise (30 m), fliehende lauter (55 m); Schüsse und Bomben deutlich lauter (siehe noise)
+  const hr = nearest(hhHead, hhNxt, e.x, e.y, 55, false);
+  if (hr) { const d = Math.hypot(hr.x - e.x, hr.y - e.y); if (d < (hr.k === K_CIV && hr.st !== 2 ? 30 : 55)) { e.tgt = hr; e.st = 1; e.lost = 0; return; } }
   if (e.st === 1 && e.tgt && !e.tgt.dead && e.tgt.st !== 4 && e.tgt.k !== K_ZOM && Math.hypot(e.tgt.x - e.x, e.tgt.y - e.y) < vis * 1.6 && (e.lost = (e.lost || 0) + .3) < 6) return;
   if (e.st === 1) { e.st = 0; e.tgt = null; e.wt = 0; }
   // Geräusche
-  let bn = null, bd = 1e9;
-  for (const n of noises) { const d = Math.hypot(n.x - e.x, n.y - e.y); if (d < n.r && d < bd && d > 8) { bd = d; bn = n; } }
+  let bn = null, bd = -1e9;
+  for (const n of noises) { const d = Math.hypot(n.x - e.x, n.y - e.y); if (d < n.r && d > 8 && n.r - d > bd) { bd = n.r - d; bn = n; } }
   if (bn && e.st !== 2 || (bn && e.pt <= 0)) { if (setPath(e, bn.x + rnd(-6, 6), bn.y + rnd(-6, 6), true)) { e.st = 2; e.pt = 3; } return; }
   if (e.st === 2 && !e.path) e.st = 0;
 }
@@ -710,7 +734,7 @@ const SAVE_KEY = n => 'zos_moosburg_slot' + n;
 function serialize() {
   return {
     v: 1, ts: Date.now(), simT, cfg, markers, S, cooldown, fx: fx.map(f => ({ ...f })),
-    E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy]),
+    E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0]),
     bar: BAR.filter(Boolean).map(b => ({ cells: b.cells, hp: b.hp, max: b.max, x: b.x, y: b.y })),
     siege: B.filter(b => b.siege > 0).map(b => [b.idx, b.siege])
   };
@@ -719,7 +743,7 @@ function deserialize(d) {
   cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; simT = d.simT; cooldown = d.cooldown; finished = false;
   noises = []; tracers = []; fx = d.fx || []; selected.clear(); barId.fill(0); BAR = [null];
   for (const b of B) { b.occ = []; b.siege = 0; }
-  E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
+  E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; if (e.g > gidN) gidN = e.g; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
   for (const b of d.bar) { const id = BAR.length; for (const c of b.cells) barId[c] = id; BAR.push(b); }
   for (const [i, s] of d.siege) B[i].siege = s;
 }
@@ -788,6 +812,7 @@ function draw() {
   ctx.beginPath(); for (const t of tracers) { ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); } ctx.stroke();
   // Auswahl
   if (selected.size) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5 / cam.z; ctx.beginPath(); for (const u of selected) if (!u.dead) { ctx.moveTo(u.x + r * 2.2, u.y); ctx.arc(u.x, u.y, r * 2.2, 0, 6.283); } ctx.stroke(); }
+  for (const u of E) if (u.ds > 0 && !u.dead && friendly(u)) { ctx.strokeStyle = u.ds === 2 ? '#c8924a' : '#c8924a88'; ctx.lineWidth = 1.6 / cam.z; ctx.setLineDash(u.ds === 2 ? [] : [3 / cam.z, 3 / cam.z]); ctx.beginPath(); ctx.arc(u.x, u.y, r * 3, 0, 6.283); ctx.stroke(); ctx.setLineDash([]); }
   // Effekte
   const now = performance.now(), pul = .5 + .5 * Math.sin(now / 90), sz = Math.max(9, 18 / cam.z);
   for (const f of fx) {
@@ -867,28 +892,36 @@ cv.addEventListener('wheel', e => {
   cam.x = wx - (e.clientX - VW / 2) / cam.z; cam.y = wy - (e.clientY - VH / 2) / cam.z; clampCam();
 }, { passive: false });
 const friendly = e => !e.dead && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN);
+let patrolArmed = false, gidN = 0;
+function addSel(u) { selected.add(u); if (u.g) for (const m of E) if (m.g === u.g && friendly(m)) selected.add(m); }
+function delSel(u) { selected.delete(u); if (u.g) for (const m of [...selected]) if (m.g === u.g) selected.delete(m); }
 function unitsPointer(d, wx, wy, add) {
   if (d.moved) {
     const x0 = Math.min(d.wx, wx), x1 = Math.max(d.wx, wx), y0 = Math.min(d.wy, wy), y1 = Math.max(d.wy, wy);
     if (!add) selected.clear();
-    for (const e of E) if (friendly(e) && e.x >= x0 && e.x <= x1 && e.y >= y0 && e.y <= y1) selected.add(e);
+    for (const e of E) if (friendly(e) && e.x >= x0 && e.x <= x1 && e.y >= y0 && e.y <= y1) addSel(e);
     return;
   }
   let best = null, bd = (16 / cam.z + 2) ** 2;
   for (const e of E) if (friendly(e)) { const q = (e.x - wx) ** 2 + (e.y - wy) ** 2; if (q < bd) { bd = q; best = e; } }
-  if (best) { if (add) { selected.has(best) ? selected.delete(best) : selected.add(best); } else { selected.clear(); selected.add(best); } }
+  if (best) { if (add) { selected.has(best) ? delSel(best) : addSel(best); } else { selected.clear(); addSel(best); } }
   else if (selected.size) commandMove(wx, wy);
 }
 function commandMove(x, y) {
   const us = [...selected].filter(friendly); if (!us.length) return;
   if (!walkCost(x, y)) { const p = randWalk(x, y, 12); if (!p) return toast('Dorthin kann niemand laufen'); x = p[0]; y = p[1]; }
+  const patrol = patrolArmed; patrolArmed = false; $('sPat').classList.remove('on');
+  const gs = {};
+  for (const u of us) if (u.g) { const o = gs[u.g] || (gs[u.g] = { n: 0, cx: 0, cy: 0, sp: 9 }); o.n++; o.cx += u.x; o.cy += u.y; o.sp = Math.min(o.sp, u.k === K_POL ? 4.4 : 4.8); }
+  for (const k in gs) { gs[k].cx /= gs[k].n; gs[k].cy /= gs[k].n; }
   const rad = 3 + Math.sqrt(us.length) * 3;
   for (const u of us) {
-    const p = randWalk(x, y, rad) || [x, y];
-    const path = findPath(u.x, u.y, p[0], p[1], false, 9000);
-    if (path) { u.path = path; u.pi = 0; u.ord = true; u.hmx = p[0]; u.hmy = p[1]; u.bt = 0; }
+    const o = u.g && gs[u.g]; let p;
+    if (o && o.n > 1) { p = randWalk(x + clamp(u.x - o.cx, -14, 14), y + clamp(u.y - o.cy, -14, 14), 3) || randWalk(x, y, rad) || [x, y]; u.gsp = o.sp; }
+    else { p = randWalk(x, y, rad) || [x, y]; u.gsp = 0; }
+    giveMove(u, p, patrol ? { x, y, r: 70 } : null);
   }
-  fx.push({ type: 'ring', x, y, r: 8, t: .8, T: .8, c: '255,255,255' });
+  fx.push({ type: 'ring', x, y, r: 8, t: .8, T: .8, c: patrol ? '90,170,255' : '255,255,255' });
 }
 function clampCam() { cam.x = clamp(cam.x, 0, WW); cam.y = clamp(cam.y, 0, WH); }
 
@@ -903,9 +936,16 @@ const MAP_LABEL = { sat: '🛰 Satellit', osm: '🗺 OSM-Karte', vec: '▦ Vekto
 function applyMapMode() { preloadTiles(); $('bMap').textContent = MAP_LABEL[mapMode]; $('attr').textContent = mapMode === 'vec' ? 'Kartendaten © OpenStreetMap-Mitwirkende' : TILE_SRC[mapMode].attr; }
 $('bMap').onclick = () => { mapMode = mapMode === 'sat' ? 'osm' : mapMode === 'osm' ? 'vec' : 'sat'; try { localStorage.setItem('zos_mapmode', mapMode); } catch (e) {} applyMapMode(); };
 try { const m = localStorage.getItem('zos_mapmode'); if (MAP_LABEL[m]) mapMode = m; } catch (e) {}
-$('sAllP').onclick = () => { selected.clear(); for (const e of E) if (e.k === K_POL && !e.dead) selected.add(e); };
-$('sAllM').onclick = () => { selected.clear(); for (const e of E) if ((e.k === K_SOL || e.k === K_SEN) && !e.dead) selected.add(e); };
-$('sRel').onclick = () => { for (const u of selected) { u.ord = false; u.path = null; } toast('Einheiten wieder selbstständig'); };
+$('sAllP').onclick = () => { selected.clear(); for (const e of E) if (e.k === K_POL && !e.dead) addSel(e); };
+const selU = () => [...selected].filter(friendly);
+$('sGrp').onclick = () => { const us = selU(); if (us.length < 2) return toast('Mindestens 2 Einheiten auswählen'); const id = ++gidN; for (const u of us) u.g = id; toast('Gruppe G' + id + ' gebildet (' + us.length + ' Einheiten)'); };
+$('sUng').onclick = () => { for (const u of selU()) u.g = 0; toast('Gruppe aufgelöst'); };
+$('sHold').onclick = () => { for (const u of selU()) { if (u.ds === 3) u.pend = null; u.ord = true; u.path = null; u.patrol = null; u.hmx = u.x; u.hmy = u.y; } toast('Stellung wird gehalten'); };
+$('sDig').onclick = () => { for (const u of selU()) if (u.ds === 0) { u.ord = true; u.path = null; u.patrol = null; u.ds = 1; u.dt = 0; } toast('Einheiten graben sich ein (1 Min.)'); };
+$('sFree').onclick = () => { for (const u of selU()) if (u.ds === 1 || u.ds === 2) { u.dt = u.ds === 1 ? 60 - u.dt : 0; u.ds = 3; u.pend = null; } toast('Stellung wird geräumt (1 Min.)'); };
+$('sPat').onclick = () => { patrolArmed = !patrolArmed; $('sPat').classList.toggle('on', patrolArmed); if (patrolArmed) toast('Ziel antippen: Einheiten patrouillieren dort'); };
+$('sAllM').onclick = () => { selected.clear(); for (const e of E) if ((e.k === K_SOL || e.k === K_SEN) && !e.dead) addSel(e); };
+$('sRel').onclick = () => { for (const u of selected) { if (u.ds > 0) { if (u.ds !== 3) { u.dt = u.ds === 1 ? 60 - u.dt : 0; u.ds = 3; } u.pend = { release: true }; } else { u.ord = false; u.path = null; u.patrol = null; } } toast('Einheiten wieder selbstständig (eingegrabene räumen zuerst)'); };
 $('sClr').onclick = () => selected.clear();
 const uRows = new Map(), uCnt = {};
 const UNAME = { [K_POL]: 'Polizist', [K_SOL]: 'Soldat', [K_SEN]: 'Garnison' }, UCOL = { [K_POL]: COL.pol, [K_SOL]: COL.sol, [K_SEN]: COL.sol };
@@ -922,13 +962,14 @@ function updateUnitList() {
     if (!row) {
       uCnt[u.k] = (uCnt[u.k] || 0) + 1;
       row = document.createElement('div'); row.className = 'urow';
-      row.innerHTML = `<i style="background:${UCOL[u.k]}"></i>${UNAME[u.k]} ${uCnt[u.k]}<span></span>`;
-      row.onclick = ev => { if (!ev.shiftKey) selected.clear(); selected.has(u) && ev.shiftKey ? selected.delete(u) : selected.add(u); };
-      row.ondblclick = () => { selected.clear(); selected.add(u); centerOn(u); };
+      row.innerHTML = `<i style="background:${UCOL[u.k]}"></i>${UNAME[u.k]} ${uCnt[u.k]}<em></em><span></span>`;
+      row.onclick = ev => { if (!ev.shiftKey) selected.clear(); selected.has(u) && ev.shiftKey ? delSel(u) : addSel(u); };
+      row.ondblclick = () => { selected.clear(); addSel(u); centerOn(u); };
       uRows.set(u, row); $('uList').appendChild(row);
     }
     row.classList.toggle('sel', selected.has(u)); row.classList.toggle('inf', u.inc >= 0);
-    const st = u.inc >= 0 ? '☣ infiziert' : u.tgt && !u.tgt.dead && u.tgt.k === K_ZOM ? 'Kampf' : u.ord ? (u.path ? 'Marsch' : 'Position') : u.k === K_SEN ? 'Wache' : u.path ? 'Patrouille' : 'bereit';
+    const gt = u.g ? 'G' + u.g : ''; if (row.children[1].textContent !== gt) row.children[1].textContent = gt;
+    const st = u.inc >= 0 ? '☣ infiziert' : u.ds === 1 ? 'gräbt ' + Math.round(u.dt / .6) + '%' : u.ds === 2 ? 'eingegraben' : u.ds === 3 ? 'räumt ' + Math.round(u.dt / .6) + '%' : u.tgt && !u.tgt.dead && u.tgt.k === K_ZOM ? 'Kampf' : u.patrol ? (u.path ? 'Marsch' : 'Patrouille') : u.ord ? (u.path ? 'Marsch' : 'Position') : u.k === K_SEN ? 'Wache' : u.path ? 'Patrouille' : 'bereit';
     const sp = row.lastChild; if (sp.textContent !== st) sp.textContent = st;
   }
   $('uCnt').textContent = us.length;
