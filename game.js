@@ -338,10 +338,11 @@ function rebuildHash() {
   }
 }
 function nearest(head, nxt, x, y, r, needSee) {
-  let best = null, bd = r * r;
+  let best = null, bd = r * r, scanned = 0;
   const x0 = Math.max(0, (x - r) / HS | 0), x1 = Math.min(HW - 1, (x + r) / HS | 0), y0 = Math.max(0, (y - r) / HS | 0), y1 = Math.min(HH - 1, (y + r) / HS | 0);
   for (let gy = y0; gy <= y1; gy++) for (let gx = x0; gx <= x1; gx++)
     for (let i = head[gy * HW + gx]; i >= 0; i = nxt[i]) {
+      if (++scanned > 150) return best;
       const e = E[i]; if (e.dead) continue;
       const d = (e.x - x) ** 2 + (e.y - y) ** 2;
       if (d < bd && (!needSee || seeLine(x, y, e.x, e.y))) { bd = d; best = e; }
@@ -458,7 +459,7 @@ function thinkCivilian(e) {
   }
   if (e.st === 5) { e.st = 0; e.wt = rnd(1, 4); }
   if (e.st === 2 && e.ft <= 0) { e.st = 0; e.wt = rnd(2, 6); }
-  if (S.evac && (e.st === 0 || e.st === 1)) { e.st = 6; e.path = null; }
+  if (S.evac && (e.st === 0 || e.st === 1) && evacCalls(e)) { e.st = 6; e.path = null; }
 }
 function stepCivilian(e) {
   if (e.inc >= 0) { e.inc -= DT; if (e.inc <= 0) { toZombie(e); return; } }
@@ -489,7 +490,7 @@ function stepCivilian(e) {
     }
     case 6: evacMove(e, 3.6); break;
     case 4:
-      if (S.evac && !e.evk) { e.evk = 1; e.inT = Math.min(e.inT, rnd(1, 45)); }
+      if (S.evac && !e.evk && evacCalls(e)) { e.evk = 1; e.inT = Math.min(e.inT, rnd(1, 45)); }
       e.inT -= DT;
       if (e.inT <= 0) { const b = B[e.b]; if (b.siege < 1) { b.occ = b.occ.filter(o => o !== e); e.b = -1; e.x = b.ex; e.y = b.ey; e.st = 0; e.wt = rnd(0, 3); } else e.inT = 5; }
       break;
@@ -640,7 +641,7 @@ function step() {
   for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (b && b.hp <= 0) { for (const c of b.cells) barId[c] = 0; BAR[i] = null; evacDirty = true; } }
   // Evakuierung
   if (S.evac) {
-    S.evacT -= DT;
+    S.evacT -= DT; if (S.evacR != null && S.evacR < 4000) S.evacR += 25 * DT;
     if (S.evacT <= 0) { S.evacT = 30; const [sx, sy] = edgeEntry(S.evac.x, S.evac.y); fx.push({ type: 'heli', kind: 'evac', x: sx, y: sy, tx: S.evac.x, ty: S.evac.y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); }
     if (evacDirty && simT - evLast > 1.5) computeEvacField();
   }
@@ -719,9 +720,11 @@ function evacMove(e, sp) {
   }
   moveTo(e, tx, ty, sp, false);
 }
+// Der Aufruf zum Evakuierungsort breitet sich wellenförmig aus (50 m, +25 m pro Sekunde)
+function evacCalls(e) { return S.evacR == null || Math.hypot(e.x - S.evac.x, e.y - S.evac.y) <= S.evacR; }
 function setEvac(x, y) {
   const p = randWalk(x, y, 20) || randWalk(x, y, 60); if (!p) return toast('Hier ist kein Evakuierungsort möglich');
-  const first = !S.evac; S.evac = { x: p[0], y: p[1] }; if (first) S.evacT = 10;
+  const first = !S.evac; S.evac = { x: p[0], y: p[1] }; S.evacR = 50; if (first) S.evacT = 10;
   computeEvacField(); toast(first ? 'Evakuierungsort festgelegt – erster Hubschrauber in ca. 10 s' : 'Evakuierungsort verlegt');
 }
 function evKind(e) { return e.k === K_CIV ? 'civ' : e.k === K_POL ? 'pol' : e.k === K_TRK ? 'trk' : 'mil'; }
