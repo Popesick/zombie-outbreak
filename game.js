@@ -242,7 +242,7 @@ function nearBuildings(x, y, r, pred) {
 // ───────────────────────── Zustand ─────────────────────────
 const DEFAULTS = { pop: 1000, inf0: 20, armed: 6, acc: 35, police: 8, mil: 0, patrol: 50, infT: 20, zs: 50, origin: 'edge' };
 let cfg = { ...DEFAULTS };
-let UL = [];
+let UL = []; const LEAD = new Map();
 let E = [], BAR = [null], noises = [], tracers = [], fx = [], markers = [];
 let S = null;       // Sim-Statistik
 let phase = 'setup', speed = 1, acc = 0;
@@ -257,7 +257,7 @@ const ZHP = 4;
 
 function newStats() { return { kills: 0, loss: 0, shots: 0, bites: 0, breaches: 0, zombified: 0, peakZ: 0, peakZt: 0, hist: [], used: { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0 }, ev: { civ: 0, pol: 0, mil: 0, trk: 0 }, evac: null, evacT: 10, evacUnits: false, histT: 0 }; }
 let uidN = 0;
-function mk(k, x, y) { return { id: ++uidN, k, x, y, hp: k === K_ZOM ? ZHP : 3, st: 0, path: null, pi: 0, th: rnd(0, .4), cd: 0, ammo: 0, acc: 0, armed: false, inc: -1, b: -1, brave: false, wt: rnd(0, 8), tgt: null, dead: false, inT: 0, hx: 0, hy: 0, ft: 0, hmx: x, hmy: y, pt: 0, bt: 0, ord: false, g: 0, ds: 0, dt: 0, pend: null, patrol: null, gsp: 0, lx: x, ly: y, ae: 0 }; }
+function mk(k, x, y) { return { id: ++uidN, k, x, y, hp: k === K_ZOM ? ZHP : 3, st: 0, path: null, pi: 0, th: rnd(0, .4), cd: 0, ammo: 0, acc: 0, armed: false, inc: -1, b: -1, brave: false, wt: rnd(0, 8), tgt: null, dead: false, inT: 0, hx: 0, hy: 0, ft: 0, hmx: x, hmy: y, pt: 0, bt: 0, ord: false, g: 0, sq: 0, ds: 0, dt: 0, pend: null, patrol: null, gsp: 0, lx: x, ly: y, ae: 0 }; }
 const zSpeed = () => 1.5 + cfg.zs / 100 * 6.8;
 const zVision = () => 60 + cfg.zs / 100 * 60;
 
@@ -304,6 +304,16 @@ function outbreakPoints() {
   }
   return pts;
 }
+// Polizei tritt in Zweier-, Militär in Vierer-Squads auf; ein Rest bildet einen kleineren Squad
+function spawnSquads(kind, total, size, acc) {
+  for (let left = total; left > 0; left -= size) {
+    const n = Math.min(size, left), id = ++gidN, c = anyWalk(true);
+    for (let j = 0; j < n; j++) {
+      const p = randWalk(c[0], c[1], 5) || c; const e = mk(kind, p[0], p[1]);
+      e.hmx = c[0]; e.hmy = c[1]; e.acc = acc; e.armed = true; e.g = id; e.sq = id; E.push(e);
+    }
+  }
+}
 function newSim() {
   E = []; BAR = [null]; barId.fill(0); noises = []; tracers = []; fx = []; simT = 0; finished = false;
   for (const b of B) { b.occ = []; b.siege = 0; }
@@ -319,8 +329,8 @@ function newSim() {
     spawnZombie(p[0], p[1]);
   }
   const home = [];
-  for (let i = 0; i < cfg.police; i++) { const p = anyWalk(true); const e = mk(K_POL, p[0], p[1]); e.hmx = p[0]; e.hmy = p[1]; e.acc = .45; e.armed = true; E.push(e); }
-  for (let i = 0; i < cfg.mil; i++) { const p = anyWalk(true); const e = mk(K_SOL, p[0], p[1]); e.hmx = p[0]; e.hmy = p[1]; e.acc = .7; e.armed = true; E.push(e); }
+  spawnSquads(K_POL, cfg.police, 2, .45);
+  spawnSquads(K_SOL, cfg.mil, 4, .7);
   record();
 }
 
@@ -561,6 +571,13 @@ function stepUnit(e) {
     return;
   }
   if (!mobile) return;
+  const ld = e.sq ? LEAD.get(e.sq) : null;
+  if (ld && ld !== e) {   // Squad: dem Anführer folgen
+    e.wt -= DT;
+    if (Math.hypot(ld.x - e.x, ld.y - e.y) > 8 && (!e.path || e.wt <= 0)) { const q = randWalk(ld.x, ld.y, 5); if (q) setPath(e, q[0], q[1], false); e.wt = 1.5; }
+    if (e.path) follow(e, unitSpeed(e) * 1.1, false);
+    return;
+  }
   if (e.path) { if (!follow(e, 4, false)) e.wt = rnd(2, 6) * (1.6 - cfg.patrol / 100 * 1.4) * 4; return; }
   e.wt -= DT;
   if (e.wt <= 0) {
@@ -623,7 +640,7 @@ function step() {
   if (E.some(e => e.dead)) E = E.filter(e => !e.dead);
   for (const b of B) if (b.occ.length) b.occ = b.occ.filter(o => !o.dead);
   rebuildHash();
-  UL = E.filter(friendly);
+  UL = E.filter(friendly); LEAD.clear(); for (const u of UL) if (u.sq && u.k !== K_TRK && !LEAD.has(u.sq)) LEAD.set(u.sq, u);
   for (let i = 0; i < E.length; i++) {
     const e = E[i]; if (e.dead) continue;
     if (e.k === K_ZOM) stepZombie(e);
@@ -756,7 +773,8 @@ function score(withAlive) {
   return { civ, pol, mil, pts: civ + pol * 5 + mil * 10 };
 }
 function landGarrison(x, y) {
-  for (let i = 0; i < 6; i++) { const p = randWalk(x, y, 9) || randWalk(x, y, 30); if (!p) continue; const e = mk(K_SEN, p[0], p[1]); e.acc = .7; e.armed = true; E.push(e); }
+  const id = ++gidN;
+  for (let i = 0; i < 4; i++) { const p = randWalk(x, y, 9) || randWalk(x, y, 30); if (!p) continue; const e = mk(K_SEN, p[0], p[1]); e.acc = .7; e.armed = true; e.g = id; e.sq = id; E.push(e); }
 }
 function lostPct(c) { c = c || counts(); return clamp((cfg.pop - (c.civ - c.inf)) / cfg.pop * 100, 0, 100); }
 function counts() {
@@ -836,7 +854,7 @@ const SAVE_KEY = n => 'zos_moosburg_slot' + n;
 function serialize() {
   return {
     v: 1, ts: Date.now(), simT, cfg, markers, S, cooldown, fx: fx.map(f => ({ ...f })),
-    E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0]),
+    E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0, e.sq]),
     bar: BAR.filter(Boolean).map(b => ({ cells: b.cells, hp: b.hp, max: b.max, x: b.x, y: b.y })),
     siege: B.filter(b => b.siege > 0).map(b => [b.idx, b.siege])
   };
@@ -845,7 +863,7 @@ function deserialize(d) {
   cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; S.used = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0, ...S.used }; S.ev = S.ev || { civ: 0, pol: 0, mil: 0, trk: 0 }; if (S.evacT == null) S.evacT = 10; evacDirty = !!S.evac; simT = d.simT; cooldown = d.cooldown; finished = false;
   noises = []; tracers = []; fx = d.fx || []; selected.clear(); barId.fill(0); BAR = [null];
   for (const b of B) { b.occ = []; b.siege = 0; }
-  E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; if (e.g > gidN) gidN = e.g; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
+  E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; e.sq = a[17] || 0; if (e.g > gidN) gidN = e.g; if (e.sq > gidN) gidN = e.sq; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
   for (const b of d.bar) { const id = BAR.length; for (const c of b.cells) barId[c] = id; BAR.push(b); }
   for (const [i, s] of d.siege) B[i].siege = s;
 }
@@ -1053,7 +1071,7 @@ $('sAllP').onclick = () => { selected.clear(); for (const e of E) if (e.k === K_
 const selU = () => [...selected].filter(friendly);
 $('bEvacU').onclick = () => startUnitEvac();
 $('sGrp').onclick = () => { const us = selU(); if (us.length < 2) return toast('Mindestens 2 Einheiten auswählen'); const id = ++gidN; for (const u of us) u.g = id; toast('Gruppe G' + id + ' gebildet (' + us.length + ' Einheiten)'); };
-$('sUng').onclick = () => { for (const u of selU()) u.g = 0; toast('Gruppe aufgelöst'); };
+$('sUng').onclick = () => { for (const u of selU()) u.g = u.sq; toast('Gruppe aufgelöst (Squads bleiben bestehen)'); };
 $('sHold').onclick = () => { for (const u of selU()) { if (u.ds === 3) u.pend = null; u.ord = true; u.path = null; u.patrol = null; u.hmx = u.x; u.hmy = u.y; } toast('Stellung wird gehalten'); };
 $('sDig').onclick = () => { for (const u of selU()) if (u.ds === 0) { u.ord = true; u.path = null; u.patrol = null; u.ds = 1; u.dt = 0; } toast('Einheiten graben sich ein (1 Min.)'); };
 $('sFree').onclick = () => { for (const u of selU()) if (u.ds === 1 || u.ds === 2) { u.dt = u.ds === 1 ? 60 - u.dt : 0; u.ds = 3; u.pend = null; } toast('Stellung wird geräumt (1 Min.)'); };
@@ -1082,7 +1100,7 @@ function updateUnitList() {
       uRows.set(u, row); $('uList').appendChild(row);
     }
     row.classList.toggle('sel', selected.has(u)); row.classList.toggle('inf', u.inc >= 0);
-    const gt = u.g ? 'G' + u.g : ''; if (row.children[1].textContent !== gt) row.children[1].textContent = gt;
+    const gt = u.g ? (u.g === u.sq ? 'S' : 'G') + u.g : ''; if (row.children[1].textContent !== gt) row.children[1].textContent = gt;
     const st = u.evac ? 'Evakuierung' : u.inc >= 0 ? '☣ infiziert' : u.ds === 1 ? 'gräbt ' + Math.round(u.dt / .6) + '%' : u.ds === 2 ? 'eingegraben' : u.ds === 3 ? 'räumt ' + Math.round(u.dt / .6) + '%' : u.tgt && !u.tgt.dead && u.tgt.k === K_ZOM ? 'Kampf' : u.patrol ? (u.path ? 'Marsch' : 'Patrouille') : u.ord ? (u.path ? 'Marsch' : 'Position') : u.k === K_SEN ? 'Wache' : u.path ? 'Patrouille' : 'bereit';
     const sp = row.lastChild; if (sp.textContent !== st) sp.textContent = st;
   }
