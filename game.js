@@ -688,12 +688,12 @@ let evD = null, evacDirty = false, evLast = -99;
 function computeEvacField() {
   if (!S || !S.evac) return;
   evacDirty = false; evLast = simT;
-  if (!evD) evD = new Float32Array(GW * GH);
+  if (!evD) evD = new Float64Array(GW * GH);
   evD.fill(1e9);
   const s0 = cellIdx(S.evac.x, S.evac.y); hN = 0; evD[s0] = 0; hpush(s0, 0);
   while (hN > 0) {
     const f = hF[0], cur = hpop();
-    if (f > evD[cur] + .01) continue;
+    if (f > evD[cur]) continue;
     const cx = cur % GW, cy = cur / GW | 0;
     for (const [dx, dy, m] of NB) {
       const nx = cx + dx, ny = cy + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
@@ -1199,11 +1199,12 @@ function frame(ts) {
   const rdt = Math.min(.1, (ts - last) / 1000); last = ts;
   if (phase === 'run' && speed > 0) {
     acc += rdt * speed; let n = 0;
-    while (acc >= DT && n < 12) { step(); acc -= DT; n++; }
+    try { while (acc >= DT && n < 12) { step(); acc -= DT; n++; } }
+    catch (err) { console.error(err); setSpeed(0); toast('Interner Fehler – Simulation pausiert. Speichern ist weiter möglich.'); }
     if (n >= 12) acc = 0;
   }
-  draw();
-  if (ts - hudT > 200) { hudT = ts; updateHud(); if (ts - (frame.ut || 0) > 500) { frame.ut = ts; updateUnitList(); } }
+  try { draw(); } catch (err) { console.error(err); }
+  if (ts - hudT > 200) { hudT = ts; try { updateHud(); if (ts - (frame.ut || 0) > 500) { frame.ut = ts; updateUnitList(); } } catch (err) { console.error(err); } }
   requestAnimationFrame(frame);
 }
 function init() {
