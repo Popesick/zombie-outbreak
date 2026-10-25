@@ -44,6 +44,9 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 #toast{position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:8px 14px;background:#000c;border-radius:20px;display:none}
 .leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:6px}.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
 #tools button.locked{opacity:.5}
+#alerts{position:fixed;top:104px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:5;max-width:calc(100% - 16px)}
+.alert{display:flex;gap:10px;align-items:center;background:#3a1512ee;border:1px solid var(--bad);border-radius:10px;padding:7px 10px;box-shadow:0 2px 12px #0008}
+.alert button{background:#7a2a24;border-color:var(--bad);white-space:nowrap}
 @media(max-width:700px){#setup{top:auto;height:58%;width:auto;left:8px}#hud{top:112px;min-width:0;font-size:12px;padding:6px 8px}#tools{bottom:auto;top:auto}#title small{display:none}}
 </style>
 </head>
@@ -95,11 +98,12 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <div class="row"><label>Zombie-Typ <b id="vZs"></b></label><input type="range" id="zs" min="0" max="100"><div class="hint">0 = klassisch (langsam) · 100 = modern (schnell, rennt Zivilisten nieder)</div></div>
   <div class="btns"><button class="big" id="bStart">▶ Simulation starten</button><button id="bResume" style="display:none">Autosave fortsetzen</button></div>
   <div class="leg"><span><i style="background:#f1f5f2"></i>Zivilist</span><span><i style="background:#ffe066"></i>bewaffnet</span><span><i style="background:#f0a030"></i>infiziert</span><span><i style="background:#58c24a"></i>Zombie</span><span><i style="background:#4a8bff"></i>Polizei</span><span><i style="background:#b9a24a"></i>Militär</span></div>
-  <p class="hint" style="margin-top:10px">Bedienung: Mausrad/Pinch = Zoom, ziehen = Karte verschieben (bei aktivem Werkzeug: rechte Maustaste oder zwei Finger). Barrikade: Linie ziehen. Einheiten: Werkzeug „Einheiten“, Einheit/Rahmen wählen, dann Ziel antippen (Desktop: rechte Maustaste). Garnison ab 25 %, Versorgung ab 35 %, Luftschlag ab 50 % Verlust/Umwandlung der Bevölkerung.</p>
+  <p class="hint" style="margin-top:10px">Bedienung: Mausrad/Pinch = Zoom, ziehen = Karte verschieben (bei aktivem Werkzeug: rechte Maustaste oder zwei Finger). Barrikade: Linie ziehen. Einheiten: Werkzeug „Einheiten“, Einheit/Rahmen wählen, dann Ziel antippen (Desktop: rechte Maustaste). Garnison (max. 4) ab 25 %, Versorgung (max. 5) ab 35 %, Luftschlag (max. 10) ab 50 % Verlust/Umwandlung der Bevölkerung.</p>
 </div>
 
 <div id="selbar" class="panel" style="display:none;position:fixed;bottom:84px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:6px;align-items:center;white-space:nowrap"><span id="selTxt"></span><button id="sAllP">Alle Polizei</button><button id="sAllM">Alle Militär</button><button id="sRel">Freigeben</button><button id="sClr">Abwählen</button></div>
 <div id="attr" style="position:fixed;right:6px;bottom:2px;font-size:10px;color:#cfd8d2;text-shadow:0 0 3px #000;pointer-events:none"></div>
+<div id="alerts"></div>
 <div id="toast"></div>
 <div id="modal"><div class="box panel" id="mbox"></div></div>
 <script src="map-data.js"></script>

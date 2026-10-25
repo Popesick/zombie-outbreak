@@ -236,6 +236,7 @@ let S = null;       // Sim-Statistik
 let phase = 'setup', speed = 1, acc = 0;
 let cooldown = { barricade: 0, strike: 0, supply: 0, garrison: 0 };
 const CD_MAX = { barricade: 3, strike: 35, supply: 20, garrison: 30 };
+const MAXUSE = { garrison: 4, strike: 10, supply: 5 };
 const UNLOCK = { garrison: 25, supply: 35, strike: 50 };
 const selected = new Set();
 let simT = 0, pathBudget = 0, finished = false;
@@ -298,6 +299,8 @@ function newSim() {
   for (let i = 0; i < cfg.pop; i++) spawnCivilian(i < inside);
   const mp = markers.length ? markers : outbreakPoints();
   const rad = 14 + Math.sqrt(cfg.inf0 / mp.length) * 4;
+  document.getElementById('alerts').innerHTML = '';
+  mp.slice(0, 3).forEach((m, i) => alertAt(m.x, m.y, 'Zombies aufgetaucht' + (mp.length > 1 ? ' (Herd ' + (i + 1) + ')' : '')));
   for (let i = 0; i < cfg.inf0; i++) {
     const m = mp[i % mp.length]; const p = randWalk(m.x, m.y, rad) || randWalk(m.x, m.y, rad * 3) || anyWalk(true);
     spawnZombie(p[0], p[1]);
@@ -395,8 +398,17 @@ function infect(e) {
   if (e.inc >= 0 || e.k === K_ZOM) return;
   e.inc = cfg.infT * rnd(.7, 1.3); S.bites++;
 }
+function alertAt(x, y, text) {
+  const box = document.getElementById('alerts'); if (!box) return;
+  while (box.children.length >= 3) box.firstChild.remove();
+  const d = document.createElement('div'); d.className = 'alert';
+  d.innerHTML = '<span>⚠ ' + text + '</span><button>Hinspringen</button>';
+  d.querySelector('button').onclick = () => { cam.x = x; cam.y = y; cam.z = Math.max(cam.z, 1.3); clampCam(); d.remove(); };
+  box.appendChild(d); setTimeout(() => d.remove(), 14000);
+}
 function toZombie(e) {
   e.k = K_ZOM; e.hp = ZHP; e.inc = -1; e.st = 0; e.path = null; e.armed = false; e.tgt = null; e.wt = 0; S.zombified++;
+  if (simT - (S.lastAlert || -99) > 10 && !nearest(hzHead, hzNxt, e.x, e.y, 150, false)) { S.lastAlert = simT; alertAt(e.x, e.y, 'Neuer Zombie-Ausbruch gemeldet'); }
   if (e.b >= 0) { const b = B[e.b]; b.occ = b.occ.filter(o => o !== e); e.b = -1; e.x = b.ex; e.y = b.ey; breach(b, .6); }
 }
 function breach(b, p) {
@@ -655,6 +667,7 @@ function drop(x, y) {
 function useTool(tool, x, y, x2, y2) {
   if (phase !== 'run' && tool !== 'infect') return;
   if (UNLOCK[tool] && lostPct() < UNLOCK[tool]) return toast(`Erst verfügbar, wenn ${UNLOCK[tool]} % der Bevölkerung tot oder verwandelt sind (aktuell ${lostPct().toFixed(0)} %)`);
+  if (MAXUSE[tool] && S.used[tool] >= MAXUSE[tool]) return toast('Keine weiteren Einsätze verfügbar (max. ' + MAXUSE[tool] + ')');
   if (tool !== 'infect' && cooldown[tool] > 0) return toast('Noch ' + Math.ceil(cooldown[tool]) + ' s Abklingzeit');
   if (tool === 'infect') {
     if (phase === 'setup') { markers.push({ x, y }); return; }
@@ -978,7 +991,7 @@ function updateHud() {
   for (const u of selected) if (!friendly(u)) selected.delete(u);
   $('selbar').style.display = selected.size ? 'flex' : 'none'; $('selTxt').textContent = selected.size + ' Einheit(en) ausgewählt – Ziel antippen (rechte Maustaste)';
   const pct = phase === 'run' ? lostPct(c) : 0;
-  document.querySelectorAll('#tools button').forEach(b => { const k = b.dataset.tool, el = b.querySelector('.cd'); if (UNLOCK[k]) { const lk = pct < UNLOCK[k]; b.classList.toggle('locked', lk); const sp = b.querySelector('span'); const t = lk ? 'ab ' + UNLOCK[k] + ' % (' + pct.toFixed(0) + ')' : sp.dataset.n; if (sp.textContent !== t) sp.textContent = t; } if (el) el.style.width = (cooldown[k] > 0 ? cooldown[k] / CD_MAX[k] * 100 : 0) + '%'; });
+  document.querySelectorAll('#tools button').forEach(b => { const k = b.dataset.tool, el = b.querySelector('.cd'); if (UNLOCK[k]) { const lk = pct < UNLOCK[k]; b.classList.toggle('locked', lk); const sp = b.querySelector('span'); const left = S ? MAXUSE[k] - S.used[k] : MAXUSE[k]; const ex = left <= 0; b.classList.toggle('locked', lk || ex); const t = ex ? sp.dataset.n + ' 0/' + MAXUSE[k] : lk ? 'ab ' + UNLOCK[k] + ' % (' + pct.toFixed(0) + ')' : sp.dataset.n + ' ' + left + '/' + MAXUSE[k]; if (sp.textContent !== t) sp.textContent = t; } if (el) el.style.width = (cooldown[k] > 0 ? cooldown[k] / CD_MAX[k] * 100 : 0) + '%'; });
 }
 
 // ───────────────────────── Hauptschleife ─────────────────────────
