@@ -3,12 +3,10 @@
    Karte: OpenStreetMap-Daten (ODbL), Spielwelt in Metern, Navigationsraster 4 m. */
 
 // ───────────────────────── Welt & Raster ─────────────────────────
-const CELL = 4, WW = MAP_DATA.w, WH = MAP_DATA.h;
-const GW = Math.ceil(WW / CELL), GH = Math.ceil(WH / CELL);
+const CELL = 4;
+let MD = null, WW = 0, WH = 0, GW = 0, GH = 0;   // aktuelle Karte (siehe setupMap)
 const T_OPEN = 0, T_ROAD = 1, T_BLD = 2, T_WATER = 3;
-const type = new Uint8Array(GW * GH);
-const comp = new Uint8Array(GW * GH);      // 1 = Hauptzusammenhangskomponente
-const barId = new Uint16Array(GW * GH);    // Barrikaden-ID je Zelle
+let type, comp, barId;   // comp: 1 = Hauptzusammenhangskomponente, barId: Barrikaden-ID je Zelle
 const DT = 1 / 30;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -28,15 +26,15 @@ function rasterMask(sc, fn) {
 function buildGrid() {
   const water = rasterMask(CELL, c => {
     c.fillStyle = c.strokeStyle = '#000';
-    for (const w of MAP_DATA.water) { if (w.poly) { strokePoly(c, w.p, true); c.fill(); } else { c.lineWidth = w.w; strokePoly(c, w.p); c.stroke(); } }
+    for (const w of MD.water) { if (w.poly) { strokePoly(c, w.p, true); c.fill(); } else { c.lineWidth = w.w; strokePoly(c, w.p); c.stroke(); } }
   });
   const roads = rasterMask(CELL, c => {
     c.strokeStyle = '#000';
-    for (const r of MAP_DATA.roads) { c.lineWidth = Math.max(r.w, 6); strokePoly(c, r.p); c.stroke(); }
+    for (const r of MD.roads) { c.lineWidth = Math.max(r.w, 6); strokePoly(c, r.p); c.stroke(); }
   });
   const blds = rasterMask(CELL, c => {
     c.fillStyle = '#000';
-    for (const b of MAP_DATA.blds) { strokePoly(c, b, true); c.fill(); }
+    for (const b of MD.blds) { strokePoly(c, b, true); c.fill(); }
   });
   for (let i = 0; i < GW * GH; i++) {
     const a = i * 4 + 3;
@@ -65,7 +63,7 @@ function buildGrid() {
 // Vorgerenderte Karte
 const RS = 2;
 let mapCv, ovCv;
-const LAT0 = 48.4790, LON0 = 11.9280, KX = 111320 * Math.cos(48.47 * Math.PI / 180), KY = 110574;
+let LAT0 = 48.4790, LON0 = 11.9280, KX = 111320 * Math.cos(48.47 * Math.PI / 180), KY = 110574;
 const TILE_SRC = {
   sat: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 18, attr: 'Bilder © Esri, Maxar, Earthstar Geographics · Daten © OpenStreetMap-Mitwirkende' },
   osm: { url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`, max: 19, attr: '© OpenStreetMap-Mitwirkende' }
@@ -116,8 +114,8 @@ function renderMap() {
   c.scale(RS, RS); c.lineCap = 'round'; c.lineJoin = 'round';
   c.fillStyle = '#26352a'; c.fillRect(0, 0, WW, WH);
   c.fillStyle = '#1d4a73'; c.strokeStyle = '#1d4a73';
-  for (const w of MAP_DATA.water) { if (w.poly) { strokePoly(c, w.p, true); c.fill(); } else { c.lineWidth = w.w; strokePoly(c, w.p); c.stroke(); } }
-  const rs = MAP_DATA.roads.slice().sort((a, b) => a.c - b.c);
+  for (const w of MD.water) { if (w.poly) { strokePoly(c, w.p, true); c.fill(); } else { c.lineWidth = w.w; strokePoly(c, w.p); c.stroke(); } }
+  const rs = MD.roads.slice().sort((a, b) => a.c - b.c);
   c.strokeStyle = '#101315';
   for (const r of rs) { c.lineWidth = r.w + 2.4; strokePoly(c, r.p); c.stroke(); }
   for (const r of rs) {
@@ -125,14 +123,14 @@ function renderMap() {
     c.lineWidth = r.w; strokePoly(c, r.p); c.stroke();
   }
   c.fillStyle = '#8c8176'; c.strokeStyle = '#2e2924'; c.lineWidth = 0.6;
-  for (const b of MAP_DATA.blds) { strokePoly(c, b, true); c.fill(); c.stroke(); }
+  for (const b of MD.blds) { strokePoly(c, b, true); c.fill(); c.stroke(); }
   // Transparente Überlagerung für Satelliten-/OSM-Hintergrund
   ovCv = document.createElement('canvas'); ovCv.width = WW * RS; ovCv.height = WH * RS;
   const o = ovCv.getContext('2d'); o.scale(RS, RS); o.lineCap = 'round'; o.lineJoin = 'round';
   o.strokeStyle = 'rgba(255,255,255,.22)';
   for (const r of rs) { o.lineWidth = Math.max(.8, r.w * .35); strokePoly(o, r.p); o.stroke(); }
   o.strokeStyle = 'rgba(255,170,90,.55)'; o.fillStyle = 'rgba(255,140,60,.12)'; o.lineWidth = .5;
-  for (const b of MAP_DATA.blds) { strokePoly(o, b, true); o.fill(); o.stroke(); }
+  for (const b of MD.blds) { strokePoly(o, b, true); o.fill(); o.stroke(); }
 }
 
 // ───────────────────────── Pfadfindung (A*) ─────────────────────────
@@ -143,7 +141,7 @@ function cost(i, zm) {
   return t === T_ROAD ? 1 : 1.6;
 }
 const walkCost = (x, y, zm) => (x < 0 || y < 0 || x >= WW || y >= WH) ? 0 : cost((y / CELL | 0) * GW + (x / CELL | 0), zm);
-const gS = new Uint32Array(GW * GH), gD = new Uint32Array(GW * GH), gG = new Float32Array(GW * GH), gP = new Int32Array(GW * GH);
+let gS, gD, gG, gP;
 let stampN = 0, hI = [], hF = [], hN = 0;
 function hpush(i, f) { let k = hN++; while (k > 0) { const p = (k - 1) >> 1; if (hF[p] <= f) break; hI[k] = hI[p]; hF[k] = hF[p]; k = p; } hI[k] = i; hF[k] = f; }
 function hpop() {
@@ -207,7 +205,7 @@ function findPath(sx, sy, tx, ty, zm, maxExp = 6000) {
 const B = [];
 const bHash = new Map(), BHS = 32;
 function buildBuildings() {
-  for (const p of MAP_DATA.blds) {
+  for (const p of MD.blds) {
     let cx = 0, cy = 0, a = 0; const n = p.length / 2;
     for (let i = 0; i < n; i++) { cx += p[i * 2]; cy += p[i * 2 + 1]; const j = (i + 1) % n; a += p[i * 2] * p[j * 2 + 1] - p[j * 2] * p[i * 2 + 1]; }
     cx /= n; cy /= n; a = Math.abs(a) / 2;
@@ -247,7 +245,7 @@ let E = [], BAR = [null], noises = [], tracers = [], fx = [], markers = [];
 let S = null;       // Sim-Statistik
 let phase = 'setup', speed = 1, acc = 0;
 let cooldown = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0 };
-const CD_MAX = { barricade: 3, strike: 0, supply: 20, garrison: 30, evac: 0, truck: 2 };
+const CD_MAX = { barricade: 0, strike: 0, supply: 20, garrison: 30, evac: 0, truck: 2 };
 const MAXUSE = { garrison: 4, strike: 10, supply: 5, truck: 2 };
 const UNLOCK = { garrison: 25, supply: 35, strike: 50, evac: 50, truck: 70 };
 const selected = new Set();
@@ -255,7 +253,8 @@ let simT = 0, pathBudget = 0, finished = false;
 const K_CIV = 0, K_ZOM = 1, K_POL = 2, K_SOL = 3, K_SEN = 4, K_TRK = 5;
 const ZHP = 4;
 
-function newStats() { return { kills: 0, loss: 0, shots: 0, bites: 0, breaches: 0, zombified: 0, peakZ: 0, peakZt: 0, hist: [], used: { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0 }, ev: { civ: 0, pol: 0, mil: 0, trk: 0 }, evac: null, evacT: 10, evacUnits: false, histT: 0 }; }
+let RULES = { barLimit: 50, barHpMul: 2 };
+function newStats() { return { plans: [], planId: 0, kills: 0, loss: 0, shots: 0, bites: 0, breaches: 0, zombified: 0, peakZ: 0, peakZt: 0, hist: [], used: { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0 }, ev: { civ: 0, pol: 0, mil: 0, trk: 0 }, evac: null, evacT: 10, evacUnits: false, histT: 0 }; }
 let uidN = 0;
 function mk(k, x, y) { return { id: ++uidN, k, x, y, hp: k === K_ZOM ? ZHP : 3, st: 0, path: null, pi: 0, th: rnd(0, .4), cd: 0, ammo: 0, acc: 0, armed: false, inc: -1, b: -1, brave: false, wt: rnd(0, 8), tgt: null, dead: false, inT: 0, hx: 0, hy: 0, ft: 0, hmx: x, hmy: y, pt: 0, bt: 0, ord: false, g: 0, sq: 0, ds: 0, dt: 0, pend: null, patrol: null, gsp: 0, lx: x, ly: y, ae: 0 }; }
 const zSpeed = () => 1.5 + cfg.zs / 100 * 6.8;
@@ -335,8 +334,8 @@ function newSim() {
 }
 
 // ───────────────────────── Räumliche Hashes ─────────────────────────
-const HS = 16, HW = Math.ceil(WW / HS), HH = Math.ceil(WH / HS);
-const hzHead = new Int32Array(HW * HH), hhHead = new Int32Array(HW * HH);
+const HS = 16;
+let HW = 0, HH = 0, hzHead, hhHead;
 let hzNxt = new Int32Array(4096), hhNxt = new Int32Array(4096);
 function rebuildHash() {
   hzHead.fill(-1); hhHead.fill(-1);
@@ -662,6 +661,7 @@ function step() {
   }
   // Barrikaden
   for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (b && b.hp <= 0) { for (const c of b.cells) barId[c] = 0; BAR[i] = null; evacDirty = true; } }
+  dispatchBuild();
   // Evakuierung
   if (S.evac) {
     S.evacT -= DT; if (S.evacR != null && S.evacR < 4000) S.evacR += 25 * DT;
@@ -686,10 +686,14 @@ function updateFx() {
     if (f.type === 'heli') {
       if (f.ph === 0) {
         const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy), sp = 48 * DT; f.a = Math.atan2(dy, dx);
-        if (d <= sp) { f.x = f.tx; f.y = f.ty; f.ph = 1; f.t = f.kind === 'garrison' ? 3.5 : f.kind === 'evac' ? 5 : 2.2; } else { f.x += dx / d * sp; f.y += dy / d * sp; }
+        if (d <= sp) { f.x = f.tx; f.y = f.ty; f.ph = 1; f.t = f.kind === 'garrison' ? 3.5 : f.kind === 'evac' ? 5 : f.kind === 'build' ? 3 : 2.2; } else { f.x += dx / d * sp; f.y += dy / d * sp; }
       } else if (f.ph === 1) {
         f.t -= DT;
-        if (f.t <= 0) {
+        if (f.t <= 0 && f.kind === 'build') {
+          deliverPlan(f.route[f.ri]); f.ri++;
+          const nq = S.plans.find(q => f.ri < f.route.length && q.id === f.route[f.ri]);
+          if (nq) { f.tx = nq.x; f.ty = nq.y; f.ph = 0; } else if (f.ri < f.route.length) { f.ri = f.route.length; f.ph = 2; } else f.ph = 2;
+        } else if (f.t <= 0) {
           f.ph = 2;
           if (f.kind === 'garrison') landGarrison(f.tx, f.ty); else if (f.kind === 'evac') doEvac(f.tx, f.ty); else drop(f.tx, f.ty);
           if (f.kind !== 'evac') fx.push({ type: 'ring', x: f.tx, y: f.ty, r: f.kind === 'garrison' ? 12 : 35, t: 1, T: 1, c: f.kind === 'garrison' ? '120,220,110' : '90,170,255' });
@@ -799,6 +803,49 @@ function score(withAlive) {
   if (withAlive) { const c = counts(); civ += c.civ; pol += c.pol; mil += c.mil; }
   return { civ, pol, mil, pts: civ + pol * 5 + mil * 10 };
 }
+// ── Bauphase: Pläne werden gesammelt, nach „Bau abschließen“ liefern Hubschrauber nach 30 s ──
+function barUsed() { let n = 0; for (const q of S.plans) n += q.cells.length; for (const b of BAR) if (b) n += b.cells.length; return n; }
+function barHp(cells) { return (60 + cells * 35) * RULES.barHpMul; }
+function commitBuild() {
+  let n = 0; for (const q of S.plans) if (q.st === 'plan') { q.st = 'ord'; q.at = simT + 30; n++; }
+  if (!n) return toast('Keine Baupläne vorhanden');
+  toast('Bau beauftragt – Hubschrauber in 30 s'); SFX.ui();
+}
+function pushOut(cells) {
+  const set = new Set(cells);
+  for (const e of E) {
+    if (e.dead || (e.st === 4 && e.k === K_CIV)) continue;
+    const ci = cellIdx(e.x, e.y); if (!set.has(ci)) continue;
+    const gx = ci % GW, gy = ci / GW | 0;
+    outer: for (let r = 1; r <= 10; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const x = gx + dx, y = gy + dy; if (x < 0 || y < 0 || x >= GW || y >= GH) continue;
+      const i = y * GW + x; if (set.has(i) || barId[i] || type[i] > T_ROAD) continue;
+      e.x = (x + .3 + Math.random() * .4) * CELL; e.y = (y + .3 + Math.random() * .4) * CELL; e.path = null; break outer;
+    }
+  }
+}
+function deliverPlan(id) {
+  const i = S.plans.findIndex(q => q.id === id); if (i < 0) return;
+  const q = S.plans[i]; S.plans.splice(i, 1);
+  const cells = q.cells.filter(c => !barId[c] && type[c] <= T_ROAD); if (!cells.length) return;
+  pushOut(cells);
+  const bid = BAR.length; for (const c of cells) barId[c] = bid;
+  const hp = barHp(cells.length);
+  BAR.push({ cells, hp, max: hp, x: q.x, y: q.y }); evacDirty = true;
+  SFX.thud(q.x, q.y); fx.push({ type: 'ring', x: q.x, y: q.y, r: 14, t: .8, T: .8, c: '230,170,70' });
+}
+function dispatchBuild() {
+  const due = S.plans.filter(q => q.st === 'ord' && simT >= q.at); if (!due.length) return;
+  const todo = due.slice();
+  while (todo.length) {
+    const route = [todo.shift()]; 
+    while (route.length < 4 && todo.length) { const l = route[route.length - 1]; todo.sort((a, b) => Math.hypot(a.x - l.x, a.y - l.y) - Math.hypot(b.x - l.x, b.y - l.y)); route.push(todo.shift()); }
+    route.forEach(q => q.st = 'dlv');
+    const [sx, sy] = edgeEntry(route[0].x, route[0].y);
+    fx.push({ type: 'heli', kind: 'build', x: sx, y: sy, tx: route[0].x, ty: route[0].y, ex: sx, ey: sy, ph: 0, t: 0, a: 0, route: route.map(q => q.id), ri: 0 });
+  }
+}
 function landGarrison(x, y) {
   const id = ++gidN;
   for (let i = 0; i < 4; i++) { const p = randWalk(x, y, 9) || randWalk(x, y, 30); if (!p) continue; const e = mk(K_SEN, p[0], p[1]); e.acc = .7; e.armed = true; e.g = id; e.sq = id; E.push(e); }
@@ -851,16 +898,26 @@ function useTool(tool, x, y, x2, y2) {
   if (tool === 'barricade') {
     const dx = x2 - x, dy = y2 - y, len = Math.hypot(dx, dy);
     if (len < 6) { x2 = x + 12; y2 = y; } else if (len > 50) { x2 = x + dx / len * 50; y2 = y + dy / len * 50; }
-    const cells = new Set(), n = Math.ceil(Math.hypot(x2 - x, y2 - y) / 1.5);
-    for (let i = 0; i <= n; i++) { const t = i / n, c = cellIdx(x + (x2 - x) * t, y + (y2 - y) * t); if (type[c] <= T_ROAD) cells.add(c); }
-    if (!cells.size) return toast('Hier ist kein Platz für eine Barrikade');
-    evacDirty = true; const id = BAR.length; for (const c of cells) barId[c] = id;
-    BAR.push({ cells: [...cells], hp: 60 + cells.size * 35, max: 60 + cells.size * 35, x: (x + x2) / 2, y: (y + y2) / 2 });
+    const taken = new Set(); for (const q of S.plans) for (const c of q.cells) taken.add(c);
+    const cells = [], seen = new Set(), n = Math.ceil(Math.hypot(x2 - x, y2 - y) / 1.5);
+    for (let i = 0; i <= n; i++) { const t = i / n, c = cellIdx(x + (x2 - x) * t, y + (y2 - y) * t); if (type[c] <= T_ROAD && !barId[c] && !taken.has(c) && !seen.has(c)) { seen.add(c); cells.push(c); } }
+    if (!cells.length) return toast('Hier ist kein Platz für eine Barrikade');
+    const free = RULES.barLimit - barUsed();
+    if (free <= 0) return toast('Barrikaden-Limit erreicht (' + RULES.barLimit + ' Elemente)');
+    if (cells.length > free) cells.length = free;
+    S.plans.push({ id: ++S.planId, cells, st: 'plan', x: (x + x2) / 2, y: (y + y2) / 2 });
+    SFX.ui(); return;
   } else if (tool === 'demolish') {
+    // Baupläne (noch nicht geliefert) lassen sich jederzeit verwerfen
+    let pi = -1, pd = 14 * 14;
+    S.plans.forEach((q, i) => { if (q.st === 'dlv') return; for (const c of q.cells) { const d = ((c % GW + .5) * CELL - x) ** 2 + (((c / GW | 0) + .5) * CELL - y) ** 2; if (d < pd) { pd = d; pi = i; } } });
+    if (pi >= 0) { S.plans.splice(pi, 1); toast('Bauplan verworfen'); return; }
     let best = 0, bd = 12 * 12;
     for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (!b) continue; for (const c of b.cells) { const d = ((c % GW + .5) * CELL - x) ** 2 + (((c / GW | 0) + .5) * CELL - y) ** 2; if (d < bd) { bd = d; best = i; } } }
     if (!best) return toast('Hier ist keine Barrikade');
-    SFX.thud(x, y); for (const c of BAR[best].cells) barId[c] = 0; BAR[best] = null; evacDirty = true; toast('Barrikade eingerissen'); return;
+    const bb = BAR[best];
+    if (!E.some(u => friendly(u) && Math.hypot(u.x - bb.x, u.y - bb.y) < 50 + bb.cells.length * 2)) return toast('Zum Einreißen muss eine Einheit (Soldat, Polizei, Truck) in der Nähe sein');
+    SFX.thud(x, y); for (const c of bb.cells) barId[c] = 0; BAR[best] = null; evacDirty = true; toast('Barrikade eingerissen'); return;
   } else if (tool === 'evac') { setEvac(x, y); return;
   } else if (tool === 'truck') {
     if (Math.min(x, y, WW - x, WH - y) > 70) return toast('Trucks können nur am Kartenrand angefordert werden');
@@ -874,7 +931,7 @@ function useTool(tool, x, y, x2, y2) {
     const [sx, sy] = edgeEntry(x, y);
     fx.push({ type: 'heli', kind: tool, x: sx, y: sy, tx: x, ty: y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 });
   }
-  cooldown[tool] = CD_MAX[tool]; S.used[tool]++; if (tool === 'barricade') SFX.thud((x + x2) / 2, (y + y2) / 2); else SFX.ui();
+  cooldown[tool] = CD_MAX[tool]; S.used[tool]++; SFX.ui();
 }
 
 // ───────────────────────── Speichern / Laden ─────────────────────────
@@ -888,7 +945,7 @@ function serialize() {
   };
 }
 function deserialize(d) {
-  cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; S.used = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0, ...S.used }; S.ev = S.ev || { civ: 0, pol: 0, mil: 0, trk: 0 }; if (S.evacT == null) S.evacT = 10; evacDirty = !!S.evac; simT = d.simT; cooldown = d.cooldown; finished = false;
+  cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; S.used = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0, ...S.used }; S.ev = S.ev || { civ: 0, pol: 0, mil: 0, trk: 0 }; S.plans = S.plans || []; S.planId = S.planId || 0; if (S.evacT == null) S.evacT = 10; evacDirty = !!S.evac; simT = d.simT; cooldown = d.cooldown; finished = false;
   noises = []; tracers = []; fx = d.fx || []; selected.clear(); barId.fill(0); BAR = [null];
   for (const b of B) { b.occ = []; b.siege = 0; }
   E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; e.sq = a[17] || 0; if (e.g > gidN) gidN = e.g; if (e.sq > gidN) gidN = e.sq; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
@@ -936,6 +993,12 @@ function draw() {
     ctx.fillStyle = b.hp / b.max > .5 ? '#a8742f' : '#7a4a22';
     for (const c of b.cells) ctx.fillRect((c % GW) * CELL, (c / GW | 0) * CELL, CELL, CELL);
   }
+  // Baupläne
+  if (S && S.plans) for (const q of S.plans) {
+    ctx.fillStyle = q.st === 'plan' ? 'rgba(217,154,74,.35)' : 'rgba(217,154,74,.6)'; ctx.strokeStyle = '#d99a4a'; ctx.lineWidth = 1 / cam.z; ctx.setLineDash(q.st === 'plan' ? [3, 2] : []);
+    for (const c of q.cells) { const cx = (c % GW) * CELL, cy = (c / GW | 0) * CELL; ctx.fillRect(cx, cy, CELL, CELL); ctx.strokeRect(cx, cy, CELL, CELL); }
+    ctx.setLineDash([]);
+  }
   // Geräusche
   ctx.lineWidth = 1 / cam.z;
   for (const n of noises) { const k = 1 - n.t / 6; ctx.strokeStyle = `rgba(255,255,255,${.18 * (1 - k)})`; ctx.beginPath(); ctx.arc(n.x, n.y, n.r * Math.min(1, k * 4), 0, 6.283); ctx.stroke(); }
@@ -975,11 +1038,11 @@ function draw() {
   const now = performance.now(), pul = .5 + .5 * Math.sin(now / 90), sz = Math.max(9, 18 / cam.z);
   for (const f of fx) {
     if (f.type === 'heli' || f.type === 'jet') {
-      const col = f.type === 'jet' ? '255,70,50' : f.kind === 'supply' ? '80,170,255' : f.kind === 'evac' ? '255,255,255' : '120,220,110', rr = f.type === 'jet' ? 30 : f.kind === 'supply' ? 35 : f.kind === 'evac' ? 30 : 9;
+      const col = f.type === 'jet' ? '255,70,50' : f.kind === 'supply' ? '80,170,255' : f.kind === 'evac' ? '255,255,255' : f.kind === 'build' ? '230,170,70' : '120,220,110', rr = f.type === 'jet' ? 30 : f.kind === 'supply' ? 35 : f.kind === 'evac' ? 30 : f.kind === 'build' ? 8 : 9;
       if (f.type === 'heli' && f.ph < 2 || f.type === 'jet' && !f.dropped) { ctx.strokeStyle = `rgba(${col},${.4 + .5 * pul})`; ctx.lineWidth = 2 / cam.z; ctx.beginPath(); ctx.arc(f.tx, f.ty, rr, 0, 6.283); ctx.stroke(); }
       ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a);
       if (f.type === 'heli') {
-        ctx.fillStyle = f.kind === 'supply' ? '#35557a' : f.kind === 'evac' ? '#8a3333' : '#3f4d33'; ctx.strokeStyle = '#000a'; ctx.lineWidth = .5 / cam.z;
+        ctx.fillStyle = f.kind === 'supply' ? '#35557a' : f.kind === 'evac' ? '#8a3333' : f.kind === 'build' ? '#7a5a2a' : '#3f4d33'; ctx.strokeStyle = '#000a'; ctx.lineWidth = .5 / cam.z;
         ctx.beginPath(); ctx.ellipse(0, 0, sz * .42, sz * .16, 0, 0, 6.283); ctx.fill(); ctx.stroke();
         ctx.fillRect(-sz * .85, -sz * .03, sz * .5, sz * .06);
         ctx.rotate(now / 40); ctx.strokeStyle = 'rgba(235,235,235,.85)'; ctx.lineWidth = Math.max(.5, 1.5 / cam.z);
@@ -1102,6 +1165,8 @@ try { const m = localStorage.getItem('zos_mapmode'); if (MAP_LABEL[m]) mapMode =
 $('sAllP').onclick = () => { selected.clear(); for (const e of E) if (e.k === K_POL && !e.dead) addSel(e); };
 const selU = () => [...selected].filter(friendly);
 $('bEvacU').onclick = () => startUnitEvac();
+$('bCommit').onclick = () => commitBuild();
+$('bDrop').onclick = () => { S.plans = S.plans.filter(q => q.st !== 'plan'); toast('Baupläne verworfen'); };
 $('sGrp').onclick = () => { const us = selU(); if (us.length < 2) return toast('Mindestens 2 Einheiten auswählen'); const id = ++gidN; for (const u of us) u.g = id; toast('Gruppe G' + id + ' gebildet (' + us.length + ' Einheiten)'); };
 $('sUng').onclick = () => { for (const u of selU()) u.g = u.sq; toast('Gruppe aufgelöst (Squads bleiben bestehen)'); };
 $('sHold').onclick = () => { for (const u of selU()) { if (u.ds === 3) u.pend = null; u.ord = true; u.path = null; u.patrol = null; u.hmx = u.x; u.hmy = u.y; } toast('Stellung wird gehalten'); };
@@ -1286,7 +1351,14 @@ function updateHud() {
   for (const u of selected) if (!friendly(u)) selected.delete(u);
   $('selbar').style.display = selected.size ? 'flex' : 'none'; $('selTxt').textContent = selected.size + ' Einheit(en) ausgewählt – Ziel antippen (rechte Maustaste)';
   const pct = phase === 'run' ? lostPct(c) : 0;
-  document.querySelectorAll('#tools button').forEach(b => { const k = b.dataset.tool, el = b.querySelector('.cd'); if (UNLOCK[k]) { const lk = pct < UNLOCK[k], mx = MAXUSE[k], left = mx ? (S ? mx - S.used[k] : mx) : 99, ex = left <= 0; b.classList.toggle('locked', lk || ex); const sp = b.querySelector('span'); const t = ex ? sp.dataset.n + ' 0/' + mx : lk ? 'ab ' + UNLOCK[k] + ' % (' + pct.toFixed(0) + ')' : sp.dataset.n + (mx ? ' ' + left + '/' + mx : ''); if (sp.textContent !== t) sp.textContent = t; } if (el) el.style.width = (cooldown[k] > 0 ? cooldown[k] / CD_MAX[k] * 100 : 0) + '%'; });
+  if (S && phase === 'run') {
+    const bb = $('buildbar'), pl = S.plans.filter(q => q.st === 'plan').length, od = S.plans.filter(q => q.st !== 'plan');
+    bb.style.display = (toolSel === 'barricade' || S.plans.length) ? 'flex' : 'none';
+    const nxt = od.filter(q => q.st === 'ord').reduce((m, q) => Math.min(m, q.at - simT), 1e9);
+    $('buildTxt').textContent = 'Bauphase: ' + barUsed() + '/' + RULES.barLimit + ' Elemente · ' + pl + ' geplant' + (od.length ? ' · Lieferung ' + (nxt < 1e8 ? 'in ' + Math.max(0, Math.ceil(nxt)) + ' s' : 'läuft') : '');
+    $('bCommit').disabled = !pl; $('bDrop').disabled = !pl;
+  } else $('buildbar').style.display = 'none';
+  document.querySelectorAll('#tools button').forEach(b => { const k = b.dataset.tool, el = b.querySelector('.cd'); if (k === 'barricade' && S) { const sp = b.querySelector('span'); const t = 'Bauen ' + barUsed() + '/' + RULES.barLimit; if (sp.textContent !== t) sp.textContent = t; } if (UNLOCK[k]) { const lk = pct < UNLOCK[k], mx = MAXUSE[k], left = mx ? (S ? mx - S.used[k] : mx) : 99, ex = left <= 0; b.classList.toggle('locked', lk || ex); const sp = b.querySelector('span'); const t = ex ? sp.dataset.n + ' 0/' + mx : lk ? 'ab ' + UNLOCK[k] + ' % (' + pct.toFixed(0) + ')' : sp.dataset.n + (mx ? ' ' + left + '/' + mx : ''); if (sp.textContent !== t) sp.textContent = t; } if (el) el.style.width = (cooldown[k] > 0 ? cooldown[k] / CD_MAX[k] * 100 : 0) + '%'; });
 }
 
 // ───────────────────────── Hauptschleife ─────────────────────────
@@ -1304,9 +1376,24 @@ function frame(ts) {
   if (ts - hudT > 200) { hudT = ts; try { updateHud(); ambience(); if (ts - (frame.ut || 0) > 500) { frame.ut = ts; updateUnitList(); } } catch (err) { console.error(err); } }
   requestAnimationFrame(frame);
 }
+// Karten: 'moosburg' (Altdatei map-data.js) und weitere aus maps/*.js
+function setupMap(id) {
+  MD = id === 'moosburg' ? MAP_DATA : window.MAPS_DATA[id];
+  WW = MD.w; WH = MD.h; GW = Math.ceil(WW / CELL); GH = Math.ceil(WH / CELL);
+  if (id === 'moosburg') { LAT0 = 48.4790; LON0 = 11.9280; KX = 111320 * Math.cos(48.47 * Math.PI / 180); KY = 110574; }
+  else { LAT0 = MD.north; LON0 = MD.west; KX = MD.kx; KY = MD.ky; }
+  type = new Uint8Array(GW * GH); comp = new Uint8Array(GW * GH); barId = new Uint16Array(GW * GH);
+  gS = new Uint32Array(GW * GH); gD = new Uint32Array(GW * GH); gG = new Float32Array(GW * GH); gP = new Int32Array(GW * GH);
+  HW = Math.ceil(WW / HS); HH = Math.ceil(WH / HS); hzHead = new Int32Array(HW * HH); hhHead = new Int32Array(HW * HH);
+  stampN = 0; evD = null; evacDirty = false; BAR = [null]; E = []; fx = []; noises = []; tracers = []; selected.clear();
+  B.length = 0; bHash.clear();
+  buildGrid(); buildBuildings(); renderMap();
+  curMap = id; fitCam();
+}
+let curMap = 'moosburg';
 function init() {
   const t0 = performance.now();
-  buildGrid(); buildBuildings(); renderMap();
+  setupMap('moosburg');
   applyMapMode(); syncSliders(); refreshResume(); resize(); fitCam(); setSpeed(0);
   addEventListener('resize', resize);
   console.log('Init', Math.round(performance.now() - t0), 'ms; Gebäude:', B.length, 'Raster', GW, GH);

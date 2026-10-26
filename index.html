@@ -53,7 +53,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 .urow i{width:9px;height:9px;border-radius:50%;flex:none}.ubody{display:none;margin-left:14px;border-left:1px solid var(--line)}.open>.ubody{display:block}
 .urow .plus{width:14px;text-align:center;color:var(--acc);cursor:pointer;flex:none}.urow u{text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;min-width:0}.urow.mem{font-size:12px;padding:3px 6px}
 .urow em{font-style:normal;color:var(--acc);font-size:11px}.urow span{margin-left:auto;color:var(--mut);font-size:11px}.urow.inf span{color:var(--warn)}
-#alerts{position:fixed;top:104px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:5;max-width:calc(100% - 16px)}
+#alerts{position:fixed;top:112px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:5;max-width:calc(100% - 16px)}
 .alert{display:flex;gap:10px;align-items:center;background:#3a1512ee;border:1px solid var(--bad);border-radius:10px;padding:7px 10px;box-shadow:0 2px 12px #0008}
 .alert button{background:#7a2a24;border-color:var(--bad);white-space:nowrap}
 @media(max-width:700px){#setup{top:auto;height:58%;width:auto;left:8px}#hud{top:112px;min-width:0;font-size:12px;padding:6px 8px}#units{top:auto;bottom:92px;height:34%;width:250px}#units.col{height:auto;bottom:92px}#tools{bottom:auto;top:auto}#title small{display:none}}
@@ -91,7 +91,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <button data-tool="pan" class="on">✋<span>Kamera</span></button>
   <button data-tool="units">🎖<span>Einheiten</span></button>
   <button data-tool="infect">☣️<span>Zombie</span></button>
-  <button data-tool="barricade">🧱<span data-n="Barrikade">Barrikade</span><div class="cd"></div></button>
+  <button data-tool="barricade">🧱<span data-n="Barrikade">Bauen</span><div class="cd"></div></button>
   <button data-tool="demolish">🔨<span>Einreißen</span></button>
   <button data-tool="evac">🚁<span data-n="Evakuierung">Evakuierung</span></button>
   <button data-tool="truck">🚛<span data-n="Trucks">Trucks</span><div class="cd"></div></button>
@@ -115,7 +115,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <div class="row"><label>Zombie-Typ <b id="vZs"></b></label><input type="range" id="zs" min="0" max="100"><div class="hint">0 = klassisch (langsam) · 100 = modern (schnell, rennt Zivilisten nieder)</div></div>
   <div class="btns"><button class="big" id="bStart">▶ Simulation starten</button><button id="bResume" style="display:none">Autosave fortsetzen</button></div>
   <div class="leg"><span><i style="background:#f1f5f2"></i>Zivilist</span><span><i style="background:#ffe066"></i>bewaffnet</span><span><i style="background:#f0a030"></i>infiziert</span><span><i style="background:#58c24a"></i>Zombie</span><span><i style="background:#4a8bff"></i>Polizei</span><span><i style="background:#b9a24a"></i>Militär</span></div>
-  <p class="hint" style="margin-top:10px">Bedienung: Mausrad/Pinch = Zoom, ziehen = Karte verschieben (bei aktivem Werkzeug: rechte Maustaste oder zwei Finger). Barrikade: Linie ziehen. Einheiten: Werkzeug „Einheiten“, Einheit/Rahmen wählen, dann Ziel antippen (Desktop: rechte Maustaste). Barrikaden lassen sich mit „Einreißen“ wieder entfernen. Garnison (max. 4) ab 25 %, Versorgung (max. 5) ab 35 %, Luftschlag (max. 10) ab 50 % Verlust/Umwandlung der Bevölkerung.</p>
+  <p class="hint" style="margin-top:10px">Bedienung: Mausrad/Pinch = Zoom, ziehen = Karte verschieben (bei aktivem Werkzeug: rechte Maustaste oder zwei Finger). Barrikade: im Baumodus Linie ziehen (Bauplan), dann „Bau abschließen“ – 30 s später liefern Hubschrauber. Einheiten: Werkzeug „Einheiten“, Einheit/Rahmen wählen, dann Ziel antippen (Desktop: rechte Maustaste). Barrikaden lassen sich mit „Einreißen“ wieder entfernen. Garnison (max. 4) ab 25 %, Versorgung (max. 5) ab 35 %, Luftschlag (max. 10) ab 50 % Verlust/Umwandlung der Bevölkerung.</p>
 </div>
 
 <div id="selbar" class="panel" style="display:none;position:fixed;bottom:84px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 16px)"><span id="selTxt" style="width:100%;text-align:center"></span>
@@ -123,10 +123,13 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 <button id="sHold" title="Stellung halten: stehen bleiben und auf Sicht schießen">🛡 Halten</button><button id="sDig" title="Eingraben (1 Min.): +15 % Treffsicherheit, aber unbeweglich">⛏ Eingraben</button><button id="sFree" title="Stellung räumen (1 Min.)">🏃 Räumen</button><button id="sPat" title="Danach Ziel antippen: Einheiten patrouillieren dort">🔁 Patrouille</button>
 <button id="sAllP">Alle Polizei</button><button id="sAllM">Alle Militär</button><button id="sRel">Freigeben</button><button id="sClr">Abwählen</button></div>
 <div id="attr" style="position:fixed;right:6px;bottom:2px;font-size:10px;color:#cfd8d2;text-shadow:0 0 3px #000;pointer-events:none"></div>
+<div id="buildbar" class="panel" style="display:none;position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:8px;align-items:center;z-index:4;white-space:nowrap;max-width:calc(100% - 16px);flex-wrap:wrap;justify-content:center"><span id="buildTxt"></span><button id="bCommit">🚁 Bau abschließen</button><button id="bDrop">Pläne verwerfen</button></div>
 <div id="alerts"></div>
 <div id="toast"></div>
 <div id="modal"><div class="box panel" id="mbox"></div></div>
 <script src="map-data.js"></script>
+<script src="maps/m1.js"></script>
+<script src="maps/m3.js"></script>
 <script src="sfx.js"></script>
 <script src="game.js"></script>
 </body>
