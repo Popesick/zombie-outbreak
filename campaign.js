@@ -168,12 +168,12 @@ const Campaign = (() => {
     const evs = []; const up = (name, t) => { if (simT < t) evs.push(`${name} in ${fmtClock(t - simT)}`); };
     const ev = m.evac(); up('📡 Evakuierungssignal', ev.at); up('💥 Luftschläge', m.tools.strike.at); if (m.tools.garrison) up('🪖 Verstärkung', m.tools.garrison.at); up('⚠ Horde stürmt', m.hordeAt);
     let sec = '';
-    if (m.secondary.bridge != null) sec = `<div class="${S.breach ? 'no' : 'ok'}">${S.breach ? '✗ Brücke durchbrochen' : '✓ Brücke gehalten'}</div><div class="${o.cleared ? 'ok' : ''}">Zombies übrig: <b>${c.zom}</b></div>`;
+    if (m.secondary.bridge != null) sec = `<div class="${S.breach ? 'no' : o.secondary ? 'ok' : ''}">${S.breach ? '✗ Brücke durchbrochen' : o.secondary ? '✓ Brücke gehalten' : '○ Brücke hält bisher'}</div><div class="${o.cleared ? 'ok' : ''}">${o.cleared ? '✓' : '○'} Zombies übrig: <b>${c.zom}</b>${simT < lastSpawnT(m) + 5 ? ' <span class="ev">(weitere Wellen folgen)</span>' : ''}</div>`;
     else if (m.secondary.kills != null) sec = `<div class="${o.secondary ? 'ok' : ''}">Zombies eliminiert: <b>${S.kills}</b> / ${m.secondary.kills}</div>`;
     else sec = `<div>Einsatzkräfte: <b>${Math.round((S.unitsStart ? E.filter(u => friendly(u) && u.k !== K_TRK && u.k !== K_TUR).length + S.evU.length : 1) / (S.unitsStart || 1) * 100)} %</b> (Ziel ≥ ${m.secondary.units * 100} %)</div>`;
     const html = `<h3>${m.name}</h3><div class="ev">Zeit ${fmtClock(simT)}</div>
       <div class="o"><b>Primär:</b> Gerettet <b class="${o.primary ? 'ok' : ''}">${o.R}</b> / ${pri}<div class="bar"><i style="width:${o.priFrac * 100}%"></i></div></div>
-      <div class="o"><b>Sekundär:</b>${sec}</div>
+      <div class="o"><b class="${o.secondary ? 'ok' : ''}">${o.secondary ? '✓ ' : ''}Sekundär:</b>${sec}</div>
       ${evs.length ? '<div class="ev">' + evs.join('<br>') + '</div>' : ''}`;
     if (box.dataset.h !== html) { box.innerHTML = html; box.dataset.h = html; }
     document.getElementById('bEnd').style.display = simT > 30 ? '' : 'none';
