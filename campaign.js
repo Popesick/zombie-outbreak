@@ -50,15 +50,15 @@ const Campaign = (() => {
       start: () => ({ sol: [{ x: 1260, y: 1540 }], pol: [{ x: 1180, y: 1480 }, { x: 1320, y: 1430 }] }),
       evac: () => ({ x: 1520, y: 1612, at: 60 }),
       evacCap: 60, evacEvery: 20,   // große Zahl Zivilisten: größere und häufigere Hubschrauber
-      spawns: () => [{ t: 0, n: 200, x: 80, y: 80, r: 45 }, { t: 120, n: 100, x: 30, y: 950, r: 45 }, { t: 300, n: 100, x: 60, y: 1750, r: 45 }],
+      spawns: () => [{ t: 0, n: 400, x: 80, y: 80, r: 45 }, { t: 120, n: 200, x: 30, y: 950, r: 45 }, { t: 300, n: 200, x: 60, y: 1750, r: 45 }],
       lure: () => ({ x: 650, y: 1180, t: 0, dur: 60 }),
-      hordeAt: 480, hordeFocus: .9,
+      hordeAt: 240, hordeFocus: .9,
       hold: null,
       tools: { supply: { at: 0, max: 5, cd: 20 }, strike: { at: 180, max: 4, cd: 8 }, garrison: { at: 240, max: 2, cd: 30 } },
       barricades: 36,
       primary: { civ: 2000, pts: 1500 }, secondary: { noLoss: true, pts: 600 },
       goal: ['Rette mindestens 2000 Zivilisten (Rettungszone auf der Ostseite der Isarbrücke).', 'Alle Einsatzkräfte müssen überleben.'],
-      info: ['3000 Zivilisten – 200 Zombies aus Nordwesten', 'Nach 2:00: 100 Zombies aus Westen, nach 5:00: 100 aus Südwesten', '5 Versorgungspakete, 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Ab 8:00 zieht die Horde zum Evakuierungspunkt']
+      info: ['3000 Zivilisten – 400 Zombies aus Nordwesten', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete, 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Ab 4:00 zieht die Horde zum Evakuierungspunkt']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
@@ -100,7 +100,7 @@ const Campaign = (() => {
     if (lv('mines')) tools.mines = { at: 0, max: 3 * lv('mines'), cd: 20 };
     if (lv('gunship')) tools.gunship = { at: 0, max: 2, cd: 45 };
     const R = {
-      evacCap: m.evacCap, evacEvery: m.evacEvery, mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
+      evacCap: m.evacCap, evacEvery: m.evacEvery, rushAfter: lastSpawnT(m), mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
       barLimit: m.barricades + 12 * lv('morebar'), barHpMul: 2 * (lv('barhp') ? 2 : 1),
       gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), squadPlus: lv('squad') ? 1 : 0, ammoMul: lv('ammo') ? 2 : 1,
       spawn: () => spawnMission(m), tick: () => tick(m), hud: c => hud(m, c), checkEnd: c => checkEnd(m, c), onEnd: msg => finish(m, msg)

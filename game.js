@@ -647,7 +647,8 @@ function thinkZombie(e) {
 function stepZombie(e) {
   e.th -= DT; e.pt -= DT;
   if (e.th <= 0) { e.th = rnd(.25, .4); thinkZombie(e); }
-  const sp = e.zsp || zSpeed();
+  let sp = e.zsp || zSpeed();
+  if (S.rush && ZF.evac && e.st !== 1) { if (e.st !== 7 || e.fz !== 'evac') { e.st = 7; e.fz = 'evac'; e.path = null; } e.fzT = 30; sp *= 1.4; }
   // Belagerung
   if (e.st === 0 && e.th < .02) { const b = nearBuildings(e.x, e.y, 9, b => b.occ.length > 0); if (b) b.siege += .3 * 1; }
   if (e.st === 1) {
@@ -711,6 +712,7 @@ function step() {
   // Barrikaden
   for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (b && b.hp <= 0) killBar(i); }
   stepMines(); dispatchBuild(); updateZF(); if (RULES.tick) RULES.tick();
+  if (S.evac && (stepN = (stepN || 0) + 1) % 30 === 0) { let z = 0; for (const e of E) if (e.k === K_ZOM && !e.dead) z++; S.rush = z > 0 && z < 100 && (S.peakZ || 0) >= 100 && simT >= (RULES.rushAfter || 0); if (S.rush && !S.rushNote) { S.rushNote = 1; toast('🏃 Die letzten Zombies sprinten zum Evakuierungspunkt'); } }
   // Evakuierung
   if (S.evac) {
     S.evacT -= DT; if (S.evacR != null && S.evacR < 4000) S.evacR += 25 * DT;
@@ -766,6 +768,7 @@ function updateFx() {
     } else { f.t -= DT; if (f.t <= 0) fx.splice(i, 1); }
   }
 }
+let stepN = 0;
 let evD = null, evacDirty = false, evLast = -99;
 // Allgemeines Distanzfeld (Dijkstra) für Horde/Lockruf; zm = Barrikaden durchlässig (hohe Kosten)
 function computeField(x, y, zm, D) {
