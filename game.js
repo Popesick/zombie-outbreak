@@ -1324,6 +1324,10 @@ const SND = { 1: '🔊', .5: '🔉', 0: '🔇' };
 $('bSnd').textContent = SND[SFX.level()];
 $('bSnd').onclick = () => { $('bSnd').textContent = SND[SFX.cycle()]; SFX.ui(); };
 addEventListener('pointerdown', SFX.resume); addEventListener('keydown', SFX.resume);
+addEventListener('pointerdown', () => Music.resume()); addEventListener('keydown', () => Music.resume());
+const MUS = { 1: '🎵', .5: '🎵 ½', 0: '🎵 ✕' };
+$('bMus').textContent = MUS[Music.level()];
+$('bMus').onclick = () => { $('bMus').textContent = MUS[Music.cycle()]; SFX.ui(); };
 $('bMap').onclick = () => { mapMode = mapMode === 'sat' ? 'osm' : mapMode === 'osm' ? 'vec' : 'sat'; try { localStorage.setItem('zos_mapmode', mapMode); } catch (e) {} applyMapMode(); };
 try { const m = localStorage.getItem('zos_mapmode'); if (MAP_LABEL[m]) mapMode = m; } catch (e) {}
 $('sAllP').onclick = () => { selected.clear(); for (const e of E) if (e.k === K_POL && !e.dead) addSel(e); };
@@ -1432,6 +1436,7 @@ document.querySelectorAll('#tools .catbtn').forEach(b => b.onclick = ev => {
 addEventListener('pointerdown', e => { if (!e.target.closest('.cat') && !e.target.closest('.tmenu')) closeMenus(); });
 addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').style.display.includes('flex')) selectTool('pan'); });
 function startRun(loaded) {
+  Music.play('game');
   phase = 'run'; $('setup').style.display = 'none'; finished = false;
   if (!loaded) newSim();
   setSpeed(1); acc = 0;
@@ -1445,7 +1450,7 @@ $('bMenu').onclick = () => modal(`<h2>Zurück zum Hauptmenü</h2><p>Aktuelle Sim
 function toMenu() {
   phase = 'setup'; E = []; BAR = [null]; barId.fill(0); gate.fill(0); fx = []; noises = []; tracers = []; for (const b of B) { b.occ = []; b.siege = 0; } markers = []; finished = false; selected.clear();
   S = null; RULES = classicRules(); if (curMap !== 'moosburg') setupMap('moosburg');
-  $('setup').style.display = 'none'; $('objs').style.display = 'none'; $('buildbar').style.display = 'none'; $('menu').style.display = 'flex'; setSpeed(0); refreshResume(); fitCam();
+  $('setup').style.display = 'none'; $('objs').style.display = 'none'; $('buildbar').style.display = 'none'; $('menu').style.display = 'flex'; setSpeed(0); refreshResume(); fitCam(); Music.play('menu');
 }
 function modal(html, init) { $('mbox').innerHTML = html; $('modal').style.display = 'flex'; if (init) init(); }
 function closeModal() { $('modal').style.display = 'none'; }
@@ -1610,7 +1615,7 @@ function init() {
   $('mSand').onclick = () => { $('menu').style.display = 'none'; $('setup').style.display = ''; };
   $('mResume').onclick = () => loadSlot(0);
   if (typeof Campaign !== 'undefined') Campaign.init();
-  $('menu').style.display = 'flex'; $('setup').style.display = 'none';
+  $('menu').style.display = 'flex'; $('setup').style.display = 'none'; Music.play('menu');
   console.log('Init', Math.round(performance.now() - t0), 'ms; Gebäude:', B.length, 'Raster', GW, GH);
   requestAnimationFrame(frame);
 }

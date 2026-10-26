@@ -1,13 +1,9 @@
-(async()=>{ const out={}; const q=new URLSearchParams(location.search); const mode=q.get('m')||'camp';
+(async()=>{ const out={};
  try {
-  const wait=ms=>new Promise(r=>setTimeout(r,ms));
-  if (mode==='camp') { document.getElementById('mCamp').click(); closeModal(); const C=Campaign.state; for (const u of Campaign.UP) C.up[u.id]=u.p.length; C.trucks=1; Campaign.start(0); }
-  else { document.getElementById('mSand').click(); document.getElementById('bStart').click(); }
-  setSpeed(0); for(let i=0;i<30*200;i++) step(); cfg.pop=5000; mapMode='vec'; await wait(500);
-  document.querySelector('.cat[data-cat="'+(q.get('c')||'air')+'"] .catbtn').click(); await wait(300);
-  out.visible=[...document.querySelectorAll('#tools .tmenu.open button')].filter(b=>b.style.display!=='none').map(b=>b.textContent.trim()).join(' | ');
-  out.cats=[...document.querySelectorAll('#tools .cat')].map(c=>c.dataset.cat+':'+c.style.display+':'+c.querySelector('.catbtn').classList.contains('rdy')).join(' ');
-  document.querySelector('.tmenu.open button[data-tool="'+(q.get('t')||'strike')+'"]').click(); out.sel=toolSel; out.openAfter=document.querySelectorAll('.tmenu.open').length;
-  if (q.get('shot')) { document.querySelector('.cat[data-cat="'+(q.get('c')||'air')+'"] .catbtn').click(); }
+  const files=['intro','anxious_waiting_0','anxious_waiting_1','anxious_waiting_2','anxious_waiting_3'];
+  out.dur=await Promise.all(files.map(f=>new Promise(r=>{ const a=new Audio('audio/music/'+f+'.mp3'); a.preload='metadata'; a.onloadedmetadata=()=>r(f+':'+Math.round(a.duration)); a.onerror=()=>r(f+':ERR'); setTimeout(()=>r(f+':timeout'),8000); })));
+  document.getElementById('mSand').click(); document.getElementById('bStart').click(); setSpeed(0);
+  out.btn=document.getElementById('bMus').textContent; document.getElementById('bMus').click(); out.btn2=document.getElementById('bMus').textContent; document.getElementById('bMus').click(); document.getElementById('bMus').click();
+  out.lvl=Music.level();
  } catch(e){ out.err=e.stack; }
  document.getElementById('__res').textContent=JSON.stringify(out); })();

@@ -149,6 +149,7 @@ const Comic = (() => {
   function play(id, done) {
     const seq = SEQ[id]; if (!seq) return done && done();
     if (typeof SFX !== 'undefined') SFX.resume();
+    if (typeof Music !== 'undefined') Music.play('menu');
     ov = document.createElement('div'); ov.id = 'comic';
     ov.innerHTML = `<div class="cwrap"><canvas width="${W}" height="${H}"></canvas><div class="ccap"></div>
       <div class="cbar"><button class="cv">${voiceOn ? '🗣 Sprache an' : '🗣 Sprache aus'}</button><span class="cn"></span><button class="cs">Überspringen</button><button class="cx big">Weiter ▶</button></div></div>`;

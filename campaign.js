@@ -246,6 +246,7 @@ const Campaign = (() => {
   }
   function hub() {
     document.body.classList.add('inhub');
+    Music.play('menu');
     const rows = MIS.map((m, i) => {
       const ok = i <= C.next, b = C.best[m.id];
       return `<div class="card ${ok ? '' : 'dis'}"><div><b>${i + 1}. ${m.name}</b><small>${m.sub}${b ? ' · Bestwert ' + b : ''}</small></div><button data-i="${i}" ${ok ? '' : 'disabled'}>${b ? 'Erneut spielen' : 'Briefing'}</button></div>`;
