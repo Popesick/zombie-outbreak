@@ -1,5 +1,5 @@
 'use strict';
-/* Zombie Outbreak Simulator – Moosburg a. d. Isar
+/* Outbreak – The Collapse (Zombie Defense Simulator)
    Karte: OpenStreetMap-Daten (ODbL), Spielwelt in Metern, Navigationsraster 4 m. */
 
 // ───────────────────────── Welt & Raster ─────────────────────────

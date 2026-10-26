@@ -1,4 +1,5 @@
-# Zombie Outbreak Simulator
+# Outbreak – The Collapse
+*Zombie Defense Simulator* (Arbeitstitel)
 
 Browser-Sandbox und Kampagne auf echten Karten (Moosburg a. d. Isar, Pfaffenhofen a. d. Ilm).
 Kartendaten: © OpenStreetMap-Mitwirkende (ODbL), Satellitenbild: Esri (zur Laufzeit geladen). Spielstände liegen lokal im Browser (localStorage).
