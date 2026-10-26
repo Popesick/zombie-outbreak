@@ -6,7 +6,7 @@
 const CELL = 4;
 let MD = null, WW = 0, WH = 0, GW = 0, GH = 0;   // aktuelle Karte (siehe setupMap)
 const T_OPEN = 0, T_ROAD = 1, T_BLD = 2, T_WATER = 3;
-let type, comp, barId;   // comp: 1 = Hauptzusammenhangskomponente, barId: Barrikaden-ID je Zelle
+let type, comp, barId, gate;   // comp: 1 = Hauptzusammenhangskomponente, barId: Barrikaden-ID je Zelle
 const DT = 1 / 30;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -137,7 +137,7 @@ function renderMap() {
 function cost(i, zm) {
   const t = type[i];
   if (t > T_ROAD) return 0;
-  if (barId[i]) return zm ? 30 : 0;
+  if (barId[i]) return zm ? 30 : (gate[i] ? 1.2 : 0);
   return t === T_ROAD ? 1 : 1.6;
 }
 const walkCost = (x, y, zm) => (x < 0 || y < 0 || x >= WW || y >= WH) ? 0 : cost((y / CELL | 0) * GW + (x / CELL | 0), zm);
@@ -245,18 +245,29 @@ let E = [], BAR = [null], noises = [], tracers = [], fx = [], markers = [];
 let S = null;       // Sim-Statistik
 let phase = 'setup', speed = 1, acc = 0;
 let cooldown = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0 };
-const CD_MAX = { barricade: 0, strike: 0, supply: 20, garrison: 30, evac: 0, truck: 2 };
-const MAXUSE = { garrison: 4, strike: 10, supply: 5, truck: 2 };
-const UNLOCK = { garrison: 25, supply: 35, strike: 50, evac: 50, truck: 70 };
 const selected = new Set();
 let simT = 0, pathBudget = 0, finished = false;
-const K_CIV = 0, K_ZOM = 1, K_POL = 2, K_SOL = 3, K_SEN = 4, K_TRK = 5;
+const K_CIV = 0, K_ZOM = 1, K_POL = 2, K_SOL = 3, K_SEN = 4, K_TRK = 5, K_TUR = 6;
 const ZHP = 4;
 
-let RULES = { barLimit: 50, barHpMul: 2 };
+// Regeln: Classic/Sandbox oder Kampagne (campaign.js setzt RULES je Mission)
+function classicRules() {
+  return { mode: 'classic', barLimit: 50, barHpMul: 2, ammo: false, xp: false, zmix: false, baseAcc: null,
+    tools: { infect: {}, barricade: {}, demolish: {}, garrison: { pct: 25, max: 4, cd: 30 }, supply: { pct: 35, max: 5, cd: 20 }, strike: { pct: 50, max: 10, cd: 0 }, evac: { pct: 50 }, truck: { pct: 70, max: 2, cd: 2 } } };
+}
+let RULES = classicRules();
+const fmtClock = t => { t = Math.round(t); return String(t / 60 | 0).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
+function toolGate(tool) {
+  const t = RULES.tools[tool]; if (!t) return { hidden: true };
+  let locked = false, label = '', why = '';
+  if (t.at != null) { if (simT < t.at) { locked = true; label = 'ab ' + fmtClock(t.at); why = 'Verfügbar ab ' + fmtClock(t.at) + ' Spielzeit'; } }
+  else if (t.pct != null) { const pc = lostPct(); if (pc < t.pct) { locked = true; label = 'ab ' + t.pct + ' % (' + pc.toFixed(0) + ')'; why = `Erst verfügbar, wenn ${t.pct} % der Bevölkerung tot oder verwandelt sind (aktuell ${pc.toFixed(0)} %)`; } }
+  const used = S && S.used[tool] || 0, left = t.max != null ? t.max - used : 99;
+  return { hidden: false, locked, label, why, left, max: t.max, cd: t.cd || 0 };
+}
 function newStats() { return { plans: [], planId: 0, kills: 0, loss: 0, shots: 0, bites: 0, breaches: 0, zombified: 0, peakZ: 0, peakZt: 0, hist: [], used: { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0 }, ev: { civ: 0, pol: 0, mil: 0, trk: 0 }, evac: null, evacT: 10, evacUnits: false, histT: 0 }; }
 let uidN = 0;
-function mk(k, x, y) { return { id: ++uidN, k, x, y, hp: k === K_ZOM ? ZHP : 3, st: 0, path: null, pi: 0, th: rnd(0, .4), cd: 0, ammo: 0, acc: 0, armed: false, inc: -1, b: -1, brave: false, wt: rnd(0, 8), tgt: null, dead: false, inT: 0, hx: 0, hy: 0, ft: 0, hmx: x, hmy: y, pt: 0, bt: 0, ord: false, g: 0, sq: 0, ds: 0, dt: 0, pend: null, patrol: null, gsp: 0, lx: x, ly: y, ae: 0 }; }
+function mk(k, x, y) { return { id: ++uidN, k, x, y, hp: k === K_ZOM ? ZHP : 3, st: 0, path: null, pi: 0, th: rnd(0, .4), cd: 0, ammo: 0, acc: 0, armed: false, inc: -1, b: -1, brave: false, wt: rnd(0, 8), tgt: null, dead: false, inT: 0, hx: 0, hy: 0, ft: 0, hmx: x, hmy: y, pt: 0, bt: 0, ord: false, g: 0, sq: 0, kills: 0, lvl: 1, snipe: false, sil: false, ds: 0, dt: 0, pend: null, patrol: null, gsp: 0, lx: x, ly: y, ae: 0 }; }
 const zSpeed = () => 1.5 + cfg.zs / 100 * 6.8;
 const zVision = () => 60 + cfg.zs / 100 * 60;
 
@@ -287,7 +298,7 @@ function spawnCivilian(inside) {
   E.push(e);
 }
 function arm(e) { e.armed = true; e.ammo = 14; e.acc = cfg.acc / 100; }
-function spawnZombie(x, y) { const e = mk(K_ZOM, x, y); e.st = 0; e.wt = rnd(0, 5); E.push(e); return e; }
+function spawnZombie(x, y) { const e = mk(K_ZOM, x, y); e.st = 0; e.wt = rnd(0, 5); if (RULES.zmix) e.zsp = Math.random() < .5 ? rnd(1.5, 3) : rnd(5, 8); E.push(e); return e; }
 
 function outbreakPoints() {
   const pts = [];
@@ -314,22 +325,24 @@ function spawnSquads(kind, total, size, acc) {
   }
 }
 function newSim() {
-  E = []; BAR = [null]; barId.fill(0); noises = []; tracers = []; fx = []; simT = 0; finished = false;
+  E = []; BAR = [null]; barId.fill(0); gate.fill(0); noises = []; tracers = []; fx = []; simT = 0; finished = false;
   for (const b of B) { b.occ = []; b.siege = 0; }
-  S = newStats(); cooldown = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0 }; evacDirty = false;
+  S = newStats(); cooldown = {}; evacDirty = false; zfDirty = true; ZF = { evac: null, lure: null };
   const inside = Math.round(cfg.pop * .5);
   for (let i = 0; i < cfg.pop; i++) spawnCivilian(i < inside);
-  const mp = markers.length ? markers : outbreakPoints();
-  const rad = 14 + Math.sqrt(cfg.inf0 / mp.length) * 4;
   document.getElementById('alerts').innerHTML = '';
-  mp.slice(0, 3).forEach((m, i) => alertAt(m.x, m.y, 'Zombies aufgetaucht' + (mp.length > 1 ? ' (Herd ' + (i + 1) + ')' : '')));
-  for (let i = 0; i < cfg.inf0; i++) {
-    const m = mp[i % mp.length]; const p = randWalk(m.x, m.y, rad) || randWalk(m.x, m.y, rad * 3) || anyWalk(true);
-    spawnZombie(p[0], p[1]);
+  if (RULES.spawn) RULES.spawn();
+  else {
+    const mp = markers.length ? markers : outbreakPoints();
+    const rad = 14 + Math.sqrt(cfg.inf0 / mp.length) * 4;
+    mp.slice(0, 3).forEach((m, i) => alertAt(m.x, m.y, 'Zombies aufgetaucht' + (mp.length > 1 ? ' (Herd ' + (i + 1) + ')' : '')));
+    for (let i = 0; i < cfg.inf0; i++) {
+      const m = mp[i % mp.length]; const p = randWalk(m.x, m.y, rad) || randWalk(m.x, m.y, rad * 3) || anyWalk(true);
+      spawnZombie(p[0], p[1]);
+    }
+    spawnSquads(K_POL, cfg.police, 2, .45);
+    spawnSquads(K_SOL, cfg.mil, 4, .7);
   }
-  const home = [];
-  spawnSquads(K_POL, cfg.police, 2, .45);
-  spawnSquads(K_SOL, cfg.mil, 4, .7);
   record();
 }
 
@@ -346,13 +359,13 @@ function rebuildHash() {
     if (e.k === K_ZOM) { hzNxt[i] = hzHead[c]; hzHead[c] = i; } else { hhNxt[i] = hhHead[c]; hhHead[c] = i; }
   }
 }
-function nearest(head, nxt, x, y, r, needSee) {
+function nearest(head, nxt, x, y, r, needSee, pred) {
   let best = null, bd = r * r, scanned = 0;
   const x0 = Math.max(0, (x - r) / HS | 0), x1 = Math.min(HW - 1, (x + r) / HS | 0), y0 = Math.max(0, (y - r) / HS | 0), y1 = Math.min(HH - 1, (y + r) / HS | 0);
   for (let gy = y0; gy <= y1; gy++) for (let gx = x0; gx <= x1; gx++)
     for (let i = head[gy * HW + gx]; i >= 0; i = nxt[i]) {
       if (++scanned > 150) return best;
-      const e = E[i]; if (e.dead) continue;
+      const e = E[i]; if (e.dead || (pred && !pred(e))) continue;
       const d = (e.x - x) ** 2 + (e.y - y) ** 2;
       if (d < bd && (!needSee || seeLine(x, y, e.x, e.y))) { bd = d; best = e; }
     }
@@ -367,19 +380,26 @@ function countZNear(x, y, r) {
 }
 
 // ───────────────────────── Bewegung ─────────────────────────
-function passable(x, y, zm) {
+function healthyNear(e) {
+  const x0 = Math.max(0, (e.x - 4) / HS | 0), x1 = Math.min(HW - 1, (e.x + 4) / HS | 0), y0 = Math.max(0, (e.y - 4) / HS | 0), y1 = Math.min(HH - 1, (e.y + 4) / HS | 0);
+  for (let gy = y0; gy <= y1; gy++) for (let gx = x0; gx <= x1; gx++) for (let i = hhHead[gy * HW + gx]; i >= 0; i = hhNxt[i]) { const u = E[i]; if (u !== e && !u.dead && u.inc < 0 && (u.x - e.x) ** 2 + (u.y - e.y) ** 2 < 16) return true; }
+  return false;
+}
+function canGate(e) { if (!e || e.k === K_ZOM) return false; if (RULES.scan && e.inc >= 0 && !healthyNear(e)) return false; return true; }
+function killBar(i) { const b = BAR[i]; if (!b) return; for (const c of b.cells) { barId[c] = 0; gate[c] = 0; } BAR[i] = null; evacDirty = true; }
+function passable(x, y, zm, e) {
   if (x < 1 || y < 1 || x > WW - 1 || y > WH - 1) return false;
   const i = cellIdx(x, y), t = type[i];
   if (t > T_ROAD) return false;
-  if (barId[i]) { if (zm) bash(barId[i]); return false; }
+  if (barId[i]) { if (gate[i] && !zm && canGate(e)) return true; if (zm) bash(barId[i]); return false; }
   return true;
 }
 function bash(id) { const b = BAR[id]; if (b) b.hp -= 7 * DT; }
 function moveDir(e, dx, dy, sp, zm) {
   const nx = e.x + dx * sp * DT, ny = e.y + dy * sp * DT;
-  if (passable(nx, ny, zm)) { e.x = nx; e.y = ny; return true; }
-  if (passable(nx, e.y, zm)) { e.x = nx; return true; }
-  if (passable(e.x, ny, zm)) { e.y = ny; return true; }
+  if (passable(nx, ny, zm, e)) { e.x = nx; e.y = ny; return true; }
+  if (passable(nx, e.y, zm, e)) { e.x = nx; return true; }
+  if (passable(e.x, ny, zm, e)) { e.y = ny; return true; }
   return false;
 }
 function moveTo(e, tx, ty, sp, zm) {
@@ -409,17 +429,18 @@ function noise(x, y, r) {
 }
 function shoot(e, z, rng, dmg) {
   S.shots++;
-  SFX.shot(e.x, e.y, e.k === K_TRK ? 'mg' : e.k === K_CIV ? 'civ' : e.k === K_POL ? 'pistol' : 'rifle');
+  if (RULES.ammo && e.k !== K_CIV) e.ammo--;
+  SFX.shot(e.x, e.y, e.k === K_TRK || e.k === K_TUR ? 'mg' : e.k === K_CIV ? 'civ' : e.k === K_POL ? 'pistol' : 'rifle');
   tracers.push({ x1: e.x, y1: e.y, x2: z.x, y2: z.y, t: .12 });
-  if (!(e.k === K_TRK && simT - (e.nt || 0) < .8)) { e.nt = simT; noise(e.x, e.y, e.k === K_CIV ? 130 : e.k === K_POL ? 170 : e.k === K_TRK ? 260 : 230); }
+  if (!((e.k === K_TRK || e.k === K_TUR) && simT - (e.nt || 0) < .8)) { e.nt = simT; noise(e.x, e.y, (e.k === K_CIV ? 130 : e.k === K_POL ? 170 : e.k === K_TRK || e.k === K_TUR ? 260 : 230) * (e.sil ? .5 : 1) * (e.snipe ? 1.2 : 1)); }
   const d = Math.hypot(z.x - e.x, z.y - e.y);
   if (Math.random() < (e.ae || e.acc) * (1 - .45 * d / rng)) {
     z.hp -= dmg;
-    if (z.hp <= 0 && !z.dead) { z.dead = true; S.kills++; }
+    if (z.hp <= 0 && !z.dead) { z.dead = true; S.kills++; if (RULES.xp && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN)) { e.kills++; const nl = 1 + Math.floor(e.kills / 50); if (nl > e.lvl) { e.lvl = nl; e.acc = RULES.baseAcc + .05 * (nl - 1); toast('⭐ Einheit steigt auf Level ' + nl + ' (Treffsicherheit ' + Math.round(e.acc * 100) + ' %)'); } } }
   }
 }
 function infect(e) {
-  if (e.inc >= 0 || e.k === K_ZOM || e.k === K_TRK) return;
+  if (e.inc >= 0 || e.k === K_ZOM || e.k === K_TRK || e.k === K_TUR) return;
   e.inc = cfg.infT * rnd(.7, 1.3); S.bites++; SFX.bite(e.x, e.y); if (e.k === K_CIV) SFX.scream(e.x, e.y);
 }
 function alertAt(x, y, text) {
@@ -530,9 +551,10 @@ function giveMove(u, p, patrol) {
   u.ord = true; u.patrol = patrol || null; u.hmx = p[0]; u.hmy = p[1]; u.bt = 0; u.wt = 1;
   if (path) { u.path = path; u.pi = 0; }
 }
+const isFoe = z => z && !z.dead && (z.k === K_ZOM || z.inc >= 0);
 function stepUnit(e) {
   if (e.inc >= 0) { e.inc -= DT; if (e.inc <= 0) { toZombie(e); return; } }
-  const trk = e.k === K_TRK, rng = trk ? 70 : e.k === K_SOL || e.k === K_SEN ? 65 : 38, rate = trk ? .12 : e.k === K_POL ? 1.1 : .7, dmg = trk ? 1 : e.k === K_POL ? 1.5 : 2.5, mobile = e.k !== K_SEN;
+  const trk = e.k === K_TRK || e.k === K_TUR, sn = !!e.snipe && !trk && e.k !== K_POL, rng = (trk ? 70 : e.k === K_SOL || e.k === K_SEN ? 65 : 38) * (sn ? 3 : 1), rate = (trk ? .12 : e.k === K_POL ? 1.1 : .7) * (sn ? 2 : 1), dmg = trk ? 1 : e.k === K_POL ? 1.5 : 2.5, mobile = e.k !== K_SEN && e.k !== K_TUR;
   // Eingraben / Stellung räumen
   if (e.ds === 1) { e.dt += DT; if (e.dt >= 60) { e.ds = 2; e.dt = 0; } }
   else if (e.ds === 3) {
@@ -542,17 +564,17 @@ function stepUnit(e) {
   const fixed = e.ds > 0;
   const mv = Math.hypot(e.x - e.lx, e.y - e.ly) > .02; e.lx = e.x; e.ly = e.y;
   const ba = trk ? Math.max(.15, e.acc - .15) : e.acc;
-  if (trk) { if (mv) e.ang = Math.atan2(e.y - e.ly0, e.x - e.lx0); e.lx0 = e.x; e.ly0 = e.y; if ((e.nz = (e.nz || 0) - DT) <= 0 && (e.nz = .3) && countZAround(e.x, e.y, 5) >= 5) { e.dead = true; toast('🚛 Truck zerstört – von Zombies umlagert'); return; } }
+  if (trk) { if (mv) e.ang = Math.atan2(e.y - e.ly0, e.x - e.lx0); e.lx0 = e.x; e.ly0 = e.y; if ((e.nz = (e.nz || 0) - DT) <= 0 && (e.nz = .3) && countZAround(e.x, e.y, 5) >= (e.k === K_TUR ? 10 : 5)) { e.dead = true; toast(e.k === K_TUR ? '🔫 Geschütz zerstört – von Zombies überrannt' : '🚛 Truck zerstört – von Zombies umlagert'); return; } }
   e.ae = e.ds === 2 ? Math.min(1, ba + .15) : mv ? Math.max(trk ? .15 : .1, ba - .2) : ba;
   e.cd -= DT; e.th -= DT;
-  if (e.th <= 0) { e.th = rnd(.2, .35); e.tgt = nearestZ(e.x, e.y, rng + 15); }
+  if (e.th <= 0) { e.th = rnd(.2, .35); e.tgt = nearestZ(e.x, e.y, rng + 15); if (!e.tgt && RULES.scan && (e.k === K_SOL || e.k === K_SEN)) e.tgt = nearest(hhHead, hhNxt, e.x, e.y, rng, true, u => u.k === K_CIV && u.inc >= 0); }
   const z = e.tgt;
   if (e.ord) {   // direkt gesteuert: auf Sicht schießen (auch in Bewegung), nicht selbstständig vorrücken
-    if (z && !z.dead && z.k === K_ZOM) {
+    if (isFoe(z)) {
       const d = Math.hypot(z.x - e.x, z.y - e.y);
-      if (d <= rng && e.cd <= 0 && seeLine(e.x, e.y, z.x, z.y)) { e.cd = rate; shoot(e, z, rng, dmg); }
+      if (d <= rng && e.cd <= 0 && (!RULES.ammo || e.ammo > 0) && seeLine(e.x, e.y, z.x, z.y)) { e.cd = rate; shoot(e, z, rng, dmg); }
     }
-    if (!fixed) {
+    if (!fixed && e.k !== K_TUR) {
       if (e.evac) evacMove(e, unitSpeed(e));
       else if (e.path) follow(e, e.gsp || unitSpeed(e), false);
       else if (e.patrol) {
@@ -562,11 +584,11 @@ function stepUnit(e) {
     }
     return;
   }
-  if (z && !z.dead && z.k === K_ZOM) {
+  if (isFoe(z)) {
     const d = Math.hypot(z.x - e.x, z.y - e.y);
     if (d < 7) { if (mobile || d < 3) moveDir(e, (e.x - z.x) / (d || 1), (e.y - z.y) / (d || 1), 4.4, false); }
     else if (d > rng * .75 && mobile) { moveTo(e, z.x, z.y, e.k === K_SOL ? 4.4 : 4, false); }
-    if (d <= rng && e.cd <= 0 && seeLine(e.x, e.y, z.x, z.y)) { e.cd = rate; shoot(e, z, rng, dmg); }
+    if (d <= rng && e.cd <= 0 && (!RULES.ammo || e.ammo > 0) && seeLine(e.x, e.y, z.x, z.y)) { e.cd = rate; shoot(e, z, rng, dmg); }
     e.path = null; e.wt = 1;
     return;
   }
@@ -595,6 +617,8 @@ function thinkZombie(e) {
   if (hr) { const d = Math.hypot(hr.x - e.x, hr.y - e.y); if (d < (hr.k === K_CIV && hr.st !== 2 ? 30 : 55)) { e.tgt = hr; e.st = 1; e.lost = 0; return; } }
   if (e.st === 1 && e.tgt && !e.tgt.dead && e.tgt.st !== 4 && e.tgt.k !== K_ZOM && Math.hypot(e.tgt.x - e.x, e.tgt.y - e.y) < vis * 1.6 && (e.lost = (e.lost || 0) + .3) < 6) return;
   if (e.st === 1) { e.st = 0; e.tgt = null; e.wt = 0; }
+  // Lockruf (Kampagne): wirkt auf alle, die kein Ziel sehen oder hören
+  if (S.lure && simT < S.lure.until && ZF.lure) { e.st = 7; e.fz = 'lure'; e.fzT = 2; return; }
   // Geräusche
   let bn = null, bd = -1e9;
   for (const n of noises) { const d = Math.hypot(n.x - e.x, n.y - e.y); if (d < n.r && d > 8 && n.r - d > bd) { bd = n.r - d; bn = n; } }
@@ -604,7 +628,7 @@ function thinkZombie(e) {
 function stepZombie(e) {
   e.th -= DT; e.pt -= DT;
   if (e.th <= 0) { e.th = rnd(.25, .4); thinkZombie(e); }
-  const sp = zSpeed();
+  const sp = e.zsp || zSpeed();
   // Belagerung
   if (e.st === 0 && e.th < .02) { const b = nearBuildings(e.x, e.y, 9, b => b.occ.length > 0); if (b) b.siege += .3 * 1; }
   if (e.st === 1) {
@@ -622,11 +646,17 @@ function stepZombie(e) {
     return;
   }
   if (e.st === 2) { if (!follow(e, sp * .9, true)) e.st = 0; return; }
+  if (e.st === 7) {   // Feldbewegung: Lockruf oder Horde zum Evakuierungsort
+    e.fzT -= DT; const lure = e.fz === 'lure', tg = lure ? S.lure : S.evac;
+    if (!tg || e.fzT <= 0 || (lure && simT >= S.lure.until)) { e.st = 0; e.wt = 0; return; }
+    fieldDescend(e, lure ? ZF.lure : ZF.evac, tg.x, tg.y, sp, true); return;
+  }
   // Umherirren
   if (e.path) { follow(e, sp * .45, true); return; }
   e.wt -= DT;
   if (e.wt <= 0) {
     e.wt = rnd(2, 9);
+    if (S.horde && S.evac && ZF.evac && Math.random() < S.horde) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(6, 12); return; }
     let tx = null;
     if (Math.random() < (S.evac ? .25 : .6)) { const b = nearBuildings(e.x, e.y, 220, b => b.occ.length > 0); if (b) { tx = [b.ex, b.ey]; } }
     if (!tx && S.evac) {
@@ -660,8 +690,8 @@ function step() {
     }
   }
   // Barrikaden
-  for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (b && b.hp <= 0) { for (const c of b.cells) barId[c] = 0; BAR[i] = null; evacDirty = true; } }
-  dispatchBuild();
+  for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (b && b.hp <= 0) killBar(i); }
+  dispatchBuild(); updateZF(); if (RULES.tick) RULES.tick();
   // Evakuierung
   if (S.evac) {
     S.evacT -= DT; if (S.evacR != null && S.evacR < 4000) S.evacR += 25 * DT;
@@ -686,17 +716,17 @@ function updateFx() {
     if (f.type === 'heli') {
       if (f.ph === 0) {
         const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy), sp = 48 * DT; f.a = Math.atan2(dy, dx);
-        if (d <= sp) { f.x = f.tx; f.y = f.ty; f.ph = 1; f.t = f.kind === 'garrison' ? 3.5 : f.kind === 'evac' ? 5 : f.kind === 'build' ? 3 : 2.2; } else { f.x += dx / d * sp; f.y += dy / d * sp; }
+        if (d <= sp) { f.x = f.tx; f.y = f.ty; f.ph = 1; f.t = f.kind === 'garrison' ? 3.5 : f.kind === 'evac' ? 5 : f.kind === 'build' ? 3 : f.kind === 'gunship' ? 30 : 2.2; } else { f.x += dx / d * sp; f.y += dy / d * sp; }
       } else if (f.ph === 1) {
-        f.t -= DT;
+        f.t -= DT; if (f.kind === 'gunship') gunFire(f);
         if (f.t <= 0 && f.kind === 'build') {
           deliverPlan(f.route[f.ri]); f.ri++;
           const nq = S.plans.find(q => f.ri < f.route.length && q.id === f.route[f.ri]);
           if (nq) { f.tx = nq.x; f.ty = nq.y; f.ph = 0; } else if (f.ri < f.route.length) { f.ri = f.route.length; f.ph = 2; } else f.ph = 2;
         } else if (f.t <= 0) {
           f.ph = 2;
-          if (f.kind === 'garrison') landGarrison(f.tx, f.ty); else if (f.kind === 'evac') doEvac(f.tx, f.ty); else drop(f.tx, f.ty);
-          if (f.kind !== 'evac') fx.push({ type: 'ring', x: f.tx, y: f.ty, r: f.kind === 'garrison' ? 12 : 35, t: 1, T: 1, c: f.kind === 'garrison' ? '120,220,110' : '90,170,255' });
+          if (f.kind === 'garrison') landGarrison(f.tx, f.ty); else if (f.kind === 'evac') doEvac(f.tx, f.ty); else if (f.kind === 'turret') placeTurret(f.tx, f.ty); else if (f.kind === 'gunship') { /* nur Abflug */ } else drop(f.tx, f.ty);
+          if (f.kind !== 'evac' && f.kind !== 'gunship') fx.push({ type: 'ring', x: f.tx, y: f.ty, r: f.kind === 'garrison' ? 12 : 35, t: 1, T: 1, c: f.kind === 'garrison' ? '120,220,110' : '90,170,255' });
         }
       } else {
         const dx = f.ex - f.x, dy = f.ey - f.y, d = Math.hypot(dx, dy), sp = 60 * DT; f.a = Math.atan2(dy, dx);
@@ -706,13 +736,58 @@ function updateFx() {
       f.x += f.vx * DT; f.y += f.vy * DT;
       if (!f.dropped && Math.hypot(f.tx - f.x, f.ty - f.y) <= f.lead) { f.dropped = true; SFX.jet(f.x, f.y); SFX.whistle(f.tx, f.ty); fx.push({ type: 'bomb', x0: f.x, y0: f.y, tx: f.tx, ty: f.ty, t: 1.2, T: 1.2 }); }
       if (f.dropped && Math.hypot(f.tx - f.x, f.ty - f.y) > 1500) fx.splice(i, 1);
+    } else if (f.type === 'timer') {
+      f.t -= DT; if (f.t <= 0) { const [sx, sy] = edgeEntry(f.spawn.tx, f.spawn.ty); fx.splice(i, 1); fx.push({ ...f.spawn, x: sx, y: sy, ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); }
+    } else if (f.type === 'flare') {
+      f.t -= DT;
+      if (f.t <= 20 && f.t > 0 && (f.nt = (f.nt || 0) - DT) <= 0) { f.nt = .5; noise(f.x, f.y, 700); if ((f.sb = (f.sb || 0) + 1) % 2) SFX.alarm(); }
+      if (f.t <= 0) { explode(f.x, f.y, 18); f.type = 'boom'; f.t = .7; f.r = 18; }
     } else if (f.type === 'bomb') {
       f.t -= DT; if (f.t <= 0) { explode(f.tx, f.ty, 30); f.type = 'boom'; f.t = .7; f.x = f.tx; f.y = f.ty; f.r = 30; }
     } else { f.t -= DT; if (f.t <= 0) fx.splice(i, 1); }
   }
 }
 let evD = null, evacDirty = false, evLast = -99;
+// Allgemeines Distanzfeld (Dijkstra) für Horde/Lockruf; zm = Barrikaden durchlässig (hohe Kosten)
+function computeField(x, y, zm, D) {
+  if (!D) D = new Float64Array(GW * GH);
+  D.fill(1e9);
+  const s0 = cellIdx(x, y); hN = 0; D[s0] = 0; hpush(s0, 0);
+  while (hN > 0) {
+    const f = hF[0], cur = hpop();
+    if (f > D[cur]) continue;
+    const cx = cur % GW, cy = cur / GW | 0;
+    for (const [dx, dy, m] of NB) {
+      const nx = cx + dx, ny = cy + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+      const ni = ny * GW + nx, c = cost(ni, zm); if (!c) continue;
+      if (dx && dy && (!cost(cy * GW + nx, zm) || !cost(ny * GW + cx, zm))) continue;
+      const nd = f + c * m; if (nd < D[ni]) { D[ni] = nd; hpush(ni, nd); }
+    }
+  }
+  return D;
+}
+function fieldDescend(e, D, tx, ty, sp, zm) {
+  let ci = cellIdx(e.x, e.y);
+  if (!D || D[ci] >= 1e8) { moveTo(e, tx, ty, sp, zm); return; }
+  let px = 0, py = 0;
+  for (let k = 0; k < 2; k++) {
+    const cx = ci % GW, cy = ci / GW | 0; let bi = ci, bd = D[ci];
+    for (const [dx, dy] of NB) {
+      const nx = cx + dx, ny = cy + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+      const ni = ny * GW + nx; if (D[ni] < bd && (!dx || !dy || (cost(cy * GW + nx, zm) && cost(ny * GW + cx, zm)))) { bd = D[ni]; bi = ni; }
+    }
+    ci = bi; px = (ci % GW + .5) * CELL; py = ((ci / GW | 0) + .5) * CELL;
+  }
+  moveTo(e, px, py, sp, zm);
+}
+let ZF = { evac: null, lure: null }, zfDirty = true;
+function updateZF() {   // Felder für Zombies bei Bedarf neu berechnen
+  if (!S || !zfDirty) return; zfDirty = false;
+  if (S.evac) ZF.evac = computeField(S.evac.x, S.evac.y, true, ZF.evac); else ZF.evac = null;
+  if (S.lure) ZF.lure = computeField(S.lure.x, S.lure.y, true, ZF.lure); else ZF.lure = null;
+}
 function computeEvacField() {
+  zfDirty = true;
   if (!S || !S.evac) return;
   evacDirty = false; evLast = simT;
   if (!evD) evD = new Float64Array(GW * GH);
@@ -778,21 +853,21 @@ function evKind(e) { return e.k === K_CIV ? 'civ' : e.k === K_POL ? 'pol' : e.k 
 function doEvac(x, y) {
   const cand = [];
   for (const e of E) {
-    if (e.dead || e.k === K_ZOM || e.inc >= 0 || (e.k === K_CIV && e.st === 4)) continue;
+    if (e.dead || e.k === K_ZOM || e.k === K_TUR || e.inc >= 0 || (e.k === K_CIV && e.st === 4)) continue;
     const d = Math.hypot(e.x - x, e.y - y); if (d > 38) continue;
     if (e.k === K_CIV) cand.push([0, d, e]); else if (S.evacUnits) cand.push([1, d, e]);
   }
   cand.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   if (cand.length < 20) for (const e of E) if (!e.dead && e.k === K_CIV && e.inc < 0 && e.st !== 4 && (e.stk || 0) > 10 && !cand.some(c => c[2] === e)) cand.push([0, 1e5, e]);   // Hubschrauber sammelt Festsitzende ein
   const take = cand.slice(0, 20);
-  for (const [, , e] of take) { e.dead = true; S.ev[evKind(e)]++; }
+  for (const [, , e] of take) { e.dead = true; S.ev[evKind(e)]++; if (S.evU && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN)) S.evU.push({ k: e.k === K_POL ? 'pol' : 'sol', kills: e.kills, sq: e.sq }); }
   fx.push({ type: 'ring', x, y, r: 30, t: 1, T: 1, c: '255,255,255' });
   if (take.length) { toast('🚁 ' + take.length + ' evakuiert'); SFX.chime(x, y); }
 }
 function startUnitEvac() {
   if (!S.evac) return toast('Erst den Evakuierungsort festlegen (Werkzeug „Evakuierung“)');
   S.evacUnits = true;
-  for (const u of E) if (friendly(u)) {
+  for (const u of E) if (friendly(u) && u.k !== K_TUR) {
     u.ord = true; u.path = null; u.patrol = null;
     if (u.ds > 0) { if (u.ds === 1) u.dt = 60 - u.dt; else if (u.ds === 2) u.dt = 0; u.ds = 3; u.pend = { evacu: true }; } else u.evac = true;
   }
@@ -832,7 +907,8 @@ function deliverPlan(id) {
   pushOut(cells);
   const bid = BAR.length; for (const c of cells) barId[c] = bid;
   const hp = barHp(cells.length);
-  BAR.push({ cells, hp, max: hp, x: q.x, y: q.y }); evacDirty = true;
+  const gs = (q.gates || []).filter(c => cells.includes(c)); for (const c of gs) gate[c] = 1;
+  BAR.push({ cells, hp, max: hp, x: q.x, y: q.y, gates: gs }); evacDirty = true;
   SFX.thud(q.x, q.y); fx.push({ type: 'ring', x: q.x, y: q.y, r: 14, t: .8, T: .8, c: '230,170,70' });
 }
 function dispatchBuild() {
@@ -846,9 +922,23 @@ function dispatchBuild() {
     fx.push({ type: 'heli', kind: 'build', x: sx, y: sy, tx: route[0].x, ty: route[0].y, ex: sx, ey: sy, ph: 0, t: 0, a: 0, route: route.map(q => q.id), ri: 0 });
   }
 }
+function gunFire(f) {   // Gunship: Gatling beharkt alle Zombies im Zielgebiet
+  if ((f.gt = (f.gt || 0) - DT) <= 0) { f.gt = .2; f.cands = E.filter(z => z.k === K_ZOM && !z.dead && Math.hypot(z.x - f.tx, z.y - f.ty) < 45); }
+  const c = f.cands; if (!c || !c.length) return;
+  const z = c[Math.random() * c.length | 0]; if (!z || z.dead) return;
+  tracers.push({ x1: f.x, y1: f.y, x2: z.x, y2: z.y, t: .08 });
+  if (Math.random() < .6) { z.hp -= 1.5; if (z.hp <= 0) { z.dead = true; S.kills++; } }
+  if ((f.nz = (f.nz || 0) - DT) <= 0) { f.nz = 1; noise(f.tx, f.ty, 350); }
+  SFX.shot(f.tx, f.ty, 'mg');
+}
+function placeTurret(x, y) {
+  const e = mk(K_TUR, x, y); e.acc = RULES.baseAcc != null ? RULES.baseAcc : .7; e.armed = true; e.ord = true; e.hmx = x; e.hmy = y;
+  if (RULES.ammo) { e.ammoMax = 2000 * RULES.ammoMul; e.ammo = e.ammoMax; }
+  E.push(e); SFX.thud(x, y);
+}
 function landGarrison(x, y) {
-  const id = ++gidN;
-  for (let i = 0; i < 4; i++) { const p = randWalk(x, y, 9) || randWalk(x, y, 30); if (!p) continue; const e = mk(K_SEN, p[0], p[1]); e.acc = .7; e.armed = true; e.g = id; e.sq = id; E.push(e); }
+  const id = ++gidN, n = 4 + (RULES.squadPlus || 0);
+  for (let i = 0; i < n; i++) { const p = randWalk(x, y, 9) || randWalk(x, y, 30); if (!p) continue; const e = mk(K_SEN, p[0], p[1]); e.acc = RULES.baseAcc != null ? RULES.baseAcc : .7; e.armed = true; e.g = id; e.sq = id; if (RULES.ammo) { e.ammoMax = 150 * RULES.ammoMul; e.ammo = e.ammoMax; } E.push(e); }
 }
 function lostPct(c) { c = c || counts(); return clamp((cfg.pop - (c.civ - c.inf)) / cfg.pop * 100, 0, 100); }
 function counts() {
@@ -857,6 +947,7 @@ function counts() {
     if (e.dead) continue;
     if (e.k === K_ZOM) c.zom++;
     else if (e.k === K_CIV) { c.civ++; if (e.inc >= 0) c.inf++; }
+    else if (e.k === K_TUR) { }
     else if (e.k === K_TRK) c.trk++;
     else if (e.k === K_POL) { c.pol++; if (e.inc >= 0) c.inf++; }
     else { c.mil++; if (e.inc >= 0) c.inf++; }
@@ -868,7 +959,8 @@ function record() {
   S.hist.push([Math.round(simT), c.civ, c.inf, c.zom, S.kills, c.pol + c.mil]);
   if (c.zom > S.peakZ) { S.peakZ = c.zom; S.peakZt = simT; }
   if (S.hist.length > 4000) S.hist = S.hist.filter((_, i) => i % 2 === 0);
-  if (phase === 'run' && !finished && simT > 5) {
+  if (RULES.checkEnd && phase === 'run' && !finished) RULES.checkEnd(c);
+  else if (phase === 'run' && !finished && simT > 5) {
     if (c.civ + c.pol + c.mil + c.trk === 0) endGame('Es gibt keine Überlebenden mehr auf der Karte.');
     else if (c.zom === 0 && c.inf === 0) endGame('Der Ausbruch wurde eingedämmt!');
   }
@@ -881,6 +973,12 @@ function explode(x, y, r) {
   noise(x, y, 450);
 }
 function drop(x, y) {
+  if (RULES.ammo) {   // Kampagne: erst Einsatzkräfte auffüllen, der Rest bewaffnet Zivilisten
+    let budget = 800;
+    for (const u of E) if (friendly(u) && u.ammoMax && Math.hypot(u.x - x, u.y - y) < 40) { const need = u.ammoMax - u.ammo; if (need > 0) { const g = Math.min(need, budget); u.ammo += g; budget -= g; } }
+    for (const e of E) { if (budget < 14) break; if (!e.dead && e.k === K_CIV && e.st !== 4 && Math.hypot(e.x - x, e.y - y) < 40) { if (!e.armed) { arm(e); e.brave = Math.random() < .7; budget -= 14; } else { e.ammo += 14; budget -= 14; } } }
+    return;
+  }
   for (const e of E) if (!e.dead && e.k === K_CIV && e.st !== 4 && Math.hypot(e.x - x, e.y - y) < 35) { if (!e.armed && Math.random() < .8) { arm(e); e.brave = Math.random() < .7; } else if (e.armed) e.ammo += 14; }
 }
 
@@ -888,8 +986,11 @@ function drop(x, y) {
 function useTool(tool, x, y, x2, y2) {
   if (phase !== 'run' && tool !== 'infect') return;
   if (tool === 'demolish') { /* kein Limit */ }
-  if (UNLOCK[tool] && lostPct() < UNLOCK[tool]) return toast(`Erst verfügbar, wenn ${UNLOCK[tool]} % der Bevölkerung tot oder verwandelt sind (aktuell ${lostPct().toFixed(0)} %)`);
-  if (MAXUSE[tool] && S.used[tool] >= MAXUSE[tool]) return toast('Keine weiteren Einsätze verfügbar (max. ' + MAXUSE[tool] + ')');
+  if (tool !== 'infect') {
+    const gate = toolGate(tool); if (gate.hidden) return;
+    if (gate.locked) return toast(gate.why);
+    if (gate.left <= 0) return toast('Keine weiteren Einsätze verfügbar (max. ' + gate.max + ')');
+  }
   if (tool !== 'infect' && cooldown[tool] > 0) return toast('Noch ' + Math.ceil(cooldown[tool]) + ' s Abklingzeit');
   if (tool === 'infect') {
     if (phase === 'setup') { markers.push({ x, y }); return; }
@@ -917,12 +1018,31 @@ function useTool(tool, x, y, x2, y2) {
     if (!best) return toast('Hier ist keine Barrikade');
     const bb = BAR[best];
     if (!E.some(u => friendly(u) && Math.hypot(u.x - bb.x, u.y - bb.y) < 50 + bb.cells.length * 2)) return toast('Zum Einreißen muss eine Einheit (Soldat, Polizei, Truck) in der Nähe sein');
-    SFX.thud(x, y); for (const c of bb.cells) barId[c] = 0; BAR[best] = null; evacDirty = true; toast('Barrikade eingerissen'); return;
+    SFX.thud(x, y); killBar(best); toast('Barrikade eingerissen'); return;
+  } else if (tool === 'gate') {
+    let best = null, bd = 10 * 10; const d2 = c => ((c % GW + .5) * CELL - x) ** 2 + (((c / GW | 0) + .5) * CELL - y) ** 2;
+    for (const q of S.plans) for (const c of q.cells) { const d = d2(c); if (d < bd) { bd = d; best = { o: q, c, plan: true }; } }
+    for (const b of BAR) if (b) for (const c of b.cells) { const d = d2(c); if (d < bd) { bd = d; best = { o: b, c, plan: false }; } }
+    if (!best) return toast('Hier ist keine Barrikade für ein Tor');
+    const arr = best.o.gates || (best.o.gates = []), has = arr.includes(best.c);
+    if (has) { arr.splice(arr.indexOf(best.c), 1); if (!best.plan) gate[best.c] = 0; toast('Tor entfernt'); }
+    else {
+      const used = S.plans.reduce((a, q) => a + (q.gates ? q.gates.length : 0), 0) + BAR.reduce((a, b) => a + (b && b.gates ? b.gates.length : 0), 0), quota = Math.floor(barUsed() / 12);
+      if (used >= quota) return toast('Pro 12 Barrikadenelemente ein Tor (' + used + '/' + quota + ' belegt)');
+      arr.push(best.c); if (!best.plan) gate[best.c] = 1; toast('Tor eingeplant');
+    }
+    evacDirty = true; SFX.ui(); return;
+  } else if (tool === 'turret') {
+    const p = randWalk(x, y, 6); if (!p) return toast('Hier kann kein Geschütz stehen');
+    fx.push({ type: 'timer', t: 30, spawn: { type: 'heli', kind: 'turret', tx: p[0], ty: p[1] } });
+  } else if (tool === 'flare') { fx.push({ type: 'flare', x, y, t: 21.2 });
+  } else if (tool === 'gunship') {
+    const [sx, sy] = edgeEntry(x, y); fx.push({ type: 'heli', kind: 'gunship', x: sx, y: sy, tx: x, ty: y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 });
   } else if (tool === 'evac') { setEvac(x, y); return;
   } else if (tool === 'truck') {
     if (Math.min(x, y, WW - x, WH - y) > 70) return toast('Trucks können nur am Kartenrand angefordert werden');
     const p = randWalk(x, y, 45, true) || randWalk(x, y, 70); if (!p) return toast('Hier kann kein Truck einfahren');
-    SFX.engine(p[0], p[1]); const e = mk(K_TRK, p[0], p[1]); e.acc = .7; e.armed = true; e.ord = true; e.hmx = p[0]; e.hmy = p[1]; e.hp = 8; E.push(e);
+    SFX.engine(p[0], p[1]); const e = mk(K_TRK, p[0], p[1]); e.acc = RULES.baseAcc != null ? RULES.baseAcc : .7; e.armed = true; e.ord = true; e.hmx = p[0]; e.hmy = p[1]; e.hp = 8; if (RULES.ammo) { e.ammoMax = 2000 * RULES.ammoMul; e.ammo = e.ammoMax; } E.push(e);
   } else if (tool === 'strike') {
     const an = Math.random() * 6.283, dx = Math.cos(an), dy = Math.sin(an);
     fx.push({ type: 'jet', x: x - dx * 1400, y: y - dy * 1400, vx: dx * 230, vy: dy * 230, a: an, tx: x, ty: y, lead: 276, dropped: false });
@@ -931,25 +1051,25 @@ function useTool(tool, x, y, x2, y2) {
     const [sx, sy] = edgeEntry(x, y);
     fx.push({ type: 'heli', kind: tool, x: sx, y: sy, tx: x, ty: y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 });
   }
-  cooldown[tool] = CD_MAX[tool]; S.used[tool]++; SFX.ui();
+  cooldown[tool] = (RULES.tools[tool] && RULES.tools[tool].cd) || 0; S.used[tool] = (S.used[tool] || 0) + 1; SFX.ui();
 }
 
 // ───────────────────────── Speichern / Laden ─────────────────────────
 const SAVE_KEY = n => 'zos_moosburg_slot' + n;
 function serialize() {
   return {
-    v: 1, ts: Date.now(), simT, cfg, markers, S, cooldown, fx: fx.map(f => ({ ...f })),
-    E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0, e.sq]),
-    bar: BAR.filter(Boolean).map(b => ({ cells: b.cells, hp: b.hp, max: b.max, x: b.x, y: b.y })),
+    v: 2, ts: Date.now(), simT, cfg, markers, S, cooldown, fx: fx.map(f => ({ ...f })), map: curMap, mode: RULES.mode, mission: RULES.missionId || null, up: RULES.up || null,
+    E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0, e.sq, e.kills, e.lvl, e.ammoMax || 0, e.snipe ? 1 : 0, e.sil ? 1 : 0, e.zsp || 0, e.lx0 ? 1 : 0]),
+    bar: BAR.filter(Boolean).map(b => ({ cells: b.cells, hp: b.hp, max: b.max, x: b.x, y: b.y, gates: b.gates || [] })),
     siege: B.filter(b => b.siege > 0).map(b => [b.idx, b.siege])
   };
 }
 function deserialize(d) {
   cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; S.used = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0, ...S.used }; S.ev = S.ev || { civ: 0, pol: 0, mil: 0, trk: 0 }; S.plans = S.plans || []; S.planId = S.planId || 0; if (S.evacT == null) S.evacT = 10; evacDirty = !!S.evac; simT = d.simT; cooldown = d.cooldown; finished = false;
-  noises = []; tracers = []; fx = d.fx || []; selected.clear(); barId.fill(0); BAR = [null];
+  noises = []; tracers = []; fx = d.fx || []; selected.clear(); barId.fill(0); gate.fill(0); BAR = [null];
   for (const b of B) { b.occ = []; b.siege = 0; }
-  E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; e.sq = a[17] || 0; if (e.g > gidN) gidN = e.g; if (e.sq > gidN) gidN = e.sq; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
-  for (const b of d.bar) { const id = BAR.length; for (const c of b.cells) barId[c] = id; BAR.push(b); }
+  E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; e.sq = a[17] || 0; e.kills = a[18] || 0; e.lvl = a[19] || 1; e.ammoMax = a[20] || 0; e.snipe = !!a[21]; e.sil = !!a[22]; if (a[23]) e.zsp = a[23]; if (e.g > gidN) gidN = e.g; if (e.sq > gidN) gidN = e.sq; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
+  for (const b of d.bar) { const id = BAR.length; for (const c of b.cells) barId[c] = id; for (const c of b.gates || []) gate[c] = 1; BAR.push(b); }
   for (const [i, s] of d.siege) B[i].siege = s;
 }
 function slotInfo(n) { try { const d = JSON.parse(localStorage.getItem(SAVE_KEY(n))); return d; } catch (e) { return null; } }
@@ -957,8 +1077,15 @@ function saveSlot(n) {
   try { localStorage.setItem(SAVE_KEY(n), JSON.stringify(serialize())); return true; }
   catch (e) { toast('Speichern fehlgeschlagen (Speicher voll?)'); return false; }
 }
+function prepareLoad(d) {
+  const m = d.map || 'moosburg';
+  if (m !== curMap) setupMap(m);
+  RULES = d.mode === 'campaign' && typeof Campaign !== 'undefined' ? Campaign.rulesFor(d.mission, d.up) : classicRules();
+  $('menu').style.display = 'none'; document.body.classList.remove('inhub');
+}
 function loadSlot(n) {
   const d = slotInfo(n); if (!d) return toast('Kein Spielstand vorhanden');
+  prepareLoad(d);
   deserialize(d); startRun(true); toast('Spielstand geladen');
 }
 
@@ -992,11 +1119,13 @@ function draw() {
     const b = BAR[i]; if (!b) continue;
     ctx.fillStyle = b.hp / b.max > .5 ? '#a8742f' : '#7a4a22';
     for (const c of b.cells) ctx.fillRect((c % GW) * CELL, (c / GW | 0) * CELL, CELL, CELL);
+    if (b.gates && b.gates.length) { ctx.fillStyle = '#7fe08a'; for (const c of b.gates) ctx.fillRect((c % GW) * CELL + 1, (c / GW | 0) * CELL + 1, CELL - 2, CELL - 2); }
   }
   // Baupläne
   if (S && S.plans) for (const q of S.plans) {
     ctx.fillStyle = q.st === 'plan' ? 'rgba(217,154,74,.35)' : 'rgba(217,154,74,.6)'; ctx.strokeStyle = '#d99a4a'; ctx.lineWidth = 1 / cam.z; ctx.setLineDash(q.st === 'plan' ? [3, 2] : []);
     for (const c of q.cells) { const cx = (c % GW) * CELL, cy = (c / GW | 0) * CELL; ctx.fillRect(cx, cy, CELL, CELL); ctx.strokeRect(cx, cy, CELL, CELL); }
+    if (q.gates) { ctx.fillStyle = 'rgba(127,224,138,.8)'; for (const c of q.gates) ctx.fillRect((c % GW) * CELL + 1, (c / GW | 0) * CELL + 1, CELL - 2, CELL - 2); }
     ctx.setLineDash([]);
   }
   // Geräusche
@@ -1019,6 +1148,12 @@ function draw() {
     ctx.fill();
     if (cam.z > 1.4 || mapMode !== 'vec') { ctx.strokeStyle = '#000b'; ctx.lineWidth = .35; ctx.stroke(); }
   }
+  // Geschütze
+  for (const e of E) if (e.k === K_TUR && !e.dead) {
+    const L = Math.max(7, 11 / cam.z), an = e.tgt && !e.tgt.dead ? Math.atan2(e.tgt.y - e.y, e.tgt.x - e.x) : (e.ang || 0); e.ang = an;
+    ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = '#4d5340'; ctx.strokeStyle = '#000b'; ctx.lineWidth = .7 / cam.z; ctx.beginPath(); ctx.arc(0, 0, L * .42, 0, 6.283); ctx.fill(); ctx.stroke();
+    ctx.rotate(an); ctx.strokeStyle = '#151515'; ctx.lineWidth = Math.max(1, 2.2 / cam.z); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(L * .8, 0); ctx.stroke(); ctx.restore();
+  }
   // Trucks
   for (const e of E) if (e.k === K_TRK && !e.dead) {
     const L = Math.max(8, 13 / cam.z); ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.ang || 0);
@@ -1026,6 +1161,7 @@ function draw() {
     ctx.fillStyle = '#9aab55'; ctx.fillRect(L * .2, -L * .2, L * .28, L * .4);
     ctx.strokeStyle = '#111'; ctx.lineWidth = Math.max(.5, 1.4 / cam.z); ctx.beginPath(); ctx.moveTo(-L * .1, 0); ctx.lineTo(L * .55, 0); ctx.stroke(); ctx.restore();
   }
+  if (S && !S.evac && S.evacPre) { ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2 / cam.z; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.arc(S.evacPre.x, S.evacPre.y, 30, 0, 6.283); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = `bold ${Math.max(14, 26 / cam.z)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('H', S.evacPre.x, S.evacPre.y); }
   // Evakuierungsort
   if (S && S.evac) { const k = .5 + .5 * Math.sin(performance.now() / 300); ctx.strokeStyle = `rgba(255,255,255,${.5 + .4 * k})`; ctx.lineWidth = 2 / cam.z; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.arc(S.evac.x, S.evac.y, 30, 0, 6.283); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = `bold ${Math.max(14, 26 / cam.z)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('H', S.evac.x, S.evac.y); }
   // Schüsse
@@ -1038,11 +1174,11 @@ function draw() {
   const now = performance.now(), pul = .5 + .5 * Math.sin(now / 90), sz = Math.max(9, 18 / cam.z);
   for (const f of fx) {
     if (f.type === 'heli' || f.type === 'jet') {
-      const col = f.type === 'jet' ? '255,70,50' : f.kind === 'supply' ? '80,170,255' : f.kind === 'evac' ? '255,255,255' : f.kind === 'build' ? '230,170,70' : '120,220,110', rr = f.type === 'jet' ? 30 : f.kind === 'supply' ? 35 : f.kind === 'evac' ? 30 : f.kind === 'build' ? 8 : 9;
+      const col = f.type === 'jet' ? '255,70,50' : f.kind === 'supply' ? '80,170,255' : f.kind === 'evac' ? '255,255,255' : f.kind === 'build' ? '230,170,70' : f.kind === 'gunship' ? '255,90,60' : '120,220,110', rr = f.type === 'jet' ? 30 : f.kind === 'supply' ? 35 : f.kind === 'evac' ? 30 : f.kind === 'build' ? 8 : f.kind === 'gunship' ? 45 : f.kind === 'turret' ? 6 : 9;
       if (f.type === 'heli' && f.ph < 2 || f.type === 'jet' && !f.dropped) { ctx.strokeStyle = `rgba(${col},${.4 + .5 * pul})`; ctx.lineWidth = 2 / cam.z; ctx.beginPath(); ctx.arc(f.tx, f.ty, rr, 0, 6.283); ctx.stroke(); }
       ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a);
       if (f.type === 'heli') {
-        ctx.fillStyle = f.kind === 'supply' ? '#35557a' : f.kind === 'evac' ? '#8a3333' : f.kind === 'build' ? '#7a5a2a' : '#3f4d33'; ctx.strokeStyle = '#000a'; ctx.lineWidth = .5 / cam.z;
+        ctx.fillStyle = f.kind === 'supply' ? '#35557a' : f.kind === 'evac' ? '#8a3333' : f.kind === 'build' ? '#7a5a2a' : f.kind === 'gunship' ? '#2b1c1c' : f.kind === 'turret' ? '#4a4f55' : '#3f4d33'; ctx.strokeStyle = '#000a'; ctx.lineWidth = .5 / cam.z;
         ctx.beginPath(); ctx.ellipse(0, 0, sz * .42, sz * .16, 0, 0, 6.283); ctx.fill(); ctx.stroke();
         ctx.fillRect(-sz * .85, -sz * .03, sz * .5, sz * .06);
         ctx.rotate(now / 40); ctx.strokeStyle = 'rgba(235,235,235,.85)'; ctx.lineWidth = Math.max(.5, 1.5 / cam.z);
@@ -1053,6 +1189,11 @@ function draw() {
         ctx.beginPath(); ctx.moveTo(sz * .7, 0); ctx.lineTo(-sz * .45, sz * .42); ctx.lineTo(-sz * .25, 0); ctx.lineTo(-sz * .45, -sz * .42); ctx.closePath(); ctx.fill(); ctx.stroke();
       }
       ctx.restore();
+    } else if (f.type === 'timer') {
+      ctx.strokeStyle = `rgba(120,220,110,${.3 + .4 * pul})`; ctx.lineWidth = 2 / cam.z; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(f.spawn.tx, f.spawn.ty, 7, 0, 6.283); ctx.stroke(); ctx.setLineDash([]);
+    } else if (f.type === 'flare') {
+      const act = f.t <= 20; ctx.fillStyle = act ? `rgba(255,${120 + 100 * pul | 0},40,.95)` : '#552'; ctx.beginPath(); ctx.arc(f.x, f.y, Math.max(1.5, 3 / cam.z), 0, 6.283); ctx.fill();
+      if (act) { ctx.strokeStyle = `rgba(255,150,50,${.25 + .35 * pul})`; ctx.lineWidth = 1.5 / cam.z; ctx.beginPath(); ctx.arc(f.x, f.y, 18, 0, 6.283); ctx.stroke(); }
     } else if (f.type === 'bomb') {
       const k = 1 - f.t / f.T; ctx.strokeStyle = `rgba(255,70,50,${.4 + .5 * pul})`; ctx.lineWidth = 2 / cam.z; ctx.beginPath(); ctx.arc(f.tx, f.ty, 30, 0, 6.283); ctx.stroke();
       ctx.fillStyle = '#220'; ctx.beginPath(); ctx.arc(f.x0 + (f.tx - f.x0) * k, f.y0 + (f.ty - f.y0) * k, Math.max(1.5, 3 / cam.z), 0, 6.283); ctx.fill();
@@ -1112,7 +1253,7 @@ cv.addEventListener('wheel', e => {
   cam.z = clamp(cam.z * Math.exp(-e.deltaY * .0015), minZ, 6);
   cam.x = wx - (e.clientX - VW / 2) / cam.z; cam.y = wy - (e.clientY - VH / 2) / cam.z; clampCam();
 }, { passive: false });
-const friendly = e => !e.dead && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN || e.k === K_TRK);
+const friendly = e => !e.dead && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN || e.k === K_TRK || e.k === K_TUR);
 const unitSpeed = u => u.k === K_POL ? 4.4 : u.k === K_TRK ? 8 : 4.8;
 let patrolArmed = false, gidN = 0;
 function addSel(u) { selected.add(u); if (u.g) for (const m of E) if (m.g === u.g && friendly(m)) selected.add(m); }
@@ -1130,7 +1271,7 @@ function unitsPointer(d, wx, wy, add) {
   else if (selected.size) commandMove(wx, wy);
 }
 function commandMove(x, y) {
-  const us = [...selected].filter(friendly); if (!us.length) return;
+  const us = [...selected].filter(u => friendly(u) && u.k !== K_TUR); if (!us.length) return;
   if (!walkCost(x, y)) { const p = randWalk(x, y, 12); if (!p) return toast('Dorthin kann niemand laufen'); x = p[0]; y = p[1]; }
   const patrol = patrolArmed; patrolArmed = false; $('sPat').classList.remove('on');
   const gs = {};
@@ -1167,6 +1308,8 @@ const selU = () => [...selected].filter(friendly);
 $('bEvacU').onclick = () => startUnitEvac();
 $('bCommit').onclick = () => commitBuild();
 $('bDrop').onclick = () => { S.plans = S.plans.filter(q => q.st !== 'plan'); toast('Baupläne verworfen'); };
+$('sSil').onclick = () => { const us = selU().filter(u => u.k === K_SOL || u.k === K_SEN); const on = !us.every(u => u.sil); for (const u of us) u.sil = on; toast(on ? 'Schalldämpfer montiert (Lärm −50 %)' : 'Schalldämpfer entfernt'); };
+$('sSnipe').onclick = () => { const us = selU().filter(u => u.k === K_SOL || u.k === K_SEN); const on = !us.every(u => u.snipe); for (const u of us) u.snipe = on; toast(on ? 'Snipergewehre: Reichweite ×3, Feuerrate −50 %, Lärm +20 %' : 'Standardgewehre'); };
 $('sGrp').onclick = () => { const us = selU(); if (us.length < 2) return toast('Mindestens 2 Einheiten auswählen'); const id = ++gidN; for (const u of us) u.g = id; toast('Gruppe G' + id + ' gebildet (' + us.length + ' Einheiten)'); };
 $('sUng').onclick = () => { for (const u of selU()) u.g = u.sq; toast('Gruppe aufgelöst (Squads bleiben bestehen)'); };
 $('sHold').onclick = () => { for (const u of selU()) { if (u.ds === 3) u.pend = null; u.ord = true; u.path = null; u.patrol = null; u.hmx = u.x; u.hmy = u.y; } toast('Stellung wird gehalten'); };
@@ -1177,10 +1320,14 @@ $('sAllM').onclick = () => { selected.clear(); for (const e of E) if ((e.k === K
 $('sRel').onclick = () => { for (const u of selected) { if (u.ds > 0) { if (u.ds !== 3) { u.dt = u.ds === 1 ? 60 - u.dt : 0; u.ds = 3; } u.pend = { release: true }; } else { u.ord = false; u.path = null; u.patrol = null; } } toast('Einheiten wieder selbstständig (eingegrabene räumen zuerst)'); };
 $('sClr').onclick = () => selected.clear();
 const uEnt = new Map(), uCnt = {};
-const UNAME = { [K_POL]: 'Polizist', [K_SOL]: 'Soldat', [K_SEN]: 'Wache', [K_TRK]: 'Truck' }, UCOL = { [K_POL]: COL.pol, [K_SOL]: COL.sol, [K_SEN]: COL.sol, [K_TRK]: '#9fb23a' };
+const UNAME = { [K_POL]: 'Polizist', [K_SOL]: 'Soldat', [K_SEN]: 'Wache', [K_TRK]: 'Truck', [K_TUR]: 'Geschütz' }, UCOL = { [K_POL]: COL.pol, [K_SOL]: COL.sol, [K_SEN]: COL.sol, [K_TRK]: '#9fb23a', [K_TUR]: '#7d8a6a' };
 const SQNAME = { [K_POL]: 'Polizei-Squad', [K_SOL]: 'Armee-Squad', [K_SEN]: 'Garnison' };
 function centerOn(u) { cam.x = u.x; cam.y = u.y; cam.z = Math.max(cam.z, 1.6); clampCam(); }
 function unitState(u) {
+  const x = (RULES.ammo && u.ammoMax ? ' · 🔫' + Math.max(0, u.ammo | 0) : '') + (u.sil ? ' 🔇' : '') + (u.snipe ? ' 🎯' : '');
+  return unitState0(u) + x;
+}
+function unitState0(u) {
   return u.evac ? 'Evakuierung' : u.inc >= 0 ? '☣ infiziert' : u.ds === 1 ? 'gräbt ' + Math.round(u.dt / .6) + '%' : u.ds === 2 ? 'eingegraben' : u.ds === 3 ? 'räumt ' + Math.round(u.dt / .6) + '%' : u.tgt && !u.tgt.dead && u.tgt.k === K_ZOM ? 'Kampf' : u.patrol ? (u.path ? 'Marsch' : 'Patrouille') : u.ord ? (u.path ? 'Marsch' : 'Position') : u.k === K_SEN ? 'Wache' : u.path ? 'Patrouille' : 'bereit';
 }
 function setTxt(el, t) { if (el.textContent !== t) el.textContent = t; }
@@ -1232,13 +1379,13 @@ function updateUnitList() {
       let row = ent.rows.get(u);
       if (!row) {
         row = document.createElement('div'); row.className = 'urow mem';
-        row.innerHTML = `<i style="background:${UCOL[u.k]}"></i><u>${UNAME[u.k]} ${i + 1}</u><span></span>`;
+        row.innerHTML = `<i style="background:${UCOL[u.k]}"></i><u>${UNAME[u.k]} ${i + 1}</u><span></span>`; row.dataset.n = UNAME[u.k] + ' ' + (i + 1);
         row.onclick = ev => { if (!ev.shiftKey) selected.clear(); addSel(u); };
         row.ondblclick = () => { selected.clear(); addSel(u); centerOn(u); };
         ent.rows.set(u, row); ent.body.appendChild(row);
       }
       row.classList.toggle('sel', selected.has(u)); row.classList.toggle('inf', u.inc >= 0);
-      if (ent.open) setTxt(row.lastChild, unitState(u) + ' · ' + Math.round((u.ae || u.acc) * 100) + '%');
+      if (ent.open) { setTxt(row.lastChild, unitState(u) + ' · ' + Math.round((u.ae || u.acc) * 100) + '%'); if (RULES.xp) setTxt(row.children[1], row.dataset.n + ' · L' + u.lvl); }
     });
   }
   $('uCnt').textContent = us.length;
@@ -1255,10 +1402,15 @@ function startRun(loaded) {
 }
 $('bStart').onclick = () => { newSim(); startRun(true); autosave(); };
 $('bResume').onclick = () => loadSlot(0);
-$('bMenu').onclick = () => modal(`<h2>Neue Simulation</h2><p>Aktuelle Simulation verwerfen und zur Konfiguration zurückkehren? (Nicht gespeicherter Fortschritt geht verloren.)</p><div class="btns"><button class="big" id="mYes">Ja, neu konfigurieren</button><button id="mNo">Abbrechen</button></div>`, () => {
-  $('mYes').onclick = () => { closeModal(); phase = 'setup'; E = []; BAR = [null]; barId.fill(0); fx = []; noises = []; tracers = []; for (const b of B) { b.occ = []; b.siege = 0; } markers = []; finished = false; $('setup').style.display = ''; setSpeed(0); refreshResume(); };
+$('bMenu').onclick = () => modal(`<h2>Zurück zum Hauptmenü</h2><p>Aktuelle Simulation verlassen? (Nicht gespeicherter Fortschritt geht verloren.)</p><div class="btns"><button class="big" id="mYes">Ja, zum Hauptmenü</button><button id="mNo">Abbrechen</button></div>`, () => {
+  $('mYes').onclick = () => { closeModal(); toMenu(); };
   $('mNo').onclick = closeModal;
 });
+function toMenu() {
+  phase = 'setup'; E = []; BAR = [null]; barId.fill(0); gate.fill(0); fx = []; noises = []; tracers = []; for (const b of B) { b.occ = []; b.siege = 0; } markers = []; finished = false; selected.clear();
+  S = null; RULES = classicRules(); if (curMap !== 'moosburg') setupMap('moosburg');
+  $('setup').style.display = 'none'; $('objs').style.display = 'none'; $('buildbar').style.display = 'none'; $('menu').style.display = 'flex'; setSpeed(0); refreshResume(); fitCam();
+}
 function modal(html, init) { $('mbox').innerHTML = html; $('modal').style.display = 'flex'; if (init) init(); }
 function closeModal() { $('modal').style.display = 'none'; }
 $('modal').addEventListener('pointerdown', e => { if (e.target === $('modal')) closeModal(); });
@@ -1288,7 +1440,8 @@ function slotModal(mode) {
 $('bSave').onclick = () => { if (phase !== 'run') return toast('Erst die Simulation starten'); slotModal('save'); };
 $('bLoad').onclick = () => slotModal('load');
 function endGame(msg) {
-  finished = true; setSpeed(0); autosave(); SFX.end(msg.includes('eingedämmt'));
+  finished = true; setSpeed(0); autosave(); SFX.end(msg.includes('eingedämmt') || msg.includes('Sieg'));
+  if (RULES.onEnd) return RULES.onEnd(msg);
   showStats(msg);
 }
 function showStats(title) {
@@ -1326,7 +1479,7 @@ function drawChart(cv, h) {
   line(1, '#f1f5f2'); line(2, '#f0a030'); line(3, '#58c24a'); line(5, '#4a8bff');
 }
 $('bStats').onclick = () => showStats('Analyse');
-function refreshResume() { $('bResume').style.display = slotInfo(0) ? '' : 'none'; }
+function refreshResume() { $('bResume').style.display = slotInfo(0) ? '' : 'none'; $('mResume').style.display = slotInfo(0) ? '' : 'none'; }
 function autosave() { if (phase === 'run' && S && !loading) saveSlot(0); }
 let loading = false;
 setInterval(() => { if (speed > 0 || finished) autosave(); }, 20000);
@@ -1345,11 +1498,12 @@ function ambience() {
 }
 function updateHud() {
   const c = counts(), g = (id, v) => { const el = $(id); if (el.textContent != v) el.textContent = v; };
+  if (RULES.hud) RULES.hud(c);
   g('hTrk', c.trk); g('hEvac', S ? (S.ev.civ + S.ev.pol + S.ev.mil + S.ev.trk) : 0); { const show = phase === 'run' && S && c.civ === 0 && c.pol + c.mil + c.trk > 0 && !S.evacUnits; $('bEvacU').style.display = show ? '' : 'none'; if (show && !S.civNote) { S.civNote = 1; toast('Keine Zivilisten mehr – Einheiten können jetzt evakuiert werden'); } }
   g('hCiv', c.civ); g('hInf', c.inf); g('hZom', c.zom); g('hPol', c.pol); g('hMil', c.mil);
   g('hKill', S ? S.kills : 0); g('hLoss', S ? S.loss : 0); g('clock', fmtT(simT));
   for (const u of selected) if (!friendly(u)) selected.delete(u);
-  $('selbar').style.display = selected.size ? 'flex' : 'none'; $('selTxt').textContent = selected.size + ' Einheit(en) ausgewählt – Ziel antippen (rechte Maustaste)';
+  $('selbar').style.display = selected.size ? 'flex' : 'none'; $('sSil').style.display = RULES.canSil ? '' : 'none'; $('sSnipe').style.display = RULES.canSnipe ? '' : 'none'; $('selTxt').textContent = selected.size + ' Einheit(en) ausgewählt – Ziel antippen (rechte Maustaste)';
   const pct = phase === 'run' ? lostPct(c) : 0;
   if (S && phase === 'run') {
     const bb = $('buildbar'), pl = S.plans.filter(q => q.st === 'plan').length, od = S.plans.filter(q => q.st !== 'plan');
@@ -1358,7 +1512,22 @@ function updateHud() {
     $('buildTxt').textContent = 'Bauphase: ' + barUsed() + '/' + RULES.barLimit + ' Elemente · ' + pl + ' geplant' + (od.length ? ' · Lieferung ' + (nxt < 1e8 ? 'in ' + Math.max(0, Math.ceil(nxt)) + ' s' : 'läuft') : '');
     $('bCommit').disabled = !pl; $('bDrop').disabled = !pl;
   } else $('buildbar').style.display = 'none';
-  document.querySelectorAll('#tools button').forEach(b => { const k = b.dataset.tool, el = b.querySelector('.cd'); if (k === 'barricade' && S) { const sp = b.querySelector('span'); const t = 'Bauen ' + barUsed() + '/' + RULES.barLimit; if (sp.textContent !== t) sp.textContent = t; } if (UNLOCK[k]) { const lk = pct < UNLOCK[k], mx = MAXUSE[k], left = mx ? (S ? mx - S.used[k] : mx) : 99, ex = left <= 0; b.classList.toggle('locked', lk || ex); const sp = b.querySelector('span'); const t = ex ? sp.dataset.n + ' 0/' + mx : lk ? 'ab ' + UNLOCK[k] + ' % (' + pct.toFixed(0) + ')' : sp.dataset.n + (mx ? ' ' + left + '/' + mx : ''); if (sp.textContent !== t) sp.textContent = t; } if (el) el.style.width = (cooldown[k] > 0 ? cooldown[k] / CD_MAX[k] * 100 : 0) + '%'; });
+  document.querySelectorAll('#tools button').forEach(b => {
+    const k = b.dataset.tool, el = b.querySelector('.cd'), sp = b.querySelector('span');
+    if (k !== 'pan' && k !== 'units') {
+      const gate = S && phase === 'run' ? toolGate(k) : { hidden: !RULES.tools[k] };
+      b.style.display = gate.hidden ? 'none' : '';
+      if (!gate.hidden && S) {
+        const ex = gate.max != null && gate.left <= 0; b.classList.toggle('locked', !!gate.locked || ex);
+        let t = sp.dataset.n || sp.textContent;
+        if (k === 'barricade') t = 'Bauen ' + barUsed() + '/' + RULES.barLimit;
+        else if (ex) t = sp.dataset.n + ' 0/' + gate.max; else if (gate.locked) t = gate.label; else if (gate.max != null) t = sp.dataset.n + ' ' + gate.left + '/' + gate.max;
+        if (sp.textContent !== t) sp.textContent = t;
+      }
+    }
+    const cdMax = (RULES.tools[k] && RULES.tools[k].cd) || 0;
+    if (el) el.style.width = (cooldown[k] > 0 && cdMax ? cooldown[k] / cdMax * 100 : 0) + '%';
+  });
 }
 
 // ───────────────────────── Hauptschleife ─────────────────────────
@@ -1382,7 +1551,7 @@ function setupMap(id) {
   WW = MD.w; WH = MD.h; GW = Math.ceil(WW / CELL); GH = Math.ceil(WH / CELL);
   if (id === 'moosburg') { LAT0 = 48.4790; LON0 = 11.9280; KX = 111320 * Math.cos(48.47 * Math.PI / 180); KY = 110574; }
   else { LAT0 = MD.north; LON0 = MD.west; KX = MD.kx; KY = MD.ky; }
-  type = new Uint8Array(GW * GH); comp = new Uint8Array(GW * GH); barId = new Uint16Array(GW * GH);
+  type = new Uint8Array(GW * GH); comp = new Uint8Array(GW * GH); barId = new Uint16Array(GW * GH); gate = new Uint8Array(GW * GH);
   gS = new Uint32Array(GW * GH); gD = new Uint32Array(GW * GH); gG = new Float32Array(GW * GH); gP = new Int32Array(GW * GH);
   HW = Math.ceil(WW / HS); HH = Math.ceil(WH / HS); hzHead = new Int32Array(HW * HH); hhHead = new Int32Array(HW * HH);
   stampN = 0; evD = null; evacDirty = false; BAR = [null]; E = []; fx = []; noises = []; tracers = []; selected.clear();
@@ -1396,6 +1565,10 @@ function init() {
   setupMap('moosburg');
   applyMapMode(); syncSliders(); refreshResume(); resize(); fitCam(); setSpeed(0);
   addEventListener('resize', resize);
+  $('mSand').onclick = () => { $('menu').style.display = 'none'; $('setup').style.display = ''; };
+  $('mResume').onclick = () => loadSlot(0);
+  if (typeof Campaign !== 'undefined') Campaign.init();
+  $('menu').style.display = 'flex'; $('setup').style.display = 'none';
   console.log('Init', Math.round(performance.now() - t0), 'ms; Gebäude:', B.length, 'Raster', GW, GH);
   requestAnimationFrame(frame);
 }

@@ -18,7 +18,9 @@ button:disabled{opacity:.45;cursor:default}
 #top .grp{display:flex;gap:6px;padding:6px;align-items:center;flex-wrap:wrap}
 #title{font-weight:700;letter-spacing:.04em;padding:4px 8px}
 #title small{display:block;font-weight:400;color:var(--mut);letter-spacing:0}
-#hud{position:fixed;top:70px;left:8px;padding:10px 12px;min-width:190px}
+#leftcol{position:fixed;top:70px;left:8px;bottom:92px;width:310px;max-width:calc(100% - 16px);display:flex;flex-direction:column;gap:8px;pointer-events:none}
+#leftcol>*{pointer-events:auto}
+#hud{padding:10px 12px;width:200px;flex:none}
 #hud div{display:flex;justify-content:space-between;gap:14px;align-items:center}
 #hud i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px}
 #hud b{font-variant-numeric:tabular-nums}
@@ -44,10 +46,31 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 #toast{position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:8px 14px;background:#000c;border-radius:20px;display:none}
 .leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:6px}.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
 #tools button.locked{opacity:.5}
-#units{position:fixed;left:8px;top:288px;bottom:92px;width:310px;max-width:calc(100% - 16px);display:flex;flex-direction:column;padding:6px}
+.inhub #leftcol,.inhub #tools,.inhub #top,.inhub #objs,.inhub #selbar,.inhub #buildbar{display:none!important}
+#comic{position:fixed;inset:0;background:#050506;z-index:40;display:flex;align-items:center;justify-content:center;padding:10px;outline:none;touch-action:manipulation}
+#comic .cwrap{width:min(100%,960px)}
+#comic canvas{width:100%;height:auto;display:block;border-radius:6px;background:#000}
+#comic .ccap{background:#f5d85a;color:#111;border:4px solid #0b0b0d;padding:10px 14px;margin:-6px 12px 0;position:relative;font:700 clamp(14px,2.2vw,20px)/1.35 "Comic Sans MS","Chalkboard SE",cursive,sans-serif;min-height:3.4em;box-shadow:4px 4px 0 #0b0b0d}
+#comic .cbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:12px}
+#comic .cn{color:var(--mut)}#comic .cbar .big{background:#2f6a28;border-color:var(--acc);font-weight:700;padding:8px 16px}
+#menu{position:fixed;inset:0;background:radial-gradient(ellipse at 30% 20%,#1d2a20,#080b09);display:flex;align-items:center;justify-content:center;z-index:20;padding:14px}
+#menu .mbox{max-width:460px;width:100%;text-align:center}
+#menu h1{font-size:34px;line-height:1.05;letter-spacing:.06em;margin:0 0 6px;color:#e4ece6;text-shadow:0 0 18px #3f8f35}
+#menu .sub{color:var(--mut);margin:0 0 22px}
+.mbtn{display:block;width:100%;padding:16px;margin:10px 0;font-size:17px;font-weight:700;background:#26402a;border-color:var(--acc);border-radius:12px}
+.mbtn:hover{background:#30522f}
+#objs{position:fixed;top:70px;right:8px;width:270px;max-width:calc(100% - 16px);padding:10px 12px;font-size:12.5px;z-index:3}
+#objs h3{margin:0 0 4px;font-size:14px}#objs .o{margin:6px 0}#objs .bar{height:6px;background:#26322a;border-radius:3px;overflow:hidden}#objs .bar i{display:block;height:100%;background:var(--acc)}
+#objs .ok{color:var(--acc)}#objs .no{color:var(--bad)}#objs .ev{color:var(--mut);font-size:11.5px}
+.card{border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.card small{color:var(--mut);display:block}.card.dis{opacity:.5}
+.stars{color:#f3c64a;letter-spacing:2px}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+@media(max-width:700px){#objs{top:auto;bottom:150px;right:8px;width:200px}.cgrid{grid-template-columns:1fr}}
+#units{flex:1 1 auto;min-height:0;width:310px;max-width:100%;display:flex;flex-direction:column;padding:6px}
 #uHead{display:flex;justify-content:space-between;padding:2px 6px 6px;cursor:pointer;font-weight:600}
 #uList{overflow-y:auto;flex:1}
-#units.col{bottom:auto}#units.col #uList{display:none}
+#units.col{flex:none}#units.col #uList{display:none}
 .urow{white-space:nowrap;display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:12.5px}
 .urow:hover{background:#26322a}.urow.sel{background:#335a2d}
 .urow i{width:9px;height:9px;border-radius:50%;flex:none}.ubody{display:none;margin-left:14px;border-left:1px solid var(--line)}.open>.ubody{display:block}
@@ -56,7 +79,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 #alerts{position:fixed;top:112px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:5;max-width:calc(100% - 16px)}
 .alert{display:flex;gap:10px;align-items:center;background:#3a1512ee;border:1px solid var(--bad);border-radius:10px;padding:7px 10px;box-shadow:0 2px 12px #0008}
 .alert button{background:#7a2a24;border-color:var(--bad);white-space:nowrap}
-@media(max-width:700px){#setup{top:auto;height:58%;width:auto;left:8px}#hud{top:112px;min-width:0;font-size:12px;padding:6px 8px}#units{top:auto;bottom:92px;height:34%;width:250px}#units.col{height:auto;bottom:92px}#tools{bottom:auto;top:auto}#title small{display:none}}
+@media(max-width:700px){#setup{top:auto;height:58%;width:auto;left:8px}#leftcol{top:112px}#hud{font-size:12px;padding:6px 8px;width:170px}#units{width:250px}#tools{bottom:auto;top:auto}#title small{display:none}}
 </style>
 </head>
 <body>
@@ -71,6 +94,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   </div>
 </div>
 
+<div id="leftcol">
 <div id="hud" class="panel">
   <div><span><i style="background:#f1f5f2"></i>Zivilisten</span><b id="hCiv">0</b></div>
   <div><span><i style="background:#f0a030"></i>Infizierte</span><b id="hInf">0</b></div>
@@ -82,10 +106,13 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <hr>
   <div><span>Eliminiert</span><b id="hKill">0</b></div>
   <div><span>Verluste</span><b id="hLoss">0</b></div>
+  <button id="bEnd" style="display:none;width:100%;margin-top:6px">⏹ Mission beenden</button>
   <button id="bEvacU" style="display:none;width:100%;margin-top:6px">🚁 Einheiten evakuieren</button>
 </div>
 
 <div id="units" class="panel" style="display:none"><div id="uHead">Einheiten <b id="uCnt">0</b><span id="uTog">▾</span></div><div id="uList"></div></div>
+
+</div>
 
 <div id="tools" class="panel">
   <button data-tool="pan" class="on">✋<span>Kamera</span></button>
@@ -94,13 +121,17 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <button data-tool="barricade">🧱<span data-n="Barrikade">Bauen</span><div class="cd"></div></button>
   <button data-tool="demolish">🔨<span>Einreißen</span></button>
   <button data-tool="evac">🚁<span data-n="Evakuierung">Evakuierung</span></button>
+  <button data-tool="gate" style="display:none">🚪<span data-n="Tor">Tor</span></button>
+  <button data-tool="turret" style="display:none">🔫<span data-n="Geschütz">Geschütz</span><div class="cd"></div></button>
+  <button data-tool="flare" style="display:none">🔥<span data-n="Signalbombe">Signalbombe</span><div class="cd"></div></button>
+  <button data-tool="gunship" style="display:none">🚁<span data-n="Gunship">Gunship</span><div class="cd"></div></button>
   <button data-tool="truck">🚛<span data-n="Trucks">Trucks</span><div class="cd"></div></button>
   <button data-tool="strike">💥<span data-n="Luftschlag">Luftschlag</span><div class="cd"></div></button>
   <button data-tool="supply">📦<span data-n="Versorgung">Versorgung</span><div class="cd"></div></button>
   <button data-tool="garrison">🪖<span data-n="Garnison">Garnison</span><div class="cd"></div></button>
 </div>
 
-<div id="setup" class="panel">
+<div id="setup" class="panel" style="display:none">
   <h2>Konfiguration</h2>
   <p>Stelle den Ausbruch ein. Mit dem Werkzeug „Zombie“ markierst du auf der Karte die Ausbruchsorte (ohne Markierung: zufällig).</p>
   <div class="row"><label>Ausbruch beginnt <b></b></label><select id="origin" style="width:100%;background:#222c25;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px"><option value="edge">an den Kartenrändern</option><option value="center">in der Kartenmitte</option></select><div class="hint">Mit dem Werkzeug „Zombie“ gesetzte Markierungen haben Vorrang.</div></div>
@@ -121,9 +152,17 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 <div id="selbar" class="panel" style="display:none;position:fixed;bottom:84px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 16px)"><span id="selTxt" style="width:100%;text-align:center"></span>
 <button id="sGrp" title="Ausgewählte Einheiten zu einer Gruppe zusammenfassen">🔗 Gruppe</button><button id="sUng" title="Gruppe auflösen">✂ Auflösen</button>
 <button id="sHold" title="Stellung halten: stehen bleiben und auf Sicht schießen">🛡 Halten</button><button id="sDig" title="Eingraben (1 Min.): +15 % Treffsicherheit, aber unbeweglich">⛏ Eingraben</button><button id="sFree" title="Stellung räumen (1 Min.)">🏃 Räumen</button><button id="sPat" title="Danach Ziel antippen: Einheiten patrouillieren dort">🔁 Patrouille</button>
-<button id="sAllP">Alle Polizei</button><button id="sAllM">Alle Militär</button><button id="sRel">Freigeben</button><button id="sClr">Abwählen</button></div>
+<button id="sSil" style="display:none">🔇 Dämpfer</button><button id="sSnipe" style="display:none">🎯 Sniper</button><button id="sAllP">Alle Polizei</button><button id="sAllM">Alle Militär</button><button id="sRel">Freigeben</button><button id="sClr">Abwählen</button></div>
 <div id="attr" style="position:fixed;right:6px;bottom:2px;font-size:10px;color:#cfd8d2;text-shadow:0 0 3px #000;pointer-events:none"></div>
 <div id="buildbar" class="panel" style="display:none;position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:8px;align-items:center;z-index:4;white-space:nowrap;max-width:calc(100% - 16px);flex-wrap:wrap;justify-content:center"><span id="buildTxt"></span><button id="bCommit">🚁 Bau abschließen</button><button id="bDrop">Pläne verwerfen</button></div>
+<div id="objs" class="panel" style="display:none"></div>
+<div id="menu"><div class="mbox">
+  <h1>ZOMBIE OUTBREAK<br>SIMULATOR</h1><p class="sub">Moosburg · Pfaffenhofen · Echte Karten, echte Straßen</p>
+  <button class="mbtn" id="mCamp">🎖 Kampagne</button>
+  <button class="mbtn" id="mSand">🧪 Sandbox / Classic</button>
+  <button class="mbtn" id="mResume" style="display:none">⏯ Autosave fortsetzen</button>
+  <p class="hint" style="margin-top:14px">Kampagne: feste Missionen, Munition, Erfahrung, Upgrades und Comic-Story. Sandbox: freie Parameter wie bisher.</p>
+</div></div>
 <div id="alerts"></div>
 <div id="toast"></div>
 <div id="modal"><div class="box panel" id="mbox"></div></div>
@@ -131,6 +170,8 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 <script src="maps/m1.js"></script>
 <script src="maps/m3.js"></script>
 <script src="sfx.js"></script>
+<script src="comics.js"></script>
+<script src="campaign.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
