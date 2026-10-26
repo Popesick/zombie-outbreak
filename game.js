@@ -1470,6 +1470,7 @@ $('bMenu').onclick = () => modal(`<h2>Zurück zum Hauptmenü</h2><p>Aktuelle Sim
 });
 function toMenu() {
   phase = 'setup'; E = []; BAR = [null]; barId.fill(0); gate.fill(0); fx = []; noises = []; tracers = []; for (const b of B) { b.occ = []; b.siege = 0; } markers = []; finished = false; selected.clear();
+  if (RULES.mode === 'campaign') cfg = { ...DEFAULTS };   // Kampagnenwerte (Polizei 0 usw.) nicht in den Classic-Modus mitnehmen
   S = null; RULES = classicRules(); if (curMap !== 'moosburg') setupMap('moosburg');
   $('setup').style.display = 'none'; $('objs').style.display = 'none'; $('buildbar').style.display = 'none'; $('menu').style.display = 'flex'; setSpeed(0); refreshResume(); fitCam(); Music.play('menu');
 }
@@ -1646,7 +1647,7 @@ function init() {
   setupMap('moosburg');
   applyMapMode(); syncSliders(); refreshResume(); resize(); fitCam(); setSpeed(0);
   addEventListener('resize', resize);
-  $('mSand').onclick = () => { $('menu').style.display = 'none'; $('setup').style.display = ''; };
+  $('mSand').onclick = () => { syncSliders(); $('menu').style.display = 'none'; $('setup').style.display = ''; };
   $('mResume').onclick = () => loadSlot(0);
   if (typeof Campaign !== 'undefined') Campaign.init();
   $('menu').style.display = 'flex'; $('setup').style.display = 'none'; Music.play('menu');
@@ -1654,4 +1655,4 @@ function init() {
   requestAnimationFrame(frame);
 }
 init();
-window.__game = { get E() { return E; }, get S() { return S; }, cfg, cam, counts, step, setSpeed, startRun, newSim, useTool, B, commandMove, selected, get fx() { return fx; } };
+window.__game = { toMenu, get E() { return E; }, get S() { return S; }, cfg, cam, counts, step, setSpeed, startRun, newSim, useTool, B, commandMove, selected, get fx() { return fx; } };
