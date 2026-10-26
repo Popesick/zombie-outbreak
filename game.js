@@ -467,6 +467,7 @@ function alertAt(x, y, text) {
   box.appendChild(d); setTimeout(() => d.remove(), 14000); SFX.alarm();
 }
 function toZombie(e) {
+  if (e.k === K_POL || e.k === K_SOL || e.k === K_SEN) S.ulost = (S.ulost || 0) + 1;
   e.k = K_ZOM; e.hp = ZHP; e.inc = -1; e.st = 0; e.path = null; e.armed = false; e.tgt = null; e.wt = 0; S.zombified++;
   if (simT - (S.lastAlert || -99) > 10 && !nearest(hzHead, hzNxt, e.x, e.y, 150, false)) { S.lastAlert = simT; alertAt(e.x, e.y, 'Neuer Zombie-Ausbruch gemeldet'); }
   if (e.b >= 0) { const b = B[e.b]; b.occ = b.occ.filter(o => o !== e); e.b = -1; e.x = b.ex; e.y = b.ey; breach(b, .6); }
@@ -476,7 +477,7 @@ function breach(b, p) {
   for (const o of b.occ) { o.st = 0; o.b = -1; o.x = b.ex; o.y = b.ey; o.wt = 0; if (Math.random() < p) infect(o); }
   b.occ = []; b.siege = 0;
 }
-function kill(e) { if (!e.dead) { e.dead = true; if (e.k === K_ZOM) S.kills++; else S.loss++; } }
+function kill(e) { if (!e.dead) { e.dead = true; if (e.k === K_ZOM) S.kills++; else { S.loss++; if (e.k === K_POL || e.k === K_SOL || e.k === K_SEN) S.ulost = (S.ulost || 0) + 1; } } }
 
 // ───────────────────────── KI ─────────────────────────
 function thinkCivilian(e) {
@@ -713,7 +714,7 @@ function step() {
   // Evakuierung
   if (S.evac) {
     S.evacT -= DT; if (S.evacR != null && S.evacR < 4000) S.evacR += 25 * DT;
-    if (S.evacT <= 0) { S.evacT = 30; const [sx, sy] = edgeEntry(S.evac.x, S.evac.y); fx.push({ type: 'heli', kind: 'evac', x: sx, y: sy, tx: S.evac.x, ty: S.evac.y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); }
+    if (S.evacT <= 0) { S.evacT = RULES.evacEvery || 30; const [sx, sy] = edgeEntry(S.evac.x, S.evac.y); fx.push({ type: 'heli', kind: 'evac', x: sx, y: sy, tx: S.evac.x, ty: S.evac.y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); }
     if (evacDirty && simT - evLast > 1.5) computeEvacField();
   }
   // Effekte
@@ -876,8 +877,9 @@ function doEvac(x, y) {
     if (e.k === K_CIV) cand.push([0, d, e]); else if (S.evacUnits) cand.push([1, d, e]);
   }
   cand.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  if (cand.length < 20) for (const e of E) if (!e.dead && e.k === K_CIV && e.inc < 0 && e.st !== 4 && (e.stk || 0) > 10 && !cand.some(c => c[2] === e)) cand.push([0, 1e5, e]);   // Hubschrauber sammelt Festsitzende ein
-  const take = cand.slice(0, 20);
+  const cap = RULES.evacCap || 20;
+  if (cand.length < cap) for (const e of E) if (!e.dead && e.k === K_CIV && e.inc < 0 && e.st !== 4 && (e.stk || 0) > 10 && !cand.some(c => c[2] === e)) cand.push([0, 1e5, e]);   // Hubschrauber sammelt Festsitzende ein
+  const take = cand.slice(0, cap);
   for (const [, , e] of take) { e.dead = true; S.ev[evKind(e)]++; if (S.evU && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN)) S.evU.push({ k: e.k === K_POL ? 'pol' : 'sol', kills: e.kills, sq: e.sq }); }
   fx.push({ type: 'ring', x, y, r: 30, t: 1, T: 1, c: '255,255,255' });
   if (take.length) { toast('🚁 ' + take.length + ' evakuiert'); SFX.chime(x, y); }

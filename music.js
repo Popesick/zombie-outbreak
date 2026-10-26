@@ -12,7 +12,8 @@ const Music = (() => {
   let level = 1; try { const v = localStorage.getItem('zos_music'); if (v !== null && !isNaN(+v)) level = +v; } catch (e) {}
   let set = null, cur = null, last = -1, blocked = false;
   const fades = new Set();
-  const vol = () => level * BASE;
+  let duckF = 1;
+  const vol = () => level * BASE * duckF;
   function tick() {
     for (const f of fades) {
       f.t += .05; const k = Math.min(1, f.t / FADE);
@@ -44,6 +45,7 @@ const Music = (() => {
       set = name; last = -1; next(true);
     },
     resume() { if (blocked && cur) { blocked = false; cur.play().catch(() => { blocked = true; }); } else if (!cur && set) next(false); },
+    duck(on) { duckF = on ? .35 : 1; if (cur) cur.volume = vol(); },
     level: () => level,
     current: () => set,
     cycle() { level = level === 1 ? .5 : level === .5 ? 0 : 1; try { localStorage.setItem('zos_music', level); } catch (e) {} for (const f of fades) fades.delete(f); if (cur) cur.volume = vol(); return level; }

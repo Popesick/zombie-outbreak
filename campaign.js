@@ -46,18 +46,19 @@ const Campaign = (() => {
       info: ['5 Versorgungspakete von Anfang an', '24 Barrikadenelemente (Bauphase, Lieferung per Hubschrauber)', 'Evakuierungssignal nach 2:00', 'Ab 3:00: drei Luftschläge', 'Ab 5:00: zweiter Soldaten-Squad per Hubschrauber', 'Nach 5:00 stürmt die Horde mit 90 % Zielstrebigkeit zum Evakuierungspunkt']
     },
     {
-      id: 'm2', map: 'moosburg', name: 'Moosburg brennt', sub: 'Die ganze Stadt', pop: 1400, armed: 6, acc: 35, zs: 50,
-      start: () => ({ sol: [{ x: 700, y: 1160 }], pol: [{ x: 600, y: 900 }, { x: 900, y: 760 }] }),
-      evac: () => ({ x: 260, y: 1030, at: 120 }),
-      spawns: () => [[1000, 620, 50], [900, 30, 30], [30, 500, 30], [800, 1850, 30]].flatMap(([x, y, n]) => [{ t: 0, n, x, y, r: 40 }, { t: 150, n: Math.round(n * .7), x, y, r: 40 }, { t: 300, n: Math.round(n * .7), x, y, r: 40 }, { t: 450, n: Math.round(n * .7), x, y, r: 40 }]),
+      id: 'm2', map: 'moosburg', name: 'Moosburg brennt', sub: 'Die ganze Stadt', pop: 3000, armed: 6, acc: 35, zs: 50,
+      start: () => ({ sol: [{ x: 1260, y: 1540 }], pol: [{ x: 1180, y: 1480 }, { x: 1320, y: 1430 }] }),
+      evac: () => ({ x: 1520, y: 1612, at: 60 }),
+      evacCap: 60, evacEvery: 20,   // große Zahl Zivilisten: größere und häufigere Hubschrauber
+      spawns: () => [{ t: 0, n: 200, x: 80, y: 80, r: 45 }, { t: 120, n: 100, x: 30, y: 950, r: 45 }, { t: 300, n: 100, x: 60, y: 1750, r: 45 }],
       lure: () => ({ x: 650, y: 1180, t: 0, dur: 60 }),
-      hordeAt: 420, hordeFocus: .9,
+      hordeAt: 480, hordeFocus: .9,
       hold: null,
       tools: { supply: { at: 0, max: 5, cd: 20 }, strike: { at: 180, max: 4, cd: 8 }, garrison: { at: 240, max: 2, cd: 30 } },
       barricades: 36,
-      primary: { civ: 500, pts: 900 }, secondary: { kills: 400, pts: 300 },
-      goal: ['Rette mindestens 500 Zivilisten.', 'Schalte mindestens 400 Zombies aus.'],
-      info: ['5 Versorgungspakete', '36 Barrikadenelemente', 'Evakuierungssignal nach 2:00', 'Ab 3:00: vier Luftschläge', 'Ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Ab 7:00 zieht die Horde zum Evakuierungspunkt']
+      primary: { civ: 2000, pts: 1500 }, secondary: { noLoss: true, pts: 600 },
+      goal: ['Rette mindestens 2000 Zivilisten (Rettungszone auf der Ostseite der Isarbrücke).', 'Alle Einsatzkräfte müssen überleben.'],
+      info: ['3000 Zivilisten – 200 Zombies aus Nordwesten', 'Nach 2:00: 100 Zombies aus Westen, nach 5:00: 100 aus Südwesten', '5 Versorgungspakete, 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Ab 8:00 zieht die Horde zum Evakuierungspunkt']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
@@ -99,7 +100,7 @@ const Campaign = (() => {
     if (lv('mines')) tools.mines = { at: 0, max: 3 * lv('mines'), cd: 20 };
     if (lv('gunship')) tools.gunship = { at: 0, max: 2, cd: 45 };
     const R = {
-      mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
+      evacCap: m.evacCap, evacEvery: m.evacEvery, mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
       barLimit: m.barricades + 12 * lv('morebar'), barHpMul: 2 * (lv('barhp') ? 2 : 1),
       gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), squadPlus: lv('squad') ? 1 : 0, ammoMul: lv('ammo') ? 2 : 1,
       spawn: () => spawnMission(m), tick: () => tick(m), hud: c => hud(m, c), checkEnd: c => checkEnd(m, c), onEnd: msg => finish(m, msg)
@@ -152,6 +153,7 @@ const Campaign = (() => {
     const o = { R, cleared, primary: R >= m.primary.civ, priFrac: Math.min(1, R / m.primary.civ) };
     if (m.secondary.bridge != null) { o.bridge = !S.breach; o.killFrac = S.spawned ? Math.min(1, S.kills / S.spawned) : 0; o.secondary = o.bridge && cleared; }
     else if (m.secondary.kills != null) { o.kills = S.kills; o.secondary = S.kills >= m.secondary.kills; }
+    else if (m.secondary.noLoss) { o.ulost = S.ulost || 0; o.secondary = o.ulost === 0; }
     else if (m.secondary.units != null) { const start = S.unitsStart || 1; const alive = E.filter(u => friendly(u) && u.k !== K_TRK && u.k !== K_TUR).length + (S.evU ? S.evU.length : 0); o.unitFrac = alive / start; o.secondary = o.unitFrac >= m.secondary.units; }
     return o;
   }
@@ -169,6 +171,7 @@ const Campaign = (() => {
     const ev = m.evac(); up('📡 Evakuierungssignal', ev.at); up('💥 Luftschläge', m.tools.strike.at); if (m.tools.garrison) up('🪖 Verstärkung', m.tools.garrison.at); up('⚠ Horde stürmt', m.hordeAt);
     let sec = '';
     if (m.secondary.bridge != null) sec = `<div class="${S.breach ? 'no' : o.secondary ? 'ok' : ''}">${S.breach ? '✗ Brücke durchbrochen' : o.secondary ? '✓ Brücke gehalten' : '○ Brücke hält bisher'}</div><div class="${o.cleared ? 'ok' : ''}">${o.cleared ? '✓' : '○'} Zombies übrig: <b>${c.zom}</b>${simT < lastSpawnT(m) + 5 ? ' <span class="ev">(weitere Wellen folgen)</span>' : ''}</div>`;
+    else if (m.secondary.noLoss) sec = `<div class="${o.ulost ? 'no' : 'ok'}">${o.ulost ? '✗' : '✓'} Verlorene Einsatzkräfte: <b>${o.ulost}</b></div>`;
     else if (m.secondary.kills != null) sec = `<div class="${o.secondary ? 'ok' : ''}">Zombies eliminiert: <b>${S.kills}</b> / ${m.secondary.kills}</div>`;
     else sec = `<div>Einsatzkräfte: <b>${Math.round((S.unitsStart ? E.filter(u => friendly(u) && u.k !== K_TRK && u.k !== K_TUR).length + S.evU.length : 1) / (S.unitsStart || 1) * 100)} %</b> (Ziel ≥ ${m.secondary.units * 100} %)</div>`;
     const html = `<h3>${m.name}</h3><div class="ev">Zeit ${fmtClock(simT)}</div>
@@ -189,6 +192,7 @@ const Campaign = (() => {
     const priPts = Math.round(m.primary.pts * o.priFrac);
     let secPts = 0, secTxt = '';
     if (m.secondary.bridge != null) { secPts = (o.bridge ? m.secondary.bridge : 0) + Math.round(m.secondary.clear * (cleared ? 1 : o.killFrac)); secTxt = `${o.bridge ? '✓' : '✗'} Brücke gehalten · ${cleared ? '✓' : '✗'} alle Zombies getötet`; }
+    else if (m.secondary.noLoss) { secPts = o.secondary ? m.secondary.pts : Math.round(m.secondary.pts * Math.max(0, 1 - o.ulost / Math.max(1, S.unitsStart || 1)) * .5); secTxt = o.secondary ? '✓ Keine Einsatzkraft verloren' : `✗ ${o.ulost} Einsatzkräfte verloren`; }
     else if (m.secondary.kills != null) { secPts = Math.round(m.secondary.pts * Math.min(1, S.kills / m.secondary.kills)); secTxt = `${S.kills} / ${m.secondary.kills} Zombies eliminiert`; }
     else { secPts = o.secondary ? m.secondary.pts : Math.round(m.secondary.pts * Math.max(0, o.unitFrac - .2) / (m.secondary.units - .2) * .5); secTxt = `${Math.round(o.unitFrac * 100)} % der Einsatzkräfte überlebt (Ziel ${m.secondary.units * 100} %)`; }
     const total = people + priPts + secPts;

@@ -1,7 +1,7 @@
 'use strict';
-/* Comic-Zwischensequenzen: prozedural gezeichnete Panels (Canvas) mit Textbox, Sprechblasen und optionaler Sprachausgabe.
-   Sprachausgabe: Web Speech API (de-DE). Eigene Sprachdateien lassen sich unter audio/<sequenz>_<panel>.mp3 ablegen
-   (z. B. audio/prologue_1.mp3) – sie haben Vorrang vor der Computerstimme. */
+/* Comic-Zwischensequenzen: Panels aus Bilddateien (img/comic/<sequenz>_<n>.webp) oder prozedural gezeichnete Szenen (Fallback),
+   Textbox, Sprechblasen (normal/Funk) und Vertonung. Vertonung: audio/voice/<sequenz>_<n>.mp3 (z. B. audio/voice/prologue_1.mp3);
+   Panels mit radio:true bekommen einen Funk-Klangfilter. Fehlt die Datei, bleibt das Panel stumm (Computerstimme nur, wenn TTS_FALLBACK = true). */
 const Comic = (() => {
   const W = 960, H = 540, INK = '#0b0b0d';
   const rng = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -59,13 +59,19 @@ const Comic = (() => {
     const p = Math.min(1, t / 1.2), R = r * (.4 + .6 * p); c.beginPath(); for (let i = 0; i < 24; i++) { const a = i / 24 * 6.283, rr = R * (i % 2 ? .62 : 1); c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath(); c.fillStyle = '#ffb83a'; c.fill(); ink(c, 4);
     c.beginPath(); for (let i = 0; i < 18; i++) { const a = i / 18 * 6.283 + .2, rr = R * .55 * (i % 2 ? .6 : 1); c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath(); c.fillStyle = '#fff3a8'; c.fill(); ink(c, 2.5);
   }
-  function bubble(c, x, y, w, text, tx, ty) {
-    c.font = 'bold 21px "Comic Sans MS","Chalkboard SE",cursive,sans-serif'; const words = text.split(' '), lines = []; let ln = '';
+  function bubble(c, x, y, w, text, tx, ty, o = {}) {
+    const fs = o.fs || 21, lh = fs * 1.25; c.font = `bold ${fs}px "Comic Sans MS","Chalkboard SE",cursive,sans-serif`;
+    const words = text.split(' '), lines = []; let ln = '';
     for (const wd of words) { if (c.measureText(ln + wd).width > w - 28) { lines.push(ln.trim()); ln = ''; } ln += wd + ' '; } lines.push(ln.trim());
-    const h = lines.length * 26 + 22; c.fillStyle = '#fff'; c.beginPath(); c.roundRect(x, y, w, h, 18); c.fill(); ink(c, 3.5);
-    c.beginPath(); c.moveTo(x + w * .3, y + h - 2); c.lineTo(tx, ty); c.lineTo(x + w * .42, y + h - 2); c.fillStyle = '#fff'; c.fill(); ink(c, 3.5);
-    c.fillStyle = '#fff'; c.fillRect(x + w * .3 + 3, y + h - 6, w * .12 - 4, 8);
-    c.fillStyle = INK; c.textBaseline = 'top'; c.textAlign = 'left'; lines.forEach((l, i) => c.fillText(l, x + 14, y + 11 + i * 26));
+    const h = lines.length * lh + 22, fill = o.radio ? '#e6f0f7' : '#fff';
+    c.fillStyle = fill; c.beginPath(); c.roundRect(x, y, w, h, o.radio ? 6 : 18); c.fill(); ink(c, 3.5);
+    c.beginPath(); c.moveTo(x + w * .3, y + h - 2);
+    if (o.radio) { const mx = (x + w * .3 + tx) / 2, my = (y + h + ty) / 2; c.lineTo(mx + 14, my - 10); c.lineTo(mx - 10, my + 6); c.lineTo(tx, ty); c.lineTo(mx + 6, my + 14); }
+    else c.lineTo(tx, ty);
+    c.lineTo(x + w * .42, y + h - 2); c.fillStyle = fill; c.fill(); ink(c, 3.5);
+    c.fillStyle = fill; c.fillRect(x + w * .3 + 3, y + h - 6, w * .12 - 4, 8);
+    if (o.who) { c.font = `bold ${Math.round(fs * .62)}px sans-serif`; const tw = c.measureText(o.who).width + 16; c.fillStyle = '#f5d85a'; c.fillRect(x + 12, y - 15, tw, 20); c.strokeStyle = INK; c.lineWidth = 2.5; c.strokeRect(x + 12, y - 15, tw, 20); c.fillStyle = INK; c.textBaseline = 'middle'; c.textAlign = 'left'; c.fillText(o.who, x + 20, y - 4); }
+    c.font = `bold ${fs}px "Comic Sans MS","Chalkboard SE",cursive,sans-serif`; c.fillStyle = INK; c.textBaseline = 'top'; c.textAlign = 'left'; lines.forEach((l, i) => c.fillText(l, x + 14, y + 11 + i * lh));
   }
   function fire(c, x, y, s, t) { for (let i = 0; i < 5; i++) { const k = Math.sin(t * 7 + i * 1.7) * .15 + 1; c.fillStyle = i % 2 ? '#ff9b2f' : '#ffd24a'; c.beginPath(); c.moveTo(x + (i - 2) * 14 * s - 12 * s, y); c.quadraticCurveTo(x + (i - 2) * 14 * s, y - 70 * s * k - i % 3 * 12 * s, x + (i - 2) * 14 * s + 12 * s, y); c.closePath(); c.fill(); ink(c, 2); } }
   function halftone(c) {
@@ -93,10 +99,12 @@ const Comic = (() => {
   // ── Geschichten ───────────────────────────────────────────────────────
   const SEQ = {
     prologue: [
-      { s: 'nightTown', cap: 'Moosburg an der Isar, kurz nach Mitternacht. Die Stadt schläft – noch.' },
-      { s: 'radio', cap: 'Dann überschlagen sich die Funksprüche.', bub: ['Leitstelle an alle Einheiten! Aggressive Personen im Gewerbegebiet, unbekannte Erkrankung!', 130, 60, 400, 300, 260] },
-      { s: 'squad', cap: 'Zwei Polizeistreifen. Ein Trupp der Bundeswehr. Mehr steht nicht zwischen der Stadt und dem, was da kommt.', bub: ['Wir halten die Linie.', 380, 90, 260, 360, 300] },
-      { s: 'bridgeNight', cap: 'Die Isarbrücke im Südosten – der einzige Weg ans Westufer und zum Evakuierungspunkt.' }
+      { s: 'burning', img: 'img/comic/prologue_1.webp', cap: 'Wir waren nicht vorbereitet, als es passierte. Alles ging viel zu schnell und bevor wir reagieren konnten, waren die Menschen in der Unterzahl. Zuerst fielen die Großstädte. Schwärme Untoter quollen aus ihnen hervor und ergossen sich über das Land. Niemand wusste, woher die Seuche kam...' },
+      { s: 'burning', img: 'img/comic/prologue_2.webp', cap: '...und niemand hatte die Zeit, die Ursache herauszufinden. Die Armee war überfordert, die Befehlsketten unterbrochen. Seit dem Fall von Berlin war der Kontakt zur Regierung abgebrochen. Rettungsteams kehrten nie mehr zurück.' },
+      { s: 'squad', img: 'img/comic/prologue_3.webp', cap: 'Verzweifelt wurde lokale Verteidigung organisiert, um das zu schützen, was noch da war. Polizei und Armee kämpften Seite an Seite einen ungleichen Kampf...' },
+      { s: 'horde', img: 'img/comic/prologue_4.webp', cap: '...gegen einen Feind, der keinen Schlaf benötigte, keine Erschöpfung und keine Angst kannte. Und während unsere Zahlen schrumpften, wuchs die Armee der Untoten von Tag zu Tag weiter an.' },
+      { s: 'radio', img: 'img/comic/prologue_5.webp', cap: '', radio: true, bub: ['Unsere Linien im Osten wurden durchbrochen, die Zeds kommen direkt auf Sie zu. Evakuieren Sie sofort die Zivilisten und retten Sie so viele Sie können.', 36, 44, 440, 555, 222, { fs: 20, who: 'LEUTNANT (ÜBER FUNK)' }] },
+      { s: 'bridgeNight', img: 'img/comic/prologue_6.webp', cap: '', radio: true, bub: ['Führen Sie sie über die Isarbrücke und halten Sie die Brücke unter allen Umständen. Wenn die Brücke fällt, fällt auch Moosburg. Sie und Ihre Einheiten sind die letzte Verteidigungslinie! Ihr Bestes wird diesmal nicht ausreichen!', 330, 34, 600, 325, 300, { fs: 20, radio: true, who: 'LEUTNANT (AUS DEM FUNKGERÄT)' }] }
     ],
     m1_win: [
       { s: 'heliLZ', cap: 'Die Brücke hielt. Rotor um Rotor trugen die Hubschrauber die Menschen aus der Gefahrenzone.' },
@@ -136,40 +144,59 @@ const Comic = (() => {
   };
 
   // ── Wiedergabe ────────────────────────────────────────────────────────
-  let voiceOn = false; try { voiceOn = localStorage.getItem('zos_voice') === '1'; } catch (e) {}
-  let ov = null, raf = 0;
-  function speak(id, i, text) {
-    if (!voiceOn) return; stopSpeak();
-    const a = new Audio('audio/' + id + '_' + (i + 1) + '.mp3'); let fell = false;
-    const tts = () => { if (fell || !window.speechSynthesis) return; fell = true; const u = new SpeechSynthesisUtterance(text); u.lang = 'de-DE'; u.rate = 1; speechSynthesis.speak(u); };
-    a.onerror = tts; a.play().catch(tts);
-    ov && (ov._audio = a);
+  const TTS_FALLBACK = false, IMG_H = 640;
+  let voiceOn = true; try { voiceOn = localStorage.getItem('zos_voice') !== '0'; } catch (e) {}
+  let ov = null, raf = 0, vac = null;
+  const imgs = {};
+  const loadImg = src => { if (!imgs[src]) { const im = new Image(); imgs[src] = { im, ok: false }; im.onload = () => { imgs[src].ok = true; }; im.src = src; } return imgs[src]; };
+  function radioChain(a) {   // Funk-Klang: Bandpass 400–3200 Hz, leichte Übersteuerung
+    try {
+      vac = vac || new (window.AudioContext || window.webkitAudioContext)();
+      const src = vac.createMediaElementSource(a), hp = vac.createBiquadFilter(), lp = vac.createBiquadFilter(), ws = vac.createWaveShaper(), g = vac.createGain();
+      hp.type = 'highpass'; hp.frequency.value = 400; lp.type = 'lowpass'; lp.frequency.value = 3200;
+      const k = new Float32Array(256); for (let i = 0; i < 256; i++) { const x = i / 128 - 1; k[i] = Math.tanh(x * 2.2); } ws.curve = k; g.gain.value = 1.1;
+      src.connect(hp); hp.connect(lp); lp.connect(ws); ws.connect(g); g.connect(vac.destination);
+    } catch (e) {}
   }
-  function stopSpeak() { try { speechSynthesis.cancel(); } catch (e) {} if (ov && ov._audio) { try { ov._audio.pause(); } catch (e) {} ov._audio = null; } }
+  function speak(id, i, text, radio) {
+    stopSpeak(); if (!voiceOn) return;
+    const a = new Audio('audio/voice/' + id + '_' + (i + 1) + '.mp3'); let fell = false;
+    const tts = () => { if (fell || !TTS_FALLBACK || !window.speechSynthesis) return; fell = true; const u = new SpeechSynthesisUtterance(text); u.lang = 'de-DE'; speechSynthesis.speak(u); };
+    a.onerror = tts; if (radio) radioChain(a);
+    if (typeof Music !== 'undefined') Music.duck(true);
+    a.onended = () => { if (typeof Music !== 'undefined') Music.duck(false); };
+    a.play().catch(tts); ov && (ov._audio = a);
+  }
+  function stopSpeak() { try { speechSynthesis.cancel(); } catch (e) {} if (ov && ov._audio) { try { ov._audio.pause(); } catch (e) {} ov._audio = null; } if (typeof Music !== 'undefined') Music.duck(false); }
   function play(id, done) {
     const seq = SEQ[id]; if (!seq) return done && done();
     if (typeof SFX !== 'undefined') SFX.resume();
     if (typeof Music !== 'undefined') Music.play('menu');
+    for (const p of seq) if (p.img) loadImg(p.img);
     ov = document.createElement('div'); ov.id = 'comic';
     ov.innerHTML = `<div class="cwrap"><canvas width="${W}" height="${H}"></canvas><div class="ccap"></div>
       <div class="cbar"><button class="cv">${voiceOn ? '🗣 Sprache an' : '🗣 Sprache aus'}</button><span class="cn"></span><button class="cs">Überspringen</button><button class="cx big">Weiter ▶</button></div></div>`;
     document.body.appendChild(ov);
     const cv = ov.querySelector('canvas'), c = cv.getContext('2d'), cap = ov.querySelector('.ccap'), nn = ov.querySelector('.cn');
     let i = 0, t0 = performance.now(), typed = 0, full = '';
-    const show = () => { const p = seq[i]; full = p.cap; typed = 0; t0 = performance.now(); nn.textContent = (i + 1) + ' / ' + seq.length; speak(id, i, p.cap + (p.bub ? ' ' + p.bub[0] : '')); };
+    const isImg = p => p.img && imgs[p.img] && imgs[p.img].ok;
+    const show = () => { const p = seq[i]; full = p.cap; typed = 0; t0 = performance.now(); nn.textContent = (i + 1) + ' / ' + seq.length; speak(id, i, p.cap + (p.bub ? ' ' + p.bub[0] : ''), p.radio); };
     const finish = () => { cancelAnimationFrame(raf); stopSpeak(); ov.remove(); ov = null; done && done(); };
     const next = () => { if (typed < full.length) { typed = full.length; return; } if (++i >= seq.length) return finish(); show(); };
     const loop = () => {
-      const t = (performance.now() - t0) / 1000, p = seq[i];
-      c.save(); c.clearRect(0, 0, W, H); const z = 1 + .05 * Math.min(1, t / 8); c.translate(W / 2, H / 2); c.scale(z, z); c.translate(-W / 2, -H / 2);
-      SCENES[p.s](c, t); c.restore();
-      if (p.bub && t > .6) { const [txt, x, y, w, tx, ty] = p.bub; bubble(c, x, y, w, txt, tx, ty); }
-      halftone(c); c.lineWidth = 12; c.strokeStyle = INK; c.strokeRect(0, 0, W, H);
+      const t = (performance.now() - t0) / 1000, p = seq[i], img = isImg(p), ch = img ? IMG_H : H;
+      if (cv.height !== ch) cv.height = ch;
+      c.save(); c.clearRect(0, 0, W, ch); const z = 1 + .05 * Math.min(1, t / 10); c.translate(W / 2, ch / 2); c.scale(z, z); c.translate(-W / 2, -ch / 2);
+      if (img) c.drawImage(imgs[p.img].im, 0, 0, W, ch); else SCENES[p.s](c, t);
+      c.restore();
+      if (p.bub && t > .6) { const [txt, x, y, w, tx, ty, o] = p.bub; bubble(c, x, y, w, txt, tx, ty, o || {}); }
+      if (!img) halftone(c);
+      c.lineWidth = 12; c.strokeStyle = INK; c.strokeRect(0, 0, W, ch);
       typed = Math.min(full.length, typed + .8); const tx = full.slice(0, typed | 0); if (cap.textContent !== tx) cap.textContent = tx;
       raf = requestAnimationFrame(loop);
     };
     ov.querySelector('.cx').onclick = next; ov.querySelector('.cs').onclick = finish;
-    ov.querySelector('.cv').onclick = e => { voiceOn = !voiceOn; try { localStorage.setItem('zos_voice', voiceOn ? '1' : '0'); } catch (x) {} e.target.textContent = voiceOn ? '🗣 Sprache an' : '🗣 Sprache aus'; if (voiceOn) speak(id, i, seq[i].cap); else stopSpeak(); };
+    ov.querySelector('.cv').onclick = e => { voiceOn = !voiceOn; try { localStorage.setItem('zos_voice', voiceOn ? '1' : '0'); } catch (x) {} e.target.textContent = voiceOn ? '🗣 Sprache an' : '🗣 Sprache aus'; if (voiceOn) speak(id, i, seq[i].cap, seq[i].radio); else stopSpeak(); };
     ov.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); next(); } else if (e.key === 'Escape') finish(); });
     ov.tabIndex = 0; ov.focus(); show(); loop();
   }
