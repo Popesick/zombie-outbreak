@@ -5,7 +5,7 @@ const Music = (() => {
   const SETS = {
     menu: { files: ['audio/music/intro.mp3'], loop: true },
     game: { files: [0, 1, 2, 3].map(i => 'audio/music/anxious_waiting_' + i + '.mp3'), shuffle: true },
-    combat: { files: [], shuffle: true },
+    combat: { files: [0, 1, 2, 3].map(i => 'audio/music/relentless_drive_' + i + '.mp3'), shuffle: true },
     defeat: { files: [], once: true }
   };
   const BASE = .5, FADE = 2.5;
@@ -45,6 +45,7 @@ const Music = (() => {
     },
     resume() { if (blocked && cur) { blocked = false; cur.play().catch(() => { blocked = true; }); } else if (!cur && set) next(false); },
     level: () => level,
+    current: () => set,
     cycle() { level = level === 1 ? .5 : level === .5 ? 0 : 1; try { localStorage.setItem('zos_music', level); } catch (e) {} for (const f of fades) fades.delete(f); if (cur) cur.volume = vol(); return level; }
   };
 })();

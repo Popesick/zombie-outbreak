@@ -1531,7 +1531,20 @@ window.addEventListener('keydown', e => {
   else if (e.key === '1') setSpeed(1); else if (e.key === '2') setSpeed(2); else if (e.key === '3' || e.key === '4') setSpeed(4);
 });
 let hudT = 0;
+// Musik-Regie: bei Gefechtslage (viele Zombies in der Nähe der Einheiten bzw. viele Schüsse) Kampfmusik, danach nach ca. 40 s ruhiger Lage zurück
+let hotT = 0, lastShots = 0, combatSince = 0;
+function musicDirector() {
+  if (phase !== 'run' || speed === 0 || !S || finished) return;
+  let near = 0; for (const u of E) if (friendly(u) && u.k !== K_TUR) near += countZAround(u.x, u.y, 70);
+  const shots = S.shots - lastShots; lastShots = S.shots;
+  const threat = near + shots * .5;
+  hotT = threat >= 8 ? Math.min(20, hotT + .2) : Math.max(0, hotT - .1);
+  const cur = Music.current();
+  if (cur !== 'combat' && hotT >= 3) { Music.play('combat'); combatSince = performance.now(); }
+  else if (cur === 'combat' && hotT <= .5 && performance.now() - combatSince > 40000) Music.play('game');
+}
 function ambience() {
+  musicDirector();
   if (phase !== 'run') { SFX.ambient([]); return; }
   SFX.ambient(fx.filter(f => f.type === 'heli').map(f => ({ x: f.x, y: f.y })));
   if (speed === 0) return;
