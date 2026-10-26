@@ -25,7 +25,7 @@ button:disabled{opacity:.45;cursor:default}
 #hud i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px}
 #hud b{font-variant-numeric:tabular-nums}
 #hud hr{border:0;border-top:1px solid var(--line);margin:6px 0;width:100%}
-#tools{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px;max-width:calc(100% - 16px);overflow-x:auto}
+#tools{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px;max-width:calc(100% - 16px);flex-wrap:wrap;justify-content:center}
 #tools button{display:flex;flex-direction:column;align-items:center;min-width:74px;position:relative;overflow:hidden}
 #tools button span{font-size:11px;color:var(--mut)}
 #tools .cd{position:absolute;left:0;bottom:0;height:3px;background:var(--warn);width:0}
@@ -46,6 +46,14 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 #toast{position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:8px 14px;background:#000c;border-radius:20px;display:none}
 .leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:6px}.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
 #tools button.locked{opacity:.5}
+.cat{position:relative;display:flex}.catbtn i.dot{position:absolute;top:5px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--acc);display:none}.catbtn.rdy i.dot{display:block}
+.cat.on>.catbtn,.cat.open>.catbtn{background:#335a2d;border-color:var(--acc)}
+.tmenu{display:none;position:fixed;z-index:7;flex-direction:column;gap:4px;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(6px);min-width:210px}
+.tmenu.open{display:flex}
+.tmenu button{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;position:relative;overflow:hidden;padding:8px 10px;text-align:left}
+.tmenu button span{font-size:13px;color:var(--tx)}
+.tmenu .cd{position:absolute;left:0;bottom:0;height:3px;background:var(--warn);width:0}
+.tmenu button.locked{opacity:.5}
 .inhub #leftcol,.inhub #tools,.inhub #top,.inhub #objs,.inhub #selbar,.inhub #buildbar{display:none!important}
 #comic{position:fixed;inset:0;background:#050506;z-index:40;display:flex;align-items:center;justify-content:center;padding:10px;outline:none;touch-action:manipulation}
 #comic .cwrap{width:min(100%,960px)}
@@ -115,21 +123,30 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 </div>
 
 <div id="tools" class="panel">
-  <button data-tool="pan" class="on">✋<span>Kamera</span></button>
-  <button data-tool="units">🎖<span>Einheiten</span></button>
-  <button data-tool="infect">☣️<span>Zombie</span></button>
-  <button data-tool="barricade">🧱<span data-n="Barrikade">Bauen</span><div class="cd"></div></button>
-  <button data-tool="demolish">🔨<span>Einreißen</span></button>
-  <button data-tool="evac">🚁<span data-n="Evakuierung">Evakuierung</span></button>
-  <button data-tool="gate" style="display:none">🚪<span data-n="Tor">Tor</span></button>
-  <button data-tool="turret" style="display:none">🔫<span data-n="Geschütz">Geschütz</span><div class="cd"></div></button>
-  <button data-tool="flare" style="display:none">🔥<span data-n="Signalbombe">Signalbombe</span><div class="cd"></div></button>
-  <button data-tool="mines" style="display:none">💣<span data-n="Minen">Minen</span><div class="cd"></div></button>
-  <button data-tool="gunship" style="display:none">🚁<span data-n="Gunship">Gunship</span><div class="cd"></div></button>
-  <button data-tool="truck">🚛<span data-n="Trucks">Trucks</span><div class="cd"></div></button>
-  <button data-tool="strike">💥<span data-n="Luftschlag">Luftschlag</span><div class="cd"></div></button>
-  <button data-tool="supply">📦<span data-n="Versorgung">Versorgung</span><div class="cd"></div></button>
-  <button data-tool="garrison">🪖<span data-n="Garnison">Garnison</span><div class="cd"></div></button>
+  <button data-tool="pan" class="on" title="Karte verschieben (Esc)">✋<span>Kamera</span></button>
+  <button data-tool="units" title="Einheiten auswählen und steuern">🎖<span>Einheiten</span></button>
+  <button data-tool="infect" title="Zombie setzen">☣️<span>Zombie</span></button>
+  <div class="cat" data-cat="build"><button class="catbtn" title="Barrikaden, Einreißen, Tore">🏗<span>Bauen</span><i class="dot"></i></button>
+    <div class="tmenu">
+      <button data-tool="barricade" title="Barrikaden planen (Linie ziehen), dann „Bau abschließen“">🧱<span data-n="Barrikade">Bauen</span><div class="cd"></div></button>
+      <button data-tool="demolish" title="Barrikade einreißen (Einheit in der Nähe nötig) oder Plan verwerfen">🔨<span>Einreißen</span></button>
+      <button data-tool="gate" style="display:none" title="Tor in eine Barrikade einsetzen (1 pro 12 Elemente)">🚪<span data-n="Tor">Tor</span></button>
+    </div></div>
+  <div class="cat" data-cat="air"><button class="catbtn" title="Luftschlag, Gunship, Versorgung, Signalbombe">✈<span>Luftunterstützung</span><i class="dot"></i></button>
+    <div class="tmenu">
+      <button data-tool="strike" title="Bombe per Kampfflieger">💥<span data-n="Luftschlag">Luftschlag</span><div class="cd"></div></button>
+      <button data-tool="gunship" style="display:none" title="Gunship beschießt das Ziel 30 s lang">🚁<span data-n="Gunship">Gunship</span><div class="cd"></div></button>
+      <button data-tool="supply" title="Versorgungspaket: Munition, bewaffnet Zivilisten">📦<span data-n="Versorgung">Versorgung</span><div class="cd"></div></button>
+      <button data-tool="flare" style="display:none" title="Signalbombe: lockt Zombies 20 s an, dann Explosion">🔥<span data-n="Signalbombe">Signalbombe</span><div class="cd"></div></button>
+    </div></div>
+  <div class="cat" data-cat="force"><button class="catbtn" title="Garnison, Truck, Geschütz, Minen">🪖<span>Verstärkung</span><i class="dot"></i></button>
+    <div class="tmenu">
+      <button data-tool="garrison" title="Soldaten-Squad per Hubschrauber">🪖<span data-n="Garnison">Garnison</span><div class="cd"></div></button>
+      <button data-tool="truck" title="MG-Truck am Kartenrand anfordern">🚛<span data-n="Trucks">Trucks</span><div class="cd"></div></button>
+      <button data-tool="turret" style="display:none" title="Automatikgeschütz per Hubschrauber (30 s Verzögerung)">🔫<span data-n="Geschütz">Geschütz</span><div class="cd"></div></button>
+      <button data-tool="mines" style="display:none" title="Minenteppich per Hubschrauber">💣<span data-n="Minen">Minen</span><div class="cd"></div></button>
+    </div></div>
+  <button data-tool="evac" title="Evakuierungspunkt festlegen">🚁<span data-n="Evakuierung">Evakuierung</span></button>
 </div>
 
 <div id="setup" class="panel" style="display:none">

@@ -1417,7 +1417,20 @@ $('uHead').onclick = () => { const b = $('units'); b.classList.toggle('col'); $(
 if (innerWidth < 700) { $('units').classList.add('col'); $('uTog').textContent = '▸'; }
 function setSpeed(s) { speed = s; for (const n of [0, 1, 2, 4]) $('sp' + n).classList.toggle('on', n === s); }
 for (const n of [0, 1, 2, 4]) $('sp' + n).onclick = () => setSpeed(n);
-document.querySelectorAll('#tools button').forEach(b => b.onclick = () => { toolSel = b.dataset.tool; document.querySelectorAll('#tools button').forEach(x => x.classList.toggle('on', x === b)); cv.style.cursor = toolSel === 'pan' ? 'grab' : 'crosshair'; });
+document.querySelectorAll('#tools .cat').forEach(c => { const m = c.querySelector('.tmenu'); c._menu = m; m._cat = c; document.body.appendChild(m); });   // Menüs außerhalb von #tools (backdrop-filter würde position:fixed verschieben)
+const closeMenus = () => document.querySelectorAll('.tmenu.open').forEach(m => { m.classList.remove('open'); m._cat.classList.remove('open'); });
+function selectTool(t) {
+  toolSel = t; document.querySelectorAll('button[data-tool]').forEach(x => x.classList.toggle('on', x.dataset.tool === t));
+  document.querySelectorAll('.cat').forEach(c => c.classList.toggle('on', !!c._menu.querySelector('button[data-tool="' + t + '"]')));
+  cv.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; closeMenus();
+}
+document.querySelectorAll('button[data-tool]').forEach(b => b.onclick = () => selectTool(b.dataset.tool));
+document.querySelectorAll('#tools .catbtn').forEach(b => b.onclick = ev => {
+  ev.stopPropagation(); const cat = b.parentElement, m = cat._menu, open = !m.classList.contains('open'); closeMenus();
+  if (open) { m.classList.add('open'); cat.classList.add('open'); const r = b.getBoundingClientRect(); m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, r.left)) + 'px'; m.style.bottom = (innerHeight - r.top + 6) + 'px'; }
+});
+addEventListener('pointerdown', e => { if (!e.target.closest('.cat') && !e.target.closest('.tmenu')) closeMenus(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').style.display.includes('flex')) selectTool('pan'); });
 function startRun(loaded) {
   phase = 'run'; $('setup').style.display = 'none'; finished = false;
   if (!loaded) newSim();
@@ -1535,7 +1548,7 @@ function updateHud() {
     $('buildTxt').textContent = 'Bauphase: ' + barUsed() + '/' + RULES.barLimit + ' Elemente · ' + pl + ' geplant' + (od.length ? ' · Lieferung ' + (nxt < 1e8 ? 'in ' + Math.max(0, Math.ceil(nxt)) + ' s' : 'läuft') : '');
     $('bCommit').disabled = !pl; $('bDrop').disabled = !pl;
   } else $('buildbar').style.display = 'none';
-  document.querySelectorAll('#tools button').forEach(b => {
+  document.querySelectorAll('button[data-tool]').forEach(b => {
     const k = b.dataset.tool, el = b.querySelector('.cd'), sp = b.querySelector('span');
     if (k !== 'pan' && k !== 'units') {
       const gate = S && phase === 'run' ? toolGate(k) : { hidden: !RULES.tools[k] };
@@ -1544,12 +1557,18 @@ function updateHud() {
         const ex = gate.max != null && gate.left <= 0; b.classList.toggle('locked', !!gate.locked || ex);
         let t = sp.dataset.n || sp.textContent;
         if (k === 'barricade') t = 'Bauen ' + barUsed() + '/' + RULES.barLimit;
-        else if (ex) t = sp.dataset.n + ' 0/' + gate.max; else if (gate.locked) t = gate.label; else if (gate.max != null) t = sp.dataset.n + ' ' + gate.left + '/' + gate.max;
+        else if (ex) t = sp.dataset.n + ' 0/' + gate.max; else if (gate.locked) t = b.closest('.tmenu') ? sp.dataset.n + ' · ' + gate.label : gate.label; else if (gate.max != null) t = sp.dataset.n + ' ' + gate.left + '/' + gate.max;
         if (sp.textContent !== t) sp.textContent = t;
       }
     }
     const cdMax = (RULES.tools[k] && RULES.tools[k].cd) || 0;
     if (el) el.style.width = (cooldown[k] > 0 && cdMax ? cooldown[k] / cdMax * 100 : 0) + '%';
+  });
+  document.querySelectorAll('#tools .cat').forEach(cat => {
+    const items = [...cat._menu.querySelectorAll('button[data-tool]')].filter(b => b.style.display !== 'none');
+    cat.style.display = items.length ? '' : 'none';
+    const ready = cat.dataset.cat !== 'build' && S && phase === 'run' && items.some(b => !b.classList.contains('locked') && !(cooldown[b.dataset.tool] > 0));
+    cat.querySelector('.catbtn').classList.toggle('rdy', !!ready);
   });
 }
 
