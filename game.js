@@ -413,8 +413,10 @@ function bash(id) { const b = BAR[id]; if (b) b.hp -= 7 * DT; }
 function moveDir(e, dx, dy, sp, zm) {
   const nx = e.x + dx * sp * DT, ny = e.y + dy * sp * DT;
   if (passable(nx, ny, zm, e)) { e.x = nx; e.y = ny; return true; }
-  if (passable(nx, e.y, zm, e)) { e.x = nx; return true; }
-  if (passable(e.x, ny, zm, e)) { e.y = ny; return true; }
+  // Teilbewegung zählt nur, wenn sie spürbar voranbringt (sonst bleibt man an einer Kante „scheinbar“ in Bewegung hängen)
+  const m = Math.abs(dx) + Math.abs(dy);
+  if (Math.abs(dx) > .35 * m && passable(nx, e.y, zm, e)) { e.x = nx; return true; }
+  if (Math.abs(dy) > .35 * m && passable(e.x, ny, zm, e)) { e.y = ny; return true; }
   return false;
 }
 function moveTo(e, tx, ty, sp, zm) {
