@@ -282,6 +282,21 @@ function randWalk(cx, cy, r, roadOnly) {
   }
   return null;
 }
+// Nächste begehbare Zelle der Hauptkomponente (Ringsuche) – z. B. wenn ein Startpunkt in einem Gebäude liegt
+function nearestWalkCell(x, y, maxR = 40) {
+  const gx = x / CELL | 0, gy = y / CELL | 0;
+  for (let r = 0; r <= maxR; r++) {
+    let best = -1, bd = 1e9;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const cx = gx + dx, cy = gy + dy; if (cx < 0 || cy < 0 || cx >= GW || cy >= GH) continue;
+      const i = cy * GW + cx; if (!comp[i] || barId[i]) continue;
+      const d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; }
+    }
+    if (best >= 0) return [(best % GW + .5) * CELL, ((best / GW | 0) + .5) * CELL];
+  }
+  return null;
+}
 function anyWalk(roadOnly) {
   for (let n = 0; n < 500; n++) { const p = randWalk(rnd(0, WW), rnd(0, WH), 0, roadOnly); if (p) return p; }
   return [WW / 2, WH / 2];
@@ -553,6 +568,9 @@ function giveMove(u, p, patrol) {
 }
 const isFoe = z => z && !z.dead && (z.k === K_ZOM || z.inc >= 0);
 function stepUnit(e) {
+  if ((e.rz = (e.rz || 0) - DT) <= 0) {   // steckt die Einheit in einem Gebäude/Hindernis (z. B. nach Bauplatzierung)? → auf begehbaren Grund setzen
+    e.rz = 1; if (e.k !== K_TRK && e.k !== K_TUR && type[cellIdx(e.x, e.y)] > T_ROAD) { const q = nearestWalkCell(e.x, e.y, 30); if (q) { e.x = q[0]; e.y = q[1]; e.path = null; } }
+  }
   if (e.inc >= 0) { e.inc -= DT; if (e.inc <= 0) { toZombie(e); return; } }
   const trk = e.k === K_TRK || e.k === K_TUR, sn = !!e.snipe && !trk && e.k !== K_POL, rng = (trk ? 70 : e.k === K_SOL || e.k === K_SEN ? 65 : 38) * (sn ? 3 : 1), rate = (trk ? .12 : e.k === K_POL ? 1.1 : .7) * (sn ? 2 : 1), dmg = trk ? 1 : e.k === K_POL ? 1.5 : 2.5, mobile = e.k !== K_SEN && e.k !== K_TUR;
   // Eingraben / Stellung räumen

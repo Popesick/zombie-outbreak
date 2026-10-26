@@ -116,7 +116,7 @@ const Campaign = (() => {
   function spawnMission(m) {
     const st = m.start(), cnt = { sol: 0, pol: 0 };
     for (const sq of C.roster.squads) {
-      const list = st[sq.k], p = list[cnt[sq.k]++ % list.length], id = ++gidN, kills = sq.m.slice();
+      const list = st[sq.k], p0 = list[cnt[sq.k]++ % list.length], p = nearestWalkCell(p0.x, p0.y, 40) ? { x: nearestWalkCell(p0.x, p0.y, 40)[0], y: nearestWalkCell(p0.x, p0.y, 40)[1] } : p0, id = ++gidN, kills = sq.m.slice();
       if (sq.k === 'sol') while (kills.length < 4 + RULES.squadPlus) kills.push(0);
       for (const kl of kills) { const q = randWalk(p.x, p.y, 6) || [p.x, p.y]; unitFrom(sq.k, q[0], q[1], id, kl); }
     }
