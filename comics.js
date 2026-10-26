@@ -104,7 +104,15 @@ const Comic = (() => {
       { s: 'squad', img: 'img/comic/prologue_3.webp', cap: 'Verzweifelt wurde lokale Verteidigung organisiert, um das zu schützen, was noch da war. Polizei und Armee kämpften Seite an Seite einen ungleichen Kampf...' },
       { s: 'horde', img: 'img/comic/prologue_4.webp', cap: '...gegen einen Feind, der keinen Schlaf benötigte, keine Erschöpfung und keine Angst kannte. Und während unsere Zahlen schrumpften, wuchs die Armee der Untoten von Tag zu Tag weiter an.' },
       { s: 'radio', img: 'img/comic/prologue_5.webp', cap: '', radio: true, bub: ['Unsere Linien im Osten wurden durchbrochen, die Zeds kommen direkt auf Sie zu. Evakuieren Sie sofort die Zivilisten und retten Sie so viele Sie können.', 36, 44, 440, 555, 222, { fs: 20, who: 'LEUTNANT (ÜBER FUNK)' }] },
-      { s: 'bridgeNight', img: 'img/comic/prologue_6.webp', cap: '', radio: true, bub: ['Führen Sie sie über die Isarbrücke und halten Sie die Brücke unter allen Umständen. Wenn die Brücke fällt, fällt auch Moosburg. Sie und Ihre Einheiten sind die letzte Verteidigungslinie! Ihr Bestes wird diesmal nicht ausreichen!', 330, 34, 600, 325, 300, { fs: 20, radio: true, who: 'LEUTNANT (AUS DEM FUNKGERÄT)' }] }
+      { s: 'bridgeNight', img: 'img/comic/prologue_6.webp', cap: '', radio: true, file: 'audio/voice/prologue_6.wav', voice: 'Führen Sie sie über die Isarbrücke und halten Sie die Brücke unter allen Umständen. Wenn die Brücke fällt, fällt auch Moosburg. Sie und Ihre Einheiten sind die letzte Verteidigungslinie! Der Feldwebel antwortete nur: Wir geben unser Bestes! Und der Leutnant: Ihr Bestes wird diesmal nicht ausreichen!',
+        // Zeitmarken (Sekunden) aus der Pausenanalyse der Aufnahme; die Funksprüche des Leutnants kommen aus dem Hörer, die Antwort aus dem Mund des Feldwebels
+        cues: [
+          { t: 0, cap: '', bub: ['Führen Sie sie über die Isarbrücke und halten Sie die Brücke unter allen Umständen. Wenn die Brücke fällt... fällt auch Moosburg. Sie und ihre Einheiten sind die letzte Verteidigungslinie!', 330, 34, 600, 338, 268, { fs: 20, radio: true, who: 'LEUTNANT (AUS DEM HÖRER)' }] },
+          { t: 10.09, cap: 'Der Feldwebel antwortete nur:', bub: null },
+          { t: 12.13, cap: 'Der Feldwebel antwortete nur:', bub: ['Wir geben unser Bestes!', 40, 40, 300, 262, 278, { fs: 22, who: 'FELDWEBEL' }] },
+          { t: 13.61, cap: 'Und der Leutnant...', bub: null },
+          { t: 14.84, cap: 'Und der Leutnant...', bub: ['Ihr Bestes wird diesmal nicht ausreichen!', 330, 34, 560, 338, 268, { fs: 22, radio: true, who: 'LEUTNANT (AUS DEM HÖRER)' }] }
+        ] }
     ],
     m1_win: [
       { s: 'heliLZ', cap: 'Die Brücke hielt. Rotor um Rotor trugen die Hubschrauber die Menschen aus der Gefahrenzone.' },
@@ -143,6 +151,23 @@ const Comic = (() => {
     ]
   };
 
+  // ── Nebelfilter für Bildpanels: zwei langsam driftende, nahtlose Nebelschichten ──
+  let fogTex = null;
+  function fogLayer(seed, h) {
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = h; const g = cv.getContext('2d'), r = rng(seed);
+    for (let i = 0; i < 26; i++) {
+      const x = r() * W, y = h * (.35 + r() * .65), rad = 90 + r() * 170, a = .12 + r() * .16;
+      for (const dx of [-W, 0, W]) { const gr = g.createRadialGradient(x + dx, y, 0, x + dx, y, rad); gr.addColorStop(0, `rgba(210,222,235,${a})`); gr.addColorStop(1, 'rgba(210,222,235,0)'); g.fillStyle = gr; g.fillRect(x + dx - rad, y - rad, rad * 2, rad * 2); }
+    }
+    return cv;
+  }
+  function drawFog(c, t, h) {
+    if (!fogTex || fogTex[0].height !== h) fogTex = [fogLayer(11, h), fogLayer(23, h)];
+    c.save(); c.globalCompositeOperation = 'screen';
+    const dr = [[fogTex[0], 9, .55, 0], [fogTex[1], -6, .42, 40]];
+    for (const [tex, sp, al, oy] of dr) { c.globalAlpha = al; const ox = ((t * sp) % W + W) % W; c.drawImage(tex, -ox, oy * Math.sin(t * .15)); c.drawImage(tex, W - ox, oy * Math.sin(t * .15)); }
+    c.restore();
+  }
   // ── Wiedergabe ────────────────────────────────────────────────────────
   const TTS_FALLBACK = false, IMG_H = 640;
   let voiceOn = true; try { voiceOn = localStorage.getItem('zos_voice') !== '0'; } catch (e) {}
@@ -158,9 +183,9 @@ const Comic = (() => {
       src.connect(hp); hp.connect(lp); lp.connect(ws); ws.connect(g); g.connect(vac.destination);
     } catch (e) {}
   }
-  function speak(id, i, text, radio, onMeta, onEnd) {
+  function speak(id, i, text, radio, onMeta, onEnd, file) {
     stopSpeak(); if (!voiceOn) return;
-    const a = new Audio('audio/voice/' + id + '_' + (i + 1) + '.mp3'); let fell = false;
+    const a = new Audio(file || 'audio/voice/' + id + '_' + (i + 1) + '.mp3'); let fell = false;
     const tts = () => { if (fell || !TTS_FALLBACK || !window.speechSynthesis) return; fell = true; const u = new SpeechSynthesisUtterance(text); u.lang = 'de-DE'; speechSynthesis.speak(u); };
     a.onerror = tts; if (radio) radioChain(a);
     if (typeof Music !== 'undefined') Music.duck(true);
@@ -184,21 +209,25 @@ const Comic = (() => {
     const show = () => {
       const p = seq[i], my = i; full = p.cap; typed = 0; rate = .8; t0 = performance.now(); clearTimeout(auto); nn.textContent = (i + 1) + ' / ' + seq.length;
       speak(id, i, p.cap + (p.bub ? ' ' + p.bub[0] : ''), p.radio,
-        d => { rate = Math.max(.12, full.length / (d * 60 * .92)); },                                            // Schreibmaschine endet kurz vor dem Sprechende
-        () => { clearTimeout(auto); auto = setTimeout(() => { if (ov && i === my) { typed = full.length; next(); } }, 2200); });   // nach der Vertonung automatisch weiter
+        d => { if (!p.cues) rate = Math.max(.12, full.length / (d * 60 * .92)); },                                            // Schreibmaschine endet kurz vor dem Sprechende
+        () => { clearTimeout(auto); auto = setTimeout(() => { if (ov && i === my) { typed = full.length; next(); } }, 2200); }, p.file);   // nach der Vertonung automatisch weiter
     };
     const finish = () => { cancelAnimationFrame(raf); clearTimeout(auto); stopSpeak(); ov.remove(); ov = null; done && done(); };
     const next = () => { clearTimeout(auto); if (typed < full.length) { typed = full.length; return; } if (++i >= seq.length) return finish(); show(); };
     const loop = () => {
       const t = (performance.now() - t0) / 1000, p = seq[i], img = isImg(p), ch = img ? IMG_H : H;
+      let bubNow = p.bub;
+      if (p.cues) { let ci = 0; p.cues.forEach((q, k) => { if (t >= q.t) ci = k; }); const q = p.cues[ci]; bubNow = q.bub; if (full !== q.cap && !p._busy) { full = q.cap; typed = 0; rate = .8; } }
       if (cv.height !== ch) cv.height = ch;
       c.save(); c.clearRect(0, 0, W, ch); const z = 1 + .05 * Math.min(1, t / 10); c.translate(W / 2, ch / 2); c.scale(z, z); c.translate(-W / 2, -ch / 2);
       if (img) c.drawImage(imgs[p.img].im, 0, 0, W, ch); else SCENES[p.s](c, t);
       c.restore();
-      if (p.bub && t > .6) { const [txt, x, y, w, tx, ty, o] = p.bub; bubble(c, x, y, w, txt, tx, ty, o || {}); }
+      if (img) drawFog(c, t, ch);
+      if (bubNow && t > .6) { const [txt, x, y, w, tx, ty, o] = bubNow; bubble(c, x, y, w, txt, tx, ty, o || {}); }
       if (!img) halftone(c);
       c.lineWidth = 12; c.strokeStyle = INK; c.strokeRect(0, 0, W, ch);
-      typed = Math.min(full.length, typed + rate); const tx = full.slice(0, typed | 0); if (cap.textContent !== tx) cap.textContent = tx;
+      const nowT = performance.now(), dtf = Math.min(3, (nowT - (loop.last || nowT)) / 16.67); loop.last = nowT;
+      typed = Math.min(full.length, typed + rate * dtf); const tx = full.slice(0, typed | 0); if (cap.textContent !== tx) { cap.textContent = tx; cap.scrollTop = cap.scrollHeight; }
       raf = requestAnimationFrame(loop);
     };
     ov.querySelector('.cx').onclick = next; ov.querySelector('.cs').onclick = finish;

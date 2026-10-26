@@ -1,9 +1,10 @@
-(async()=>{ const out={};
+(async()=>{ const out={}; const q=new URLSearchParams(location.search); const w=+(q.get('w')||2000), pn=+(q.get('p')||5);
  try {
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
-  out.dur=await Promise.all([1,2,3,4,5].map(n=>new Promise(r=>{ const a=new Audio('audio/voice/prologue_'+n+'.mp3'); a.onloadedmetadata=()=>r(n+':'+a.duration.toFixed(1)); a.onerror=()=>r(n+':ERR'); setTimeout(()=>r(n+':timeout'),6000); })));
-  document.getElementById('menu').remove();
-  Comic.play('prologue', ()=>{}); await wait(1500);
-  out.panel=document.querySelector('#comic .cn').textContent; out.cap=document.querySelector('#comic .ccap').textContent.length;
+  document.getElementById('menu').remove(); setSpeed(0);
+  Comic.play('prologue', ()=>{}); await wait(400);
+  document.querySelector('#comic .cv').click();   // Sprache aus: kein Autoweiter
+  for(let g=0;g<30 && document.querySelector('#comic .cn').textContent!==(pn+1)+' / 6'; g++){ document.querySelector('#comic .cx').click(); await wait(60); }
+  await wait(w); out.panel=document.querySelector('#comic .cn').textContent;
  } catch(e){ out.err=e.stack; }
  document.getElementById('__res').textContent=JSON.stringify(out); })();
