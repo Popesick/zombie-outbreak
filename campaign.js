@@ -14,6 +14,7 @@ const Campaign = (() => {
     { id: 'ammo', n: 'Mehr Munition', d: 'Munitionsvorrat +100 %.', p: [350] },
     { id: 'moresupply', n: 'Mehr Versorgungspakete', d: '+5 Versorgungspakete pro Stufe.', p: [200, 300] },
     { id: 'flare', n: 'Signalbomben', d: '5 Signalbomben: 20 s lauter Lockton, danach Explosion (60 % Radius eines Luftschlags).', p: [250] },
+    { id: 'mines', n: 'Minenteppiche', d: 'Ein Hubschrauber legt einen Minenteppich (Radius 25 m, 36 Minen). Jede Figur löst aus, Explosion nach 1 s. Je Stufe 3 Teppiche pro Mission.', p: [250, 300, 350] },
     { id: 'gunship', n: 'Gunship', d: 'Ein Hubschrauber schwebt 30 s über dem Ziel und beschießt es mit der Gatling (2 Einsätze pro Mission).', p: [700] }
   ];
   const BUY = [
@@ -95,6 +96,7 @@ const Campaign = (() => {
     if (lv('gate')) tools.gate = {};
     if (lv('turret')) tools.turret = { at: 0, max: 2, cd: 10 };
     if (lv('flare')) tools.flare = { at: 0, max: 5, cd: 4 };
+    if (lv('mines')) tools.mines = { at: 0, max: 3 * lv('mines'), cd: 20 };
     if (lv('gunship')) tools.gunship = { at: 0, max: 2, cd: 45 };
     const R = {
       mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,

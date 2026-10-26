@@ -691,7 +691,7 @@ function step() {
   }
   // Barrikaden
   for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (b && b.hp <= 0) killBar(i); }
-  dispatchBuild(); updateZF(); if (RULES.tick) RULES.tick();
+  stepMines(); dispatchBuild(); updateZF(); if (RULES.tick) RULES.tick();
   // Evakuierung
   if (S.evac) {
     S.evacT -= DT; if (S.evacR != null && S.evacR < 4000) S.evacR += 25 * DT;
@@ -716,7 +716,7 @@ function updateFx() {
     if (f.type === 'heli') {
       if (f.ph === 0) {
         const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy), sp = 48 * DT; f.a = Math.atan2(dy, dx);
-        if (d <= sp) { f.x = f.tx; f.y = f.ty; f.ph = 1; f.t = f.kind === 'garrison' ? 3.5 : f.kind === 'evac' ? 5 : f.kind === 'build' ? 3 : f.kind === 'gunship' ? 30 : 2.2; } else { f.x += dx / d * sp; f.y += dy / d * sp; }
+        if (d <= sp) { f.x = f.tx; f.y = f.ty; f.ph = 1; f.t = f.kind === 'garrison' ? 3.5 : f.kind === 'evac' ? 5 : f.kind === 'build' ? 3 : f.kind === 'gunship' ? 30 : f.kind === 'mines' ? 2.5 : 2.2; } else { f.x += dx / d * sp; f.y += dy / d * sp; }
       } else if (f.ph === 1) {
         f.t -= DT; if (f.kind === 'gunship') gunFire(f);
         if (f.t <= 0 && f.kind === 'build') {
@@ -725,8 +725,8 @@ function updateFx() {
           if (nq) { f.tx = nq.x; f.ty = nq.y; f.ph = 0; } else if (f.ri < f.route.length) { f.ri = f.route.length; f.ph = 2; } else f.ph = 2;
         } else if (f.t <= 0) {
           f.ph = 2;
-          if (f.kind === 'garrison') landGarrison(f.tx, f.ty); else if (f.kind === 'evac') doEvac(f.tx, f.ty); else if (f.kind === 'turret') placeTurret(f.tx, f.ty); else if (f.kind === 'gunship') { /* nur Abflug */ } else drop(f.tx, f.ty);
-          if (f.kind !== 'evac' && f.kind !== 'gunship') fx.push({ type: 'ring', x: f.tx, y: f.ty, r: f.kind === 'garrison' ? 12 : 35, t: 1, T: 1, c: f.kind === 'garrison' ? '120,220,110' : '90,170,255' });
+          if (f.kind === 'garrison') landGarrison(f.tx, f.ty); else if (f.kind === 'evac') doEvac(f.tx, f.ty); else if (f.kind === 'turret') placeTurret(f.tx, f.ty); else if (f.kind === 'mines') scatterMines(f.tx, f.ty); else if (f.kind === 'gunship') { /* nur Abflug */ } else drop(f.tx, f.ty);
+          if (f.kind !== 'evac' && f.kind !== 'gunship' && f.kind !== 'mines') fx.push({ type: 'ring', x: f.tx, y: f.ty, r: f.kind === 'garrison' ? 12 : 35, t: 1, T: 1, c: f.kind === 'garrison' ? '120,220,110' : '90,170,255' });
         }
       } else {
         const dx = f.ex - f.x, dy = f.ey - f.y, d = Math.hypot(dx, dy), sp = 60 * DT; f.a = Math.atan2(dy, dx);
@@ -922,6 +922,24 @@ function dispatchBuild() {
     fx.push({ type: 'heli', kind: 'build', x: sx, y: sy, tx: route[0].x, ty: route[0].y, ex: sx, ey: sy, ph: 0, t: 0, a: 0, route: route.map(q => q.id), ri: 0 });
   }
 }
+// ── Minen: Teppich per Hubschrauber, Auslösung durch jede Figur (1,6 m), Explosion nach 1 s, keine Kettenreaktion ──
+function scatterMines(cx, cy) {
+  if (!S.mines) S.mines = [];
+  for (let i = 0; i < 36; i++) { const p = randWalk(cx, cy, 25); if (p) S.mines.push({ x: p[0], y: p[1], t: null }); }
+  SFX.thud(cx, cy); fx.push({ type: 'ring', x: cx, y: cy, r: 25, t: 1, T: 1, c: '230,170,70' });
+}
+function mineBlast(x, y) {
+  const R = 7; SFX.boom(x, y); noise(x, y, 300); fx.push({ type: 'boom', x, y, r: R, t: .7 });
+  for (const e of E) if (!e.dead && !(e.st === 4 && e.k === K_CIV) && Math.hypot(e.x - x, e.y - y) < R) kill(e);
+}
+function stepMines() {
+  const M = S.mines; if (!M || !M.length) return;
+  for (let i = M.length - 1; i >= 0; i--) {
+    const m = M[i];
+    if (m.t == null) { if (nearest(hzHead, hzNxt, m.x, m.y, 1.6, false) || nearest(hhHead, hhNxt, m.x, m.y, 1.6, false)) m.t = 1; }
+    else { m.t -= DT; if (m.t <= 0) { M.splice(i, 1); mineBlast(m.x, m.y); } }
+  }
+}
 function gunFire(f) {   // Gunship: Gatling beharkt alle Zombies im Zielgebiet
   if ((f.gt = (f.gt || 0) - DT) <= 0) { f.gt = .2; f.cands = E.filter(z => z.k === K_ZOM && !z.dead && Math.hypot(z.x - f.tx, z.y - f.ty) < 45); }
   const c = f.cands; if (!c || !c.length) return;
@@ -1032,6 +1050,9 @@ function useTool(tool, x, y, x2, y2) {
       arr.push(best.c); if (!best.plan) gate[best.c] = 1; toast('Tor eingeplant');
     }
     evacDirty = true; SFX.ui(); return;
+  } else if (tool === 'mines') {
+    if (!randWalk(x, y, 25)) return toast('Hier lässt sich kein Minenteppich auslegen');
+    const [sx, sy] = edgeEntry(x, y); fx.push({ type: 'heli', kind: 'mines', x: sx, y: sy, tx: x, ty: y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 });
   } else if (tool === 'turret') {
     const p = randWalk(x, y, 6); if (!p) return toast('Hier kann kein Geschütz stehen');
     fx.push({ type: 'timer', t: 30, spawn: { type: 'heli', kind: 'turret', tx: p[0], ty: p[1] } });
@@ -1148,6 +1169,8 @@ function draw() {
     ctx.fill();
     if (cam.z > 1.4 || mapMode !== 'vec') { ctx.strokeStyle = '#000b'; ctx.lineWidth = .35; ctx.stroke(); }
   }
+  // Minen
+  if (S && S.mines) for (const m of S.mines) { const on = m.t != null && Math.floor(performance.now() / 120) % 2; ctx.fillStyle = on ? '#ff3b2f' : '#222'; ctx.strokeStyle = '#d9b36a'; ctx.lineWidth = .5 / cam.z; ctx.beginPath(); ctx.arc(m.x, m.y, Math.max(.9, 1.5 / cam.z), 0, 6.283); ctx.fill(); ctx.stroke(); }
   // Geschütze
   for (const e of E) if (e.k === K_TUR && !e.dead) {
     const L = Math.max(7, 11 / cam.z), an = e.tgt && !e.tgt.dead ? Math.atan2(e.tgt.y - e.y, e.tgt.x - e.x) : (e.ang || 0); e.ang = an;
@@ -1174,11 +1197,11 @@ function draw() {
   const now = performance.now(), pul = .5 + .5 * Math.sin(now / 90), sz = Math.max(9, 18 / cam.z);
   for (const f of fx) {
     if (f.type === 'heli' || f.type === 'jet') {
-      const col = f.type === 'jet' ? '255,70,50' : f.kind === 'supply' ? '80,170,255' : f.kind === 'evac' ? '255,255,255' : f.kind === 'build' ? '230,170,70' : f.kind === 'gunship' ? '255,90,60' : '120,220,110', rr = f.type === 'jet' ? 30 : f.kind === 'supply' ? 35 : f.kind === 'evac' ? 30 : f.kind === 'build' ? 8 : f.kind === 'gunship' ? 45 : f.kind === 'turret' ? 6 : 9;
+      const col = f.type === 'jet' ? '255,70,50' : f.kind === 'supply' ? '80,170,255' : f.kind === 'evac' ? '255,255,255' : f.kind === 'build' ? '230,170,70' : f.kind === 'gunship' ? '255,90,60' : f.kind === 'mines' ? '230,140,60' : '120,220,110', rr = f.type === 'jet' ? 30 : f.kind === 'supply' ? 35 : f.kind === 'evac' ? 30 : f.kind === 'build' ? 8 : f.kind === 'gunship' ? 45 : f.kind === 'turret' ? 6 : f.kind === 'mines' ? 25 : 9;
       if (f.type === 'heli' && f.ph < 2 || f.type === 'jet' && !f.dropped) { ctx.strokeStyle = `rgba(${col},${.4 + .5 * pul})`; ctx.lineWidth = 2 / cam.z; ctx.beginPath(); ctx.arc(f.tx, f.ty, rr, 0, 6.283); ctx.stroke(); }
       ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a);
       if (f.type === 'heli') {
-        ctx.fillStyle = f.kind === 'supply' ? '#35557a' : f.kind === 'evac' ? '#8a3333' : f.kind === 'build' ? '#7a5a2a' : f.kind === 'gunship' ? '#2b1c1c' : f.kind === 'turret' ? '#4a4f55' : '#3f4d33'; ctx.strokeStyle = '#000a'; ctx.lineWidth = .5 / cam.z;
+        ctx.fillStyle = f.kind === 'supply' ? '#35557a' : f.kind === 'evac' ? '#8a3333' : f.kind === 'build' ? '#7a5a2a' : f.kind === 'gunship' ? '#2b1c1c' : f.kind === 'turret' ? '#4a4f55' : f.kind === 'mines' ? '#5a4a2a' : '#3f4d33'; ctx.strokeStyle = '#000a'; ctx.lineWidth = .5 / cam.z;
         ctx.beginPath(); ctx.ellipse(0, 0, sz * .42, sz * .16, 0, 0, 6.283); ctx.fill(); ctx.stroke();
         ctx.fillRect(-sz * .85, -sz * .03, sz * .5, sz * .06);
         ctx.rotate(now / 40); ctx.strokeStyle = 'rgba(235,235,235,.85)'; ctx.lineWidth = Math.max(.5, 1.5 / cam.z);
