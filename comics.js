@@ -158,13 +158,14 @@ const Comic = (() => {
       src.connect(hp); hp.connect(lp); lp.connect(ws); ws.connect(g); g.connect(vac.destination);
     } catch (e) {}
   }
-  function speak(id, i, text, radio) {
+  function speak(id, i, text, radio, onMeta, onEnd) {
     stopSpeak(); if (!voiceOn) return;
     const a = new Audio('audio/voice/' + id + '_' + (i + 1) + '.mp3'); let fell = false;
     const tts = () => { if (fell || !TTS_FALLBACK || !window.speechSynthesis) return; fell = true; const u = new SpeechSynthesisUtterance(text); u.lang = 'de-DE'; speechSynthesis.speak(u); };
     a.onerror = tts; if (radio) radioChain(a);
     if (typeof Music !== 'undefined') Music.duck(true);
-    a.onended = () => { if (typeof Music !== 'undefined') Music.duck(false); };
+    a.onloadedmetadata = () => { if (onMeta && isFinite(a.duration)) onMeta(a.duration); };
+    a.onended = () => { if (typeof Music !== 'undefined') Music.duck(false); if (onEnd) onEnd(); };
     a.play().catch(tts); ov && (ov._audio = a);
   }
   function stopSpeak() { try { speechSynthesis.cancel(); } catch (e) {} if (ov && ov._audio) { try { ov._audio.pause(); } catch (e) {} ov._audio = null; } if (typeof Music !== 'undefined') Music.duck(false); }
@@ -178,11 +179,16 @@ const Comic = (() => {
       <div class="cbar"><button class="cv">${voiceOn ? '🗣 Sprache an' : '🗣 Sprache aus'}</button><span class="cn"></span><button class="cs">Überspringen</button><button class="cx big">Weiter ▶</button></div></div>`;
     document.body.appendChild(ov);
     const cv = ov.querySelector('canvas'), c = cv.getContext('2d'), cap = ov.querySelector('.ccap'), nn = ov.querySelector('.cn');
-    let i = 0, t0 = performance.now(), typed = 0, full = '';
+    let i = 0, t0 = performance.now(), typed = 0, full = '', rate = .8, auto = 0;
     const isImg = p => p.img && imgs[p.img] && imgs[p.img].ok;
-    const show = () => { const p = seq[i]; full = p.cap; typed = 0; t0 = performance.now(); nn.textContent = (i + 1) + ' / ' + seq.length; speak(id, i, p.cap + (p.bub ? ' ' + p.bub[0] : ''), p.radio); };
-    const finish = () => { cancelAnimationFrame(raf); stopSpeak(); ov.remove(); ov = null; done && done(); };
-    const next = () => { if (typed < full.length) { typed = full.length; return; } if (++i >= seq.length) return finish(); show(); };
+    const show = () => {
+      const p = seq[i], my = i; full = p.cap; typed = 0; rate = .8; t0 = performance.now(); clearTimeout(auto); nn.textContent = (i + 1) + ' / ' + seq.length;
+      speak(id, i, p.cap + (p.bub ? ' ' + p.bub[0] : ''), p.radio,
+        d => { rate = Math.max(.12, full.length / (d * 60 * .92)); },                                            // Schreibmaschine endet kurz vor dem Sprechende
+        () => { clearTimeout(auto); auto = setTimeout(() => { if (ov && i === my) { typed = full.length; next(); } }, 2200); });   // nach der Vertonung automatisch weiter
+    };
+    const finish = () => { cancelAnimationFrame(raf); clearTimeout(auto); stopSpeak(); ov.remove(); ov = null; done && done(); };
+    const next = () => { clearTimeout(auto); if (typed < full.length) { typed = full.length; return; } if (++i >= seq.length) return finish(); show(); };
     const loop = () => {
       const t = (performance.now() - t0) / 1000, p = seq[i], img = isImg(p), ch = img ? IMG_H : H;
       if (cv.height !== ch) cv.height = ch;
@@ -192,7 +198,7 @@ const Comic = (() => {
       if (p.bub && t > .6) { const [txt, x, y, w, tx, ty, o] = p.bub; bubble(c, x, y, w, txt, tx, ty, o || {}); }
       if (!img) halftone(c);
       c.lineWidth = 12; c.strokeStyle = INK; c.strokeRect(0, 0, W, ch);
-      typed = Math.min(full.length, typed + .8); const tx = full.slice(0, typed | 0); if (cap.textContent !== tx) cap.textContent = tx;
+      typed = Math.min(full.length, typed + rate); const tx = full.slice(0, typed | 0); if (cap.textContent !== tx) cap.textContent = tx;
       raf = requestAnimationFrame(loop);
     };
     ov.querySelector('.cx').onclick = next; ov.querySelector('.cs').onclick = finish;
