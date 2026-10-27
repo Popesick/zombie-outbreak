@@ -441,9 +441,9 @@ function setPath(e, tx, ty, zm) {
 }
 
 // ───────────────────────── Kampf ─────────────────────────
-function noise(x, y, r) {
+function noise(x, y, r, fl) {
   if (noises.length > 40) noises.shift();
-  noises.push({ x, y, r, t: 6 });
+  noises.push({ x, y, r, t: 6, fl });
 }
 function shoot(e, z, rng, dmg) {
   S.shots++;
@@ -571,8 +571,8 @@ function giveMove(u, p, patrol) {
     if (u.ds === 1) u.dt = 60 - u.dt; else if (u.ds === 2) u.dt = 0;
     u.ds = 3; u.pend = { x: p[0], y: p[1], patrol }; return;
   }
-  const path = findPath(u.x, u.y, p[0], p[1], false, 9000);
-  u.ord = true; u.patrol = patrol || null; u.hmx = p[0]; u.hmy = p[1]; u.bt = 0; u.wt = 1;
+  const path = findPath(u.x, u.y, p[0], p[1], false, 60000);
+  u.ord = true; u.patrol = patrol || null; u.hmx = p[0]; u.hmy = p[1]; u.bt = 0; u.wt = 1; u.sk = 0; u.nu = 0;
   if (path) { u.path = path; u.pi = 0; }
 }
 const isFoe = z => z && !z.dead && (z.k === K_ZOM || z.inc >= 0);
@@ -609,6 +609,14 @@ function stepUnit(e) {
     if (isFoe(z)) {
       const d = Math.hypot(z.x - e.x, z.y - e.y);
       if (d <= rng && e.cd <= 0 && (!RULES.ammo || e.ammo > 0) && seeLine(e.x, e.y, z.x, z.y)) { e.cd = rate; shoot(e, z, rng, dmg); }
+    }
+    if (!fixed && e.k !== K_TUR && e.k !== K_TRK && !e.evac && !e.patrol && e.hmx != null && (e.nu || 0) <= 8 && Math.hypot(e.hmx - e.x, e.hmy - e.y) > 6) {   // hängt trotz Marschbefehl fest → anschubsen
+      if (mv) e.sk = 0;
+      else if ((e.sk = (e.sk || 0) + DT) > 2.5) {
+        e.sk = 0;
+        if ((e.nu = (e.nu || 0) + 1) > 8) e.nu = 9;   // aufgeben (Ziel wohl unerreichbar)
+        else { const q = randWalk(e.x, e.y, 4) || nearestWalkCell(e.x, e.y, 12); if (q) { e.x = q[0]; e.y = q[1]; } const p = findPath(e.x, e.y, e.hmx, e.hmy, false, 60000); e.path = p || null; e.pi = 0; e.bt = 0; }
+      }
     }
     if (!fixed && e.k !== K_TUR) {
       if (e.evac) evacMove(e, unitSpeed(e));
@@ -654,14 +662,18 @@ function thinkZombie(e) {
   if (e.st === 1 && e.tgt && !e.tgt.dead && e.tgt.st !== 4 && e.tgt.k !== K_ZOM && Math.hypot(e.tgt.x - e.x, e.tgt.y - e.y) < vis * 1.6 && (e.lost = (e.lost || 0) + .3) < 6) return;
   if (e.st === 1) { e.st = 0; e.tgt = null; e.wt = 0; }
   // Lockruf (Kampagne): wirkt auf alle, die kein Ziel sehen oder hören
-  if (e.mk) {   // Marschbefehl (Kampagne): feste Route zu einem Zielpunkt, bis er erreicht ist
+  if (e.mk) {   // Marschbefehl (Kampagne): Wegpunkte abgehen, am Sammelpunkt warten, dann Zug zum Evakuierungspunkt
     const mk = S.marches && S.marches[e.mk - 1];
-    if (!mk || simT >= mk.until || Math.hypot(e.x - mk.x, e.y - mk.y) < 25) e.mk = 0; else { e.st = 7; e.fz = 'march'; e.fzT = 2; return; }
+    if (!mk || simT >= mk.until || mk.go) {
+      e.mk = 0;
+      if (mk && mk.go && S.evac && ZF.evac) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; return; }
+    } else { e.st = 7; e.fz = 'march'; e.fzT = 2; return; }
   }
   if (S.lure && simT < S.lure.until && ZF.lure) { e.st = 7; e.fz = 'lure'; e.fzT = 2; return; }
   // Geräusche
   let bn = null, bd = -1e9;
   for (const n of noises) { const d = Math.hypot(n.x - e.x, n.y - e.y); if (d < n.r && d > 8 && n.r - d > bd) { bd = n.r - d; bn = n; } }
+  if (bn && bn.fl && bn.fl.D) { e.st = 7; e.fz = 'flare'; e.fzRef = bn.fl; e.fzT = 2; e.path = null; return; }
   if (bn && e.st !== 2 || (bn && e.pt <= 0)) { if (setPath(e, bn.x + rnd(-6, 6), bn.y + rnd(-6, 6), true)) { e.st = 2; e.pt = 3; } return; }
   if (e.st === 2 && !e.path) e.st = 0;
 }
@@ -688,11 +700,22 @@ function stepZombie(e) {
   }
   if (e.st === 2) { if (!follow(e, sp * .9, true)) e.st = 0; return; }
   if (e.st === 7) {   // Feldbewegung: Lockruf oder Horde zum Evakuierungsort
+    if (e.fz === 'flare') {
+      const f = e.fzRef; e.fzT -= DT;
+      if (!f || f.t <= 0 || e.fzT <= 0 || Math.hypot(f.x - e.x, f.y - e.y) < 10) { e.st = 0; e.wt = 0; return; }
+      fieldDescend(e, f.D, f.x, f.y, sp, true); return;
+    }
     if (e.fz === 'march') {
       const mk = e.mk && S.marches && S.marches[e.mk - 1]; e.fzT -= DT;
       if (!mk || e.fzT <= 0) { e.st = 0; e.wt = 0; return; }
-      if (!mk.D) Object.defineProperty(mk, 'D', { value: computeField(mk.x, mk.y, true), enumerable: false });   // nicht serialisieren
-      fieldDescend(e, mk.D, mk.x, mk.y, sp, true); return;
+      if (e.mw) return;   // wartet am Sammelpunkt
+      const rt = mk.routes[e.mr || 0] || [], fin = (e.mi || 0) >= rt.length, wp = fin ? [mk.gather.x, mk.gather.y] : rt[e.mi || 0];
+      if (!mk.F) Object.defineProperty(mk, 'F', { value: {}, enumerable: false });   // Felder nicht serialisieren
+      const key = wp[0] + ',' + wp[1];
+      let f = mk.F[key];
+      if (!f) { const q = nearestWalkCell(wp[0], wp[1], 80) || wp; f = mk.F[key] = { x: q[0], y: q[1], D: computeField(q[0], q[1], true) }; }   // Wegpunkt auf begehbaren Grund legen
+      if (Math.hypot(e.x - f.x, e.y - f.y) < (fin ? mk.gather.r : 30)) { if (fin) { e.mw = 1; mk.arr++; if (mk.t1 == null) mk.t1 = simT; } else e.mi = (e.mi || 0) + 1; return; }
+      fieldDescend(e, f.D, f.x, f.y, sp * 1.6, true); return;
     }
     e.fzT -= DT; const lure = e.fz === 'lure', tg = lure ? S.lure : S.evac;
     if (!tg || e.fzT <= 0 || (lure && simT >= S.lure.until)) { e.st = 0; e.wt = 0; return; }
@@ -788,7 +811,8 @@ function updateFx() {
       f.t -= DT; if (f.t <= 0) { const [sx, sy] = edgeEntry(f.spawn.tx, f.spawn.ty); fx.splice(i, 1); fx.push({ ...f.spawn, x: sx, y: sy, ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); }
     } else if (f.type === 'flare') {
       f.t -= DT;
-      if (f.t <= 20 && f.t > 0 && (f.nt = (f.nt || 0) - DT) <= 0) { f.nt = .5; noise(f.x, f.y, 700); if ((f.sb = (f.sb || 0) + 1) % 2) SFX.alarm(); }
+      if (f.t <= 20 && f.t > 0 && (f.nt = (f.nt || 0) - DT) <= 0) { f.nt = .5; if (!f.D) Object.defineProperty(f, 'D', { value: computeField(f.x, f.y, true), enumerable: false, writable: true });   // ein gemeinsames Wegfeld statt A* pro Zombie
+        noise(f.x, f.y, 700, f); if ((f.sb = (f.sb || 0) + 1) % 2) SFX.alarm(); }
       if (f.t <= 0) { explode(f.x, f.y, 18); f.type = 'boom'; f.t = .7; f.r = 18; }
     } else if (f.type === 'bomb') {
       f.t -= DT; if (f.t <= 0) { explode(f.tx, f.ty, 30); f.type = 'boom'; f.t = .7; f.x = f.tx; f.y = f.ty; f.r = 30; }

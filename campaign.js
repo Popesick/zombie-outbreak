@@ -51,8 +51,8 @@ const Campaign = (() => {
       evac: () => ({ x: 1520, y: 1612, at: 60 }),
       evacCap: 60, evacEvery: 20,   // große Zahl Zivilisten: größere und häufigere Hubschrauber
       spawns: () => [{ t: 0, n: 400, x: 80, y: 80, r: 45 }, { t: 120, n: 200, x: 30, y: 950, r: 45 }, { t: 300, n: 200, x: 60, y: 1750, r: 45 },
-        // 200 weitere aus dem Wald im Nordosten: marschieren sofort entlang dreier Routen Richtung Süd-Südwest (Ostrand der Stadt)
-        { t: 0, n: 67, x: 1540, y: 940, r: 30, march: { x: 1430, y: 1126 } }, { t: 0, n: 67, x: 1595, y: 935, r: 30, march: { x: 1521, y: 1198 } }, { t: 0, n: 66, x: 1725, y: 945, r: 30, march: { x: 1611, y: 1216 } }],
+        // 200 weitere aus dem Nordost-Wald: wandern langsam auf drei Routen zum Sammelpunkt „H“ (Waldrand), warten dort und stürmen dann mit den übrigen
+        ...[0, 1, 2].map(k => ({ t: 0, n: k === 2 ? 66 : 67, x: [1490, 1625, 1770][k], y: 70, r: 40, march: { id: 'ne', route: k, routes: NE_ROUTES, gather: { x: 1700, y: 830, r: 45 } } }))],
       lure: () => ({ x: 90, y: 1400, t: 0, dur: 120 }),   // die erste Welle marschiert 2 Minuten lang geradlinig nach Süden
       hordeAt: 0, hordeFocus: .6, hordeQuiet: true,       // danach (und für alle späteren Wellen): 60 % Zug zum Evakuierungspunkt
       civNorth: { frac: .7, ymax: 650 },
@@ -62,7 +62,7 @@ const Campaign = (() => {
       barricades: 36,
       primary: { civ: 2000, pts: 1500 }, secondary: { noLoss: true, pts: 600 },
       goal: ['Rette mindestens 2000 Zivilisten (Rettungszone auf der Ostseite der Isarbrücke).', 'Alle Einsatzkräfte müssen überleben.'],
-      info: ['3500 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren, dazu 200 aus dem Nordost-Wald, die sofort Richtung Stadtrand ziehen', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
+      info: ['3500 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren, dazu 200 aus dem Nordost-Wald, die sich langsam am Waldrand sammeln und dann zum Evakuierungspunkt stürmen', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
@@ -129,12 +129,19 @@ const Campaign = (() => {
     { const ev = m.evac(), p = randWalk(ev.x, ev.y, 25) || randWalk(ev.x, ev.y, 80) || [ev.x, ev.y]; S.pad = { x: p[0], y: p[1] }; S.evacPre = S.pad; }
     cfg.pop = m.pop;
   }
+  const NE_ROUTES = [[[1430, 300], [1440, 600], [1500, 800]], [[1670, 200], [1680, 500], [1690, 740]], [[1830, 200], [1830, 500], [1790, 700]]];   // links am Waldrand, mittig, rechts am Isarufer
   function spawnWave(w, first) {
     let mkId = 0;
-    if (w.march) { (S.marches = S.marches || []).push({ x: w.march.x, y: w.march.y, until: simT + (w.march.dur || 300) }); mkId = S.marches.length; }
+    if (w.march) {
+      S.marches = S.marches || [];
+      let m = S.marches.find(q => q.id === w.march.id);
+      if (!m) S.marches.push(m = { id: w.march.id, routes: w.march.routes, gather: w.march.gather, until: simT + (w.march.dur || 900), arr: 0, n: 0, t1: null, go: false });
+      m.n += w.n; mkId = S.marches.indexOf(m) + 1;
+    }
     for (let i = 0; i < w.n; i++) {
       const p = randWalk(w.x, w.y, w.r || 30) || randWalk(w.x, w.y, 90) || anyWalk(true);
-      spawnZombie(p[0], p[1], mkId); S.spawned++;
+      const z = spawnZombie(p[0], p[1], mkId); S.spawned++;
+      if (w.march) z.mr = w.march.route;
     }
     if (first) alertAt(w.x, w.y, 'Infizierte dringen ein');
   }
@@ -142,6 +149,13 @@ const Campaign = (() => {
     if (!S.fired) return;
     const fire = (id, t, fn) => { if (!S.fired[id] && simT >= t) { S.fired[id] = 1; fn(); } };
     m.spawns().forEach((w, i) => fire('sp' + i, w.t, () => spawnWave(w, w.t === 0)));
+    if (S.marches && S.marches.some(q => !q.go) && (S.mstep = (S.mstep || 0) + 1) % 30 === 0) {
+      for (const [i, mk] of S.marches.entries()) {
+        if (mk.go || mk.t1 == null) continue;
+        let alive = 0; for (const z of E) if (z.k === K_ZOM && !z.dead && z.mk === i + 1) alive++;
+        if (mk.arr >= .8 * alive || simT >= mk.t1 + 180) mk.go = true;
+      }
+    }   // Sammelpunkt erreicht: Welle losgeschickt
     const lu = m.lure(); fire('lure', lu.t, () => { S.lure = { x: lu.x, y: lu.y, until: simT + lu.dur }; zfDirty = true; });
     const ev = m.evac(); fire('evac', ev.at, () => { S.evac = { x: S.pad.x, y: S.pad.y }; S.evacR = 50; S.evacT = 8; S.evacPre = null; Music.play('hope'); computeEvacField(); toast('📡 Evakuierungssignal gegeben – Zivilisten laufen zum Landeplatz'); SFX.alarm(); });
     fire('horde', m.hordeAt, () => { S.horde = m.hordeFocus; zfDirty = true; if (!m.hordeQuiet) { toast('⚠ Die Horde zieht jetzt zielstrebig zum Evakuierungspunkt!'); SFX.alarm(); } });
