@@ -115,21 +115,16 @@ const Comic = (() => {
         ] }
     ],
     m1_win: [
-      { s: 'heliLZ', cap: 'Die Brücke hielt. Rotor um Rotor trugen die Hubschrauber die Menschen aus der Gefahrenzone.' },
-      { s: 'dawn', cap: 'Doch bei Sonnenaufgang kamen Meldungen aus der Innenstadt: Die Seuche war längst auch im Westen angekommen.' },
-      { s: 'radio', cap: 'Neuer Einsatzbefehl.', bub: ['Alle überlebenden Kräfte nach Moosburg-Zentrum! Die Altstadt muss evakuiert werden!', 130, 60, 420, 300, 260] }
+      { s: 'bridgeNight', img: 'img/comic/m1_win_1.webp', cap: 'Die Brücke wurde gehalten... und die Zivilisten gerettet. Unsere Soldaten kümmerten sich um vereinzelte Nachzügler und sicherten die Brücke. Moosburg war sicher. Dachten wir.' },
+      { s: 'radio', img: 'img/comic/m1_win_2.webp', cap: 'Am nächsten Tag... verstummten die Funkkanäle zum rückwärtigen Gefechtsstand. Nur noch statisches Rauschen war auf den Kanälen zu hören.' },
+      { s: 'horde', img: 'img/comic/m1_win_3.webp', cap: 'Noch bevor wir uns ausmalen konnten, was passiert sein könnte... waren sie da. Keine Warnung. Keine Zeit, uns vorzubereiten. Vom Norden her rollte eine ganze Welle Untoter auf uns zu!' },
+      { s: 'burning', img: 'img/comic/m1_win_4.webp', cap: 'Wir mussten die Stadt evakuieren... und die Zivilisten auf die andere Seite der Brücke bringen.' },
+      { s: 'radio', img: 'img/comic/m1_win_5.webp', cap: 'Dann... ein Knacken im Funkgerät. Wir hatten Kontakt! Der Leutnant. Der Gefechtsstand musste neu Stellung beziehen... bei Kelheim. Dort errichteten sie Notunterkünfte.' },
+      { s: 'heliLZ', img: 'img/comic/m1_win_6.webp', cap: 'Hubschrauber waren unterwegs, um unsere Überlebenden aufzunehmen. Wir mussten nur lange genug durchhalten...' }
     ],
     m1_lose: [
       { s: 'burning', cap: 'Die Brücke fiel. Hinter dem Fluss breitete sich die Seuche aus.' },
       { s: 'squad', cap: 'Wer überlebte, sammelte sich neu. Moosburg war noch nicht verloren.', bub: ['Neu formieren. Wir gehen zurück in die Stadt.', 380, 90, 260, 360, 300] }
-    ],
-    m2_intro: [
-      { s: 'bridgeNight', img: 'img/comic/m2_intro_1.webp', cap: 'Die Brücke wurde gehalten... und die Zivilisten gerettet. Unsere Soldaten kümmerten sich um vereinzelte Nachzügler und sicherten die Brücke. Moosburg war sicher. Dachten wir.' },
-      { s: 'radio', img: 'img/comic/m2_intro_2.webp', cap: 'Am nächsten Tag... verstummten die Funkkanäle zum rückwärtigen Gefechtsstand. Nur noch statisches Rauschen war auf den Kanälen zu hören.' },
-      { s: 'horde', img: 'img/comic/m2_intro_3.webp', cap: 'Noch bevor wir uns ausmalen konnten, was passiert sein könnte... waren sie da. Keine Warnung. Keine Zeit, uns vorzubereiten. Vom Norden her rollte eine ganze Welle Untoter auf uns zu!' },
-      { s: 'burning', img: 'img/comic/m2_intro_4.webp', cap: 'Wir mussten die Stadt evakuieren... und die Zivilisten auf die andere Seite der Brücke bringen.' },
-      { s: 'radio', img: 'img/comic/m2_intro_5.webp', cap: 'Dann... ein Knacken im Funkgerät. Wir hatten Kontakt! Der Leutnant. Der Gefechtsstand musste neu Stellung beziehen... bei Kelheim. Dort errichteten sie Notunterkünfte.' },
-      { s: 'heliLZ', img: 'img/comic/m2_intro_6.webp', cap: 'Hubschrauber waren unterwegs, um unsere Überlebenden aufzunehmen. Wir mussten nur lange genug durchhalten...' }
     ],
     m2_win: [
       { s: 'heliLZ', cap: 'Hunderte erreichten den Landeplatz. Die Hubschrauber flogen, bis der Treibstoff knapp wurde.' },

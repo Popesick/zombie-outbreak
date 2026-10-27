@@ -1649,7 +1649,7 @@ function init() {
   setupMap('moosburg');
   applyMapMode(); syncSliders(); refreshResume(); resize(); fitCam(); setSpeed(0);
   addEventListener('resize', resize);
-  const COMIC_NAMES = { prologue: 'Prolog', m1_win: 'Mission 1 – Sieg', m1_lose: 'Mission 1 – Niederlage', m2_intro: 'Mission 2 – Intro', m2_win: 'Mission 2 – Sieg', m2_lose: 'Mission 2 – Niederlage', m3_intro: 'Mission 3 – Intro', m3_win: 'Mission 3 – Sieg', m3_lose: 'Mission 3 – Niederlage' };
+  const COMIC_NAMES = { prologue: 'Prolog', m1_win: 'Mission 1 – Sieg (Outro)', m1_lose: 'Mission 1 – Niederlage', m2_win: 'Mission 2 – Sieg', m2_lose: 'Mission 2 – Niederlage', m3_intro: 'Mission 3 – Intro', m3_win: 'Mission 3 – Sieg', m3_lose: 'Mission 3 – Niederlage' };
   const comicList = () => modal('<h2>Intros &amp; Comics</h2><div class="btns" style="flex-direction:column">' + Object.keys(Comic.SEQ).map(k => `<button data-c="${k}">▶ ${COMIC_NAMES[k] || k}</button>`).join('') + '<button id="cBack">Zurück</button></div>', () => {
     $('cBack').onclick = closeModal;
     document.querySelectorAll('#mbox button[data-c]').forEach(b => b.onclick = () => { closeModal(); Comic.play(b.dataset.c, () => { Music.play('menu'); comicList(); }); });
