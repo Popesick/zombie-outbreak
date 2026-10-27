@@ -46,19 +46,21 @@ const Campaign = (() => {
       info: ['5 Versorgungspakete von Anfang an', '24 Barrikadenelemente (Bauphase, Lieferung per Hubschrauber)', 'Evakuierungssignal nach 2:00', 'Ab 3:00: drei Luftschläge', 'Ab 5:00: zweiter Soldaten-Squad per Hubschrauber', 'Nach 5:00 stürmt die Horde mit 90 % Zielstrebigkeit zum Evakuierungspunkt']
     },
     {
-      id: 'm2', map: 'moosburg', name: 'Moosburg brennt', sub: 'Die ganze Stadt', pop: 3000, armed: 6, acc: 35, zs: 50,
+      id: 'm2', map: 'moosburg', name: 'Moosburg brennt', sub: 'Die ganze Stadt', pop: 5000, armed: 6, acc: 35, zs: 50,
       start: () => ({ sol: [{ x: 1260, y: 1540 }], pol: [{ x: 1180, y: 1480 }, { x: 1320, y: 1430 }] }),
       evac: () => ({ x: 1520, y: 1612, at: 60 }),
       evacCap: 60, evacEvery: 20,   // große Zahl Zivilisten: größere und häufigere Hubschrauber
       spawns: () => [{ t: 0, n: 400, x: 80, y: 80, r: 45 }, { t: 120, n: 200, x: 30, y: 950, r: 45 }, { t: 300, n: 200, x: 60, y: 1750, r: 45 }],
-      lure: () => ({ x: 650, y: 1180, t: 0, dur: 60 }),
-      hordeAt: 240, hordeFocus: .9,
+      lure: () => ({ x: 90, y: 1400, t: 0, dur: 120 }),   // die erste Welle marschiert 2 Minuten lang geradlinig nach Süden
+      hordeAt: 0, hordeFocus: .6, hordeQuiet: true,       // danach (und für alle späteren Wellen): 60 % Zug zum Evakuierungspunkt
+      civNorth: { frac: .7, ymax: 650 },
+      supplyBonus: { at: 600, n: 3, msg: 'Das Hauptquartier meldet, dass es noch weitere Versorgungspakete bereitstellen konnte. Haltet weiter die Stellung!' },
       hold: null,
       tools: { supply: { at: 0, max: 5, cd: 20 }, strike: { at: 180, max: 4, cd: 8 }, garrison: { at: 240, max: 2, cd: 30 } },
       barricades: 36,
       primary: { civ: 2000, pts: 1500 }, secondary: { noLoss: true, pts: 600 },
       goal: ['Rette mindestens 2000 Zivilisten (Rettungszone auf der Ostseite der Isarbrücke).', 'Alle Einsatzkräfte müssen überleben.'],
-      info: ['3000 Zivilisten – 400 Zombies aus Nordwesten', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete, 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Ab 4:00 zieht die Horde zum Evakuierungspunkt']
+      info: ['5000 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
@@ -100,7 +102,7 @@ const Campaign = (() => {
     if (lv('mines')) tools.mines = { at: 0, max: 3 * lv('mines'), cd: 20 };
     if (lv('gunship')) tools.gunship = { at: 0, max: 2, cd: 45 };
     const R = {
-      evacCap: m.evacCap, evacEvery: m.evacEvery, rushAfter: lastSpawnT(m), mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
+      evacCap: m.evacCap, evacEvery: m.evacEvery, civNorth: m.civNorth, rushAfter: lastSpawnT(m), mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
       barLimit: m.barricades + 12 * lv('morebar'), barHpMul: 2 * (lv('barhp') ? 2 : 1),
       gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), squadPlus: lv('squad') ? 1 : 0, ammoMul: lv('ammo') ? 2 : 1,
       spawn: () => spawnMission(m), tick: () => tick(m), hud: c => hud(m, c), checkEnd: c => checkEnd(m, c), onEnd: msg => finish(m, msg)
@@ -138,7 +140,11 @@ const Campaign = (() => {
     m.spawns().forEach((w, i) => fire('sp' + i, w.t, () => spawnWave(w, w.t === 0)));
     const lu = m.lure(); fire('lure', lu.t, () => { S.lure = { x: lu.x, y: lu.y, until: simT + lu.dur }; zfDirty = true; });
     const ev = m.evac(); fire('evac', ev.at, () => { S.evac = { x: S.pad.x, y: S.pad.y }; S.evacR = 50; S.evacT = 8; S.evacPre = null; Music.play('hope'); computeEvacField(); toast('📡 Evakuierungssignal gegeben – Zivilisten laufen zum Landeplatz'); SFX.alarm(); });
-    fire('horde', m.hordeAt, () => { S.horde = m.hordeFocus; zfDirty = true; toast('⚠ Die Horde zieht jetzt zielstrebig zum Evakuierungspunkt!'); SFX.alarm(); });
+    fire('horde', m.hordeAt, () => { S.horde = m.hordeFocus; zfDirty = true; if (!m.hordeQuiet) { toast('⚠ Die Horde zieht jetzt zielstrebig zum Evakuierungspunkt!'); SFX.alarm(); } });
+    if (m.supplyBonus && simT >= m.supplyBonus.at && !RULES.supBonusOn) {   // zusätzliche Versorgungspakete (nach dem Laden stillschweigend wieder aktiv)
+      RULES.supBonusOn = true; RULES.tools.supply = { ...RULES.tools.supply, max: (RULES.tools.supply.max || 0) + m.supplyBonus.n };
+      if (!S.fired.supBonus) { S.fired.supBonus = 1; banner(m.supplyBonus.msg, 14000); SFX.ui(); }
+    }
     for (const [tool, t] of Object.entries(RULES.tools)) if (t.at > 0) fire('u' + tool, t.at, () => toast(({ strike: '💥 Luftschläge freigegeben', garrison: '🪖 Verstärkung kann angefordert werden', truck: '🚛 Trucks freigegeben' })[tool] || 'Neues Werkzeug verfügbar'));
     // Brücke halten: kein Zombie darf das Westufer erreichen
     if (m.hold && !S.breach && (S.hstep = (S.hstep || 0) + 1) % 20 === 0) { for (const z of E) if (z.k === K_ZOM && !z.dead && m.hold(z)) { S.breach = true; alertAt(z.x, z.y, 'Brücke durchbrochen!'); break; } }
@@ -201,7 +207,7 @@ const Campaign = (() => {
     const idx = MIS.indexOf(m);
     const old = C.best[m.id] || 0; if (total > old) C.best[m.id] = total;
     const keep = () => {
-      C.points += total;
+      C.points += total; C.trucks = Math.max(0, (C.trucks || 0) - (S.trkLost || 0));   // zerstörte Trucks werden nicht ersetzt
       let squads = res.squads.filter(s => s.m.length);
       if (!squads.some(s => s.k === 'sol')) squads.push({ k: 'sol', m: [0, 0, 0, 0] });   // Reserve, damit die Kampagne nie ohne Truppen dasteht
       if (!squads.some(s => s.k === 'pol')) squads.push({ k: 'pol', m: [0, 0] });

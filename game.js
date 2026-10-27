@@ -301,13 +301,14 @@ function anyWalk(roadOnly) {
   for (let n = 0; n < 500; n++) { const p = randWalk(rnd(0, WW), rnd(0, WH), 0, roadOnly); if (p) return p; }
   return [WW / 2, WH / 2];
 }
-function spawnCivilian(inside) {
+function spawnCivilian(inside, ymax) {
   let e;
   if (inside && B.length) {
-    const b = B[Math.random() * B.length | 0];
+    let b = B[Math.random() * B.length | 0];
+    if (ymax) for (let t = 0; t < 40 && b.ey > ymax; t++) b = B[Math.random() * B.length | 0];
     if (b.occ.length < b.cap) { e = mk(K_CIV, b.ex, b.ey); e.st = 4; e.b = b.idx; e.inT = rnd(10, 90); b.occ.push(e); }
   }
-  if (!e) { const p = anyWalk(Math.random() < .7); e = mk(K_CIV, p[0], p[1]); }
+  if (!e) { const p = (ymax && randWalk(rnd(0, WW), rnd(0, ymax), 40)) || anyWalk(Math.random() < .7); e = mk(K_CIV, p[0], p[1]); }
   e.brave = Math.random() < .5;
   if (Math.random() * 100 < cfg.armed) arm(e);
   E.push(e);
@@ -344,7 +345,7 @@ function newSim() {
   for (const b of B) { b.occ = []; b.siege = 0; }
   S = newStats(); cooldown = {}; evacDirty = false; zfDirty = true; ZF = { evac: null, lure: null };
   const inside = Math.round(cfg.pop * .5);
-  for (let i = 0; i < cfg.pop; i++) spawnCivilian(i < inside);
+  const cn = RULES.civNorth; for (let i = 0; i < cfg.pop; i++) spawnCivilian(i < inside, cn && Math.random() < cn.frac ? cn.ymax : 0);
   document.getElementById('alerts').innerHTML = '';
   if (RULES.spawn) RULES.spawn();
   else {
@@ -468,6 +469,11 @@ function alertAt(x, y, text) {
   d.querySelector('button').onclick = () => { cam.x = x; cam.y = y; cam.z = Math.max(cam.z, 1.3); clampCam(); d.remove(); };
   box.appendChild(d); setTimeout(() => d.remove(), 14000); SFX.alarm();
 }
+function banner(text, ms = 12000) {   // Meldung bleibt stehen (Toasts werden von anderen Meldungen überschrieben)
+  const box = document.getElementById('alerts'); if (!box) return;
+  const d = document.createElement('div'); d.className = 'alert'; d.innerHTML = '<span>📦 ' + text + '</span>';
+  box.appendChild(d); setTimeout(() => d.remove(), ms);
+}
 function toZombie(e) {
   if (e.k === K_POL || e.k === K_SOL || e.k === K_SEN) S.ulost = (S.ulost || 0) + 1;
   e.k = K_ZOM; e.hp = ZHP; e.inc = -1; e.st = 0; e.path = null; e.armed = false; e.tgt = null; e.wt = 0; S.zombified++;
@@ -479,7 +485,7 @@ function breach(b, p) {
   for (const o of b.occ) { o.st = 0; o.b = -1; o.x = b.ex; o.y = b.ey; o.wt = 0; if (Math.random() < p) infect(o); }
   b.occ = []; b.siege = 0;
 }
-function kill(e) { if (!e.dead) { e.dead = true; if (e.k === K_ZOM) S.kills++; else { S.loss++; if (e.k === K_POL || e.k === K_SOL || e.k === K_SEN) S.ulost = (S.ulost || 0) + 1; } } }
+function kill(e) { if (!e.dead) { e.dead = true; if (e.k === K_ZOM) S.kills++; else { S.loss++; if (e.k === K_POL || e.k === K_SOL || e.k === K_SEN) S.ulost = (S.ulost || 0) + 1; else if (e.k === K_TRK) { S.ulost = (S.ulost || 0) + 1; S.trkLost = (S.trkLost || 0) + 1; } } } }
 
 // ───────────────────────── KI ─────────────────────────
 function thinkCivilian(e) {
@@ -575,6 +581,15 @@ function stepUnit(e) {
     e.rz = 1; if (e.k !== K_TRK && e.k !== K_TUR && (type[cellIdx(e.x, e.y)] > T_ROAD || !comp[cellIdx(e.x, e.y)])) { const q = nearestWalkCell(e.x, e.y, 30); if (q) { e.x = q[0]; e.y = q[1]; e.path = null; } }
   }
   if (e.inc >= 0) { e.inc -= DT; if (e.inc <= 0) { toZombie(e); return; } }
+  if (e.inc >= 0 && e.ds !== 1 && e.ds !== 2 && e.k !== K_TRK && e.k !== K_TUR) {   // Infizierte entfernen sich von ihrem Squad (außer eingegraben)
+    if ((e.fl = (e.fl || 0) - DT) <= 0) {
+      e.fl = 1; let ax = 0, ay = 0, n = 0;
+      for (const u of UL) if (u !== e && u.inc < 0 && (u.x - e.x) ** 2 + (u.y - e.y) ** 2 < 900) { ax += e.x - u.x; ay += e.y - u.y; n++; }
+      if (n) { const l = Math.hypot(ax, ay) || 1; e.fhx = ax / l; e.fhy = ay / l; } else if (e.fhx == null) { const a = rnd(0, 6.283); e.fhx = Math.cos(a); e.fhy = Math.sin(a); }
+    }
+    if (!moveDir(e, e.fhx, e.fhy, 3.6, false)) { const a = Math.atan2(e.fhy, e.fhx) + rnd(-1.5, 1.5); e.fhx = Math.cos(a); e.fhy = Math.sin(a); }
+    e.path = null; return;
+  }
   const trk = e.k === K_TRK || e.k === K_TUR, sn = !!e.snipe && !trk && e.k !== K_POL, rng = (trk ? 70 : e.k === K_SOL || e.k === K_SEN ? 65 : 38) * (sn ? 3 : 1), rate = (trk ? .12 : e.k === K_POL ? 1.1 : .7) * (sn ? 2 : 1), dmg = trk ? 1 : e.k === K_POL ? 1.5 : 2.5, mobile = e.k !== K_SEN && e.k !== K_TUR;
   // Eingraben / Stellung räumen
   if (e.ds === 1) { e.dt += DT; if (e.dt >= 60) { e.ds = 2; e.dt = 0; } }
@@ -585,7 +600,7 @@ function stepUnit(e) {
   const fixed = e.ds > 0;
   const mv = Math.hypot(e.x - e.lx, e.y - e.ly) > .02; e.lx = e.x; e.ly = e.y;
   const ba = trk ? Math.max(.15, e.acc - .15) : e.acc;
-  if (trk) { if (mv) e.ang = Math.atan2(e.y - e.ly0, e.x - e.lx0); e.lx0 = e.x; e.ly0 = e.y; if ((e.nz = (e.nz || 0) - DT) <= 0 && (e.nz = .3) && countZAround(e.x, e.y, 5) >= (e.k === K_TUR ? 10 : 5)) { e.dead = true; toast(e.k === K_TUR ? '🔫 Geschütz zerstört – von Zombies überrannt' : '🚛 Truck zerstört – von Zombies umlagert'); return; } }
+  if (trk) { if (mv) e.ang = Math.atan2(e.y - e.ly0, e.x - e.lx0); e.lx0 = e.x; e.ly0 = e.y; if ((e.nz = (e.nz || 0) - DT) <= 0 && (e.nz = .3) && countZAround(e.x, e.y, 5) >= (e.k === K_TUR ? 10 : 5)) { e.dead = true; if (e.k === K_TRK) { S.ulost = (S.ulost || 0) + 1; S.trkLost = (S.trkLost || 0) + 1; } toast(e.k === K_TUR ? '🔫 Geschütz zerstört – von Zombies überrannt' : '🚛 Truck zerstört – von Zombies umlagert'); return; } }
   e.ae = e.ds === 2 ? Math.min(1, ba + .15) : mv ? Math.max(trk ? .15 : .1, ba - .2) : ba;
   e.cd -= DT; e.th -= DT;
   if (e.th <= 0) { e.th = rnd(.2, .35); e.tgt = nearestZ(e.x, e.y, rng + 15); if (!e.tgt && RULES.scan && (e.k === K_SOL || e.k === K_SEN)) e.tgt = nearest(hhHead, hhNxt, e.x, e.y, rng, true, u => u.k === K_CIV && u.inc >= 0); }
@@ -1341,7 +1356,7 @@ function clampCam() { cam.x = clamp(cam.x, 0, WW); cam.y = clamp(cam.y, 0, WH); 
 
 // ───────────────────────── UI ─────────────────────────
 const $ = id => document.getElementById(id);
-function toast(t) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => el.style.display = 'none', 2200); }
+function toast(t, ms = 2200) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => el.style.display = 'none', ms); }
 const SL = { pop: ['vPop', v => v], inf0: ['vInf0', v => v], armed: ['vArmed', v => v + ' %'], acc: ['vAcc', v => v + ' %'], police: ['vPolice', v => v], mil: ['vMil', v => v], patrol: ['vPatrol', v => v < 25 ? 'selten' : v < 70 ? 'mittel' : 'häufig'], infT: ['vInfT', v => v + ' s'], zs: ['vZs', v => v < 33 ? 'klassisch' : v < 70 ? 'gemischt' : 'modern'] };
 function syncSliders() { $('origin').value = cfg.origin; for (const k in SL) { $(k).value = cfg[k]; $(SL[k][0]).textContent = SL[k][1](+cfg[k]); } }
 for (const k in SL) $(k).addEventListener('input', () => { cfg[k] = +$(k).value; $(SL[k][0]).textContent = SL[k][1](cfg[k]); });
