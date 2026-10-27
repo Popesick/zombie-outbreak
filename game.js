@@ -871,7 +871,7 @@ function evacCalls(e) { return S.evacR == null || Math.hypot(e.x - S.evac.x, e.y
 function setEvac(x, y) {
   const p = randWalk(x, y, 20) || randWalk(x, y, 60); if (!p) return toast('Hier ist kein Evakuierungsort möglich');
   const first = !S.evac; S.evac = { x: p[0], y: p[1] }; S.evacR = 50; if (first) S.evacT = 10;
-  computeEvacField(); toast(first ? 'Evakuierungsort festgelegt – erster Hubschrauber in ca. 10 s' : 'Evakuierungsort verlegt');
+  if (first) Music.play('hope'); computeEvacField(); toast(first ? 'Evakuierungsort festgelegt – erster Hubschrauber in ca. 10 s' : 'Evakuierungsort verlegt');
 }
 function evKind(e) { return e.k === K_CIV ? 'civ' : e.k === K_POL ? 'pol' : e.k === K_TRK ? 'trk' : 'mil'; }
 function doEvac(x, y) {
@@ -1505,6 +1505,7 @@ $('bLoad').onclick = () => slotModal('load');
 function endGame(msg) {
   finished = true; setSpeed(0); autosave(); SFX.end(msg.includes('eingedämmt') || msg.includes('Sieg'));
   if (RULES.onEnd) return RULES.onEnd(msg);
+  if (!(msg.includes('eingedämmt') || msg.includes('Sieg'))) Music.play('defeat');
   showStats(msg);
 }
 function showStats(title) {
@@ -1563,6 +1564,7 @@ function musicDirector() {
   hotT = threat >= 8 ? Math.min(20, hotT + .2) : Math.max(0, hotT - .1);
   const cur = Music.current();
   if (cur !== 'combat' && hotT >= 3) { Music.play('combat'); combatSince = performance.now(); }
+  else if (!cur) Music.play('game');
   else if (cur === 'combat' && hotT <= .5 && performance.now() - combatSince > 40000) Music.play('game');
 }
 function ambience() {

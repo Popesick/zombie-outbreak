@@ -1,12 +1,13 @@
 'use strict';
-/* Hintergrundmusik: Menü/Story ('menu'), Ingame ('game'); 'combat' und 'defeat' sind vorbereitet (Dateien folgen).
+/* Hintergrundmusik: Menü/Story ('menu'), Ingame ('game'); 'combat', 'hope' (Evakuierung/Sieg) und 'defeat' (Niederlage, einmalig).
    Überblendung per Lautstärkerampe; Start erst nach der ersten Nutzeraktion (Autoplay-Regeln der Browser). */
 const Music = (() => {
   const SETS = {
     menu: { files: ['audio/music/intro.mp3'], loop: true },
     game: { files: [0, 1, 2, 3].map(i => 'audio/music/anxious_waiting_' + i + '.mp3'), shuffle: true },
     combat: { files: [0, 1, 2, 3].map(i => 'audio/music/relentless_drive_' + i + '.mp3'), shuffle: true },
-    defeat: { files: [], once: true }
+    hope: { files: ['audio/music/relieved_drive.mp3'], once: true },
+    defeat: { files: ['audio/music/signal_fades.mp3'], once: true }
   };
   const BASE = .5, FADE = 2.5;
   let level = 1; try { const v = localStorage.getItem('zos_music'); if (v !== null && !isNaN(+v)) level = +v; } catch (e) {}
@@ -20,7 +21,7 @@ const Music = (() => {
       f.a.volume = Math.max(0, Math.min(1, (f.from + (f.to - f.from) * k) * (f.rel ? vol() : 1)));
       if (k >= 1) { fades.delete(f); if (f.to === 0) { f.a.pause(); f.a.src = ''; } }
     }
-    if (cur && !cur.loop && cur.duration && cur.duration - cur.currentTime < FADE + .2 && !cur._next) { cur._next = true; next(true); }
+    if (cur && !cur.loop && !(SETS[set] && SETS[set].once) && cur.duration && cur.duration - cur.currentTime < FADE + .2 && !cur._next) { cur._next = true; next(true); }
   }
   setInterval(tick, 50);
   function ramp(a, from, to) { for (const f of fades) if (f.a === a) fades.delete(f); fades.add({ a, from, to, t: 0, rel: true }); }
@@ -33,7 +34,7 @@ const Music = (() => {
   function next(cross) {
     const s = SETS[set]; if (!s) return; const file = pick(s); if (!file) return;
     const old = cur, a = new Audio(file); a.loop = !!s.loop; a.volume = 0; cur = a;
-    a.addEventListener('ended', () => { if (cur === a && !s.once && !s.loop) next(false); });
+    a.addEventListener('ended', () => { if (cur === a && !s.once && !s.loop) next(false); else if (cur === a && s.once) { set = null; cur = null; } });
     const p = a.play();
     if (p && p.catch) p.catch(() => { blocked = true; });
     ramp(a, 0, 1);

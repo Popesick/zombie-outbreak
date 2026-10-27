@@ -137,7 +137,7 @@ const Campaign = (() => {
     const fire = (id, t, fn) => { if (!S.fired[id] && simT >= t) { S.fired[id] = 1; fn(); } };
     m.spawns().forEach((w, i) => fire('sp' + i, w.t, () => spawnWave(w, w.t === 0)));
     const lu = m.lure(); fire('lure', lu.t, () => { S.lure = { x: lu.x, y: lu.y, until: simT + lu.dur }; zfDirty = true; });
-    const ev = m.evac(); fire('evac', ev.at, () => { S.evac = { x: S.pad.x, y: S.pad.y }; S.evacR = 50; S.evacT = 8; S.evacPre = null; computeEvacField(); toast('📡 Evakuierungssignal gegeben – Zivilisten laufen zum Landeplatz'); SFX.alarm(); });
+    const ev = m.evac(); fire('evac', ev.at, () => { S.evac = { x: S.pad.x, y: S.pad.y }; S.evacR = 50; S.evacT = 8; S.evacPre = null; Music.play('hope'); computeEvacField(); toast('📡 Evakuierungssignal gegeben – Zivilisten laufen zum Landeplatz'); SFX.alarm(); });
     fire('horde', m.hordeAt, () => { S.horde = m.hordeFocus; zfDirty = true; toast('⚠ Die Horde zieht jetzt zielstrebig zum Evakuierungspunkt!'); SFX.alarm(); });
     for (const [tool, t] of Object.entries(RULES.tools)) if (t.at > 0) fire('u' + tool, t.at, () => toast(({ strike: '💥 Luftschläge freigegeben', garrison: '🪖 Verstärkung kann angefordert werden', truck: '🚛 Trucks freigegeben' })[tool] || 'Neues Werkzeug verfügbar'));
     // Brücke halten: kein Zombie darf das Westufer erreichen

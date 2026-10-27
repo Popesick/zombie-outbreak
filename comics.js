@@ -162,10 +162,15 @@ const Comic = (() => {
     return cv;
   }
   function drawFog(c, t, h) {
-    if (!fogTex || fogTex[0].height !== h) fogTex = [fogLayer(11, h), fogLayer(23, h)];
+    if (!fogTex || fogTex[0].height !== h) fogTex = [fogLayer(11, h), fogLayer(23, h), fogLayer(37, h)];
     c.save(); c.globalCompositeOperation = 'screen';
-    const dr = [[fogTex[0], 9, .55, 0], [fogTex[1], -6, .42, 40]];
-    for (const [tex, sp, al, oy] of dr) { c.globalAlpha = al; const ox = ((t * sp) % W + W) % W; c.drawImage(tex, -ox, oy * Math.sin(t * .15)); c.drawImage(tex, W - ox, oy * Math.sin(t * .15)); }
+    // Schichten: Textur, Drift px/s, Grundalpha, vertikale Schwingung, Tempo der Schwingung, Pulsphase
+    const dr = [[fogTex[0], 22, .55, 55, .23, 0], [fogTex[1], -15, .45, 70, .17, 2], [fogTex[2], 9, .32, 40, .31, 4]];
+    for (const [tex, sp, al, amp, fr, ph] of dr) {
+      c.globalAlpha = al * (.75 + .25 * Math.sin(t * .4 + ph));
+      const ox = ((t * sp) % W + W) % W, oy = amp * Math.sin(t * fr + ph), s = 1.06 + .05 * Math.sin(t * .13 + ph);
+      for (const x of [-ox, W - ox]) { c.save(); c.translate(x + W / 2, h / 2 + oy); c.scale(1, s); c.drawImage(tex, -W / 2, -h / 2); c.restore(); }
+    }
     c.restore();
   }
   // ── Wiedergabe ────────────────────────────────────────────────────────
@@ -194,11 +199,18 @@ const Comic = (() => {
     a.play().catch(tts); ov && (ov._audio = a);
   }
   function stopSpeak() { try { speechSynthesis.cancel(); } catch (e) {} if (ov && ov._audio) { try { ov._audio.pause(); } catch (e) {} ov._audio = null; } if (typeof Music !== 'undefined') Music.duck(false); }
-  function play(id, done) {
+  function play(id, done, ready) {
     const seq = SEQ[id]; if (!seq) return done && done();
+    if (!ready) {   // erst alle Bilder laden, sonst blitzt kurz die Ersatzszene auf
+      const pend = seq.filter(p => p.img).map(p => loadImg(p.img));
+      if (pend.some(x => !x.ok)) {
+        const cover = document.createElement('div'); cover.id = 'comic'; document.body.appendChild(cover);
+        const t0 = performance.now(), poll = setInterval(() => { if (pend.every(x => x.ok) || performance.now() - t0 > 8000) { clearInterval(poll); cover.remove(); play(id, done, true); } }, 40);
+        return;
+      }
+    }
     if (typeof SFX !== 'undefined') SFX.resume();
-    if (typeof Music !== 'undefined') Music.play('menu');
-    for (const p of seq) if (p.img) loadImg(p.img);
+    if (typeof Music !== 'undefined') Music.play(/_lose$/.test(id) ? 'defeat' : /_win$/.test(id) ? 'hope' : 'menu');
     ov = document.createElement('div'); ov.id = 'comic';
     ov.innerHTML = `<div class="cwrap"><canvas width="${W}" height="${H}"></canvas><div class="ccap"></div>
       <div class="cbar"><button class="cv">${voiceOn ? '🗣 Sprache an' : '🗣 Sprache aus'}</button><span class="cn"></span><button class="cs">Überspringen</button><button class="cx big">Weiter ▶</button></div></div>`;
@@ -210,7 +222,7 @@ const Comic = (() => {
       const p = seq[i], my = i; full = p.cap; typed = 0; rate = .8; t0 = performance.now(); clearTimeout(auto); nn.textContent = (i + 1) + ' / ' + seq.length;
       speak(id, i, p.cap + (p.bub ? ' ' + p.bub[0] : ''), p.radio,
         d => { if (!p.cues) rate = Math.max(.12, full.length / (d * 60 * .92)); },                                            // Schreibmaschine endet kurz vor dem Sprechende
-        () => { clearTimeout(auto); auto = setTimeout(() => { if (ov && i === my) { typed = full.length; next(); } }, 2200); }, p.file);   // nach der Vertonung automatisch weiter
+        () => { clearTimeout(auto); auto = setTimeout(() => { if (ov && i === my) { typed = full.length; next(); } }, 0); }, p.file);   // nach der Vertonung automatisch weiter
     };
     const finish = () => { cancelAnimationFrame(raf); clearTimeout(auto); stopSpeak(); ov.remove(); ov = null; done && done(); };
     const next = () => { clearTimeout(auto); if (typed < full.length) { typed = full.length; return; } if (++i >= seq.length) return finish(); show(); };
