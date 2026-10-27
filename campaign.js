@@ -46,7 +46,7 @@ const Campaign = (() => {
       info: ['5 Versorgungspakete von Anfang an', '24 Barrikadenelemente (Bauphase, Lieferung per Hubschrauber)', 'Evakuierungssignal nach 2:00', 'Ab 3:00: drei Luftschläge', 'Ab 5:00: zweiter Soldaten-Squad per Hubschrauber', 'Nach 5:00 stürmt die Horde mit 90 % Zielstrebigkeit zum Evakuierungspunkt']
     },
     {
-      id: 'm2', map: 'moosburg', name: 'Moosburg brennt', sub: 'Die ganze Stadt', pop: 5000, armed: 6, acc: 35, zs: 50,
+      id: 'm2', map: 'moosburg', name: 'Moosburg brennt', sub: 'Die ganze Stadt', pop: 3500, armed: 6, acc: 35, zs: 50,
       start: () => ({ sol: [{ x: 1260, y: 1540 }], pol: [{ x: 1180, y: 1480 }, { x: 1320, y: 1430 }] }),
       evac: () => ({ x: 1520, y: 1612, at: 60 }),
       evacCap: 60, evacEvery: 20,   // große Zahl Zivilisten: größere und häufigere Hubschrauber
@@ -60,7 +60,7 @@ const Campaign = (() => {
       barricades: 36,
       primary: { civ: 2000, pts: 1500 }, secondary: { noLoss: true, pts: 600 },
       goal: ['Rette mindestens 2000 Zivilisten (Rettungszone auf der Ostseite der Isarbrücke).', 'Alle Einsatzkräfte müssen überleben.'],
-      info: ['5000 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
+      info: ['3500 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
