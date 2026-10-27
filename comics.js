@@ -127,8 +127,9 @@ const Comic = (() => {
       { s: 'bridgeNight', img: 'img/comic/m2_intro_1.webp', cap: 'Die Brücke wurde gehalten... und die Zivilisten gerettet. Unsere Soldaten kümmerten sich um vereinzelte Nachzügler und sicherten die Brücke. Moosburg war sicher. Dachten wir.' },
       { s: 'radio', img: 'img/comic/m2_intro_2.webp', cap: 'Am nächsten Tag... verstummten die Funkkanäle zum rückwärtigen Gefechtsstand. Nur noch statisches Rauschen war auf den Kanälen zu hören.' },
       { s: 'horde', img: 'img/comic/m2_intro_3.webp', cap: 'Noch bevor wir uns ausmalen konnten, was passiert sein könnte... waren sie da. Keine Warnung. Keine Zeit, uns vorzubereiten. Vom Norden her rollte eine ganze Welle Untoter auf uns zu!' },
-      { s: 'burning', img: 'img/comic/m2_intro_4.webp', cap: 'Wir mussten die Stadt evakuieren... und die Zivilisten auf die andere Seite der Brücke treiben.' },
-      { s: 'radio', img: 'img/comic/m2_intro_5.webp', cap: 'Dann... ein Knacken im Funkgerät. Wir hatten Kontakt! Der Leutnant. Der Gefechtsstand musste neu Stellung beziehen... bei Kelheim. Dort errichteten sie Notunterkünfte.' }
+      { s: 'burning', img: 'img/comic/m2_intro_4.webp', cap: 'Wir mussten die Stadt evakuieren... und die Zivilisten auf die andere Seite der Brücke bringen.' },
+      { s: 'radio', img: 'img/comic/m2_intro_5.webp', cap: 'Dann... ein Knacken im Funkgerät. Wir hatten Kontakt! Der Leutnant. Der Gefechtsstand musste neu Stellung beziehen... bei Kelheim. Dort errichteten sie Notunterkünfte.' },
+      { s: 'heliLZ', img: 'img/comic/m2_intro_6.webp', cap: 'Hubschrauber waren unterwegs, um unsere Überlebenden aufzunehmen. Wir mussten nur lange genug durchhalten...' }
     ],
     m2_win: [
       { s: 'heliLZ', cap: 'Hunderte erreichten den Landeplatz. Die Hubschrauber flogen, bis der Treibstoff knapp wurde.' },
