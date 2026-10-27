@@ -131,7 +131,7 @@ const Campaign = (() => {
   }
   function spawnWave(w, first) {
     let mkId = 0;
-    if (w.march) { (S.marches = S.marches || []).push({ x: w.march.x, y: w.march.y, until: simT + (w.march.dur || 300), D: computeField(w.march.x, w.march.y, true) }); mkId = S.marches.length; }
+    if (w.march) { (S.marches = S.marches || []).push({ x: w.march.x, y: w.march.y, until: simT + (w.march.dur || 300) }); mkId = S.marches.length; }
     for (let i = 0; i < w.n; i++) {
       const p = randWalk(w.x, w.y, w.r || 30) || randWalk(w.x, w.y, 90) || anyWalk(true);
       spawnZombie(p[0], p[1], mkId); S.spawned++;

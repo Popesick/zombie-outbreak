@@ -691,6 +691,7 @@ function stepZombie(e) {
     if (e.fz === 'march') {
       const mk = e.mk && S.marches && S.marches[e.mk - 1]; e.fzT -= DT;
       if (!mk || e.fzT <= 0) { e.st = 0; e.wt = 0; return; }
+      if (!mk.D) Object.defineProperty(mk, 'D', { value: computeField(mk.x, mk.y, true), enumerable: false });   // nicht serialisieren
       fieldDescend(e, mk.D, mk.x, mk.y, sp, true); return;
     }
     e.fzT -= DT; const lure = e.fz === 'lure', tg = lure ? S.lure : S.evac;
