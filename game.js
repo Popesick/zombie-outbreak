@@ -572,7 +572,7 @@ function giveMove(u, p, patrol) {
 const isFoe = z => z && !z.dead && (z.k === K_ZOM || z.inc >= 0);
 function stepUnit(e) {
   if ((e.rz = (e.rz || 0) - DT) <= 0) {   // steckt die Einheit in einem Gebäude/Hindernis (z. B. nach Bauplatzierung)? → auf begehbaren Grund setzen
-    e.rz = 1; if (e.k !== K_TRK && e.k !== K_TUR && type[cellIdx(e.x, e.y)] > T_ROAD) { const q = nearestWalkCell(e.x, e.y, 30); if (q) { e.x = q[0]; e.y = q[1]; e.path = null; } }
+    e.rz = 1; if (e.k !== K_TRK && e.k !== K_TUR && (type[cellIdx(e.x, e.y)] > T_ROAD || !comp[cellIdx(e.x, e.y)])) { const q = nearestWalkCell(e.x, e.y, 30); if (q) { e.x = q[0]; e.y = q[1]; e.path = null; } }
   }
   if (e.inc >= 0) { e.inc -= DT; if (e.inc <= 0) { toZombie(e); return; } }
   const trk = e.k === K_TRK || e.k === K_TUR, sn = !!e.snipe && !trk && e.k !== K_POL, rng = (trk ? 70 : e.k === K_SOL || e.k === K_SEN ? 65 : 38) * (sn ? 3 : 1), rate = (trk ? .12 : e.k === K_POL ? 1.1 : .7) * (sn ? 2 : 1), dmg = trk ? 1 : e.k === K_POL ? 1.5 : 2.5, mobile = e.k !== K_SEN && e.k !== K_TUR;
@@ -1328,7 +1328,10 @@ function commandMove(x, y) {
   const rad = 3 + Math.sqrt(us.length) * 3;
   for (const u of us) {
     const o = u.g && gs[u.g]; let p;
-    if (o && o.n > 1) { p = randWalk(x + clamp(u.x - o.cx, -14, 14), y + clamp(u.y - o.cy, -14, 14), 3) || randWalk(x, y, rad) || [x, y]; u.gsp = o.sp; }
+    if (o && o.n > 1) {   // feste Formationsplätze rund ums Ziel (nicht die aktuelle Streuung übernehmen, sonst finden auseinandergelaufene Squads nie zusammen)
+      const k = o.i = (o.i || 0) + 1, a = k / o.n * 6.283, r = o.n > 1 ? 2.5 + (k % 2) * 1.5 : 0;
+      p = randWalk(x + Math.cos(a) * r, y + Math.sin(a) * r, 2.5) || randWalk(x, y, rad) || [x, y]; u.gsp = o.sp;
+    }
     else { p = randWalk(x, y, rad) || [x, y]; u.gsp = 0; }
     giveMove(u, p, patrol ? { x, y, r: 70 } : null);
   }
