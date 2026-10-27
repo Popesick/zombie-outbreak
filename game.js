@@ -160,7 +160,7 @@ function seeLine(x0, y0, x1, y1) {
   return true;
 }
 const NB = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
-function findPath(sx, sy, tx, ty, zm, maxExp = 6000) {
+function findPath(sx, sy, tx, ty, zm, maxExp = 6000, smooth = true) {
   const s = cellIdx(sx, sy), g = cellIdx(tx, ty);
   if (s === g) return [[tx, ty]];
   if (!cost(g, zm)) return null;
@@ -192,6 +192,7 @@ function findPath(sx, sy, tx, ty, zm, maxExp = 6000) {
   if (!found) return null;
   const raw = []; for (let i = g; i >= 0; i = gP[i]) raw.push([(i % GW + .5) * CELL, ((i / GW | 0) + .5) * CELL]);
   raw.reverse(); raw[raw.length - 1] = [tx, ty];
+  if (!smooth) return raw;   // Zellmitte zu Zellmitte: garantiert begehbar (kein Abkürzen über Kanten)
   const out = []; let ax = sx, ay = sy, k = 0;
   while (k < raw.length) {
     let j = raw.length - 1;
@@ -611,11 +612,15 @@ function stepUnit(e) {
       if (d <= rng && e.cd <= 0 && (!RULES.ammo || e.ammo > 0) && seeLine(e.x, e.y, z.x, z.y)) { e.cd = rate; shoot(e, z, rng, dmg); }
     }
     if (!fixed && e.k !== K_TUR && e.k !== K_TRK && !e.evac && !e.patrol && e.hmx != null && (e.nu || 0) <= 8 && Math.hypot(e.hmx - e.x, e.hmy - e.y) > 6) {   // hängt trotz Marschbefehl fest → anschubsen
-      if (mv) e.sk = 0;
-      else if ((e.sk = (e.sk || 0) + DT) > 2.5) {
+      if (mv) { e.sk = 0; if ((e.mvT = (e.mvT || 0) + DT) > 8) e.nu = 0; }
+      else if ((e.mvT = 0, e.sk = (e.sk || 0) + DT) > 1.5) {
         e.sk = 0;
         if ((e.nu = (e.nu || 0) + 1) > 8) e.nu = 9;   // aufgeben (Ziel wohl unerreichbar)
-        else { const q = randWalk(e.x, e.y, 4) || nearestWalkCell(e.x, e.y, 12); if (q) { e.x = q[0]; e.y = q[1]; } const p = findPath(e.x, e.y, e.hmx, e.hmy, false, 60000); e.path = p || null; e.pi = 0; e.bt = 0; }
+        else {   // erst auf die Zellmitte, danach mit wachsendem Radius versetzen; Weg ohne Kantenabkürzung neu berechnen
+          const ci = cellIdx(e.x, e.y), q = e.nu === 1 && comp[ci] ? [(ci % GW + .5) * CELL, ((ci / GW | 0) + .5) * CELL] : randWalk(e.x, e.y, 2 + e.nu * 2) || nearestWalkCell(e.x, e.y, 12);
+          if (q) { e.x = q[0]; e.y = q[1]; }
+          const p = findPath(e.x, e.y, e.hmx, e.hmy, false, 60000, false); e.path = p || null; e.pi = 0; e.bt = 0;
+        }
       }
     }
     if (!fixed && e.k !== K_TUR) {
