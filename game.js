@@ -719,7 +719,7 @@ function step() {
   if (S.evac) {
     S.evacT -= DT; if (S.evacR != null && S.evacR < 4000) S.evacR += 25 * DT;
     if (S.evacT <= 0) { S.evacT = RULES.evacEvery || 30; const [sx, sy] = edgeEntry(S.evac.x, S.evac.y); fx.push({ type: 'heli', kind: 'evac', x: sx, y: sy, tx: S.evac.x, ty: S.evac.y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); }
-    if (evacDirty && simT - evLast > 1.5) computeEvacField();
+    if (evacDirty && simT - evLast > 3) computeEvacField();
   }
   // Effekte
   for (let i = noises.length - 1; i >= 0; i--) { noises[i].t -= DT; if (noises[i].t <= 0) noises.splice(i, 1); }
@@ -1620,9 +1620,10 @@ function frame(ts) {
   const rdt = Math.min(.1, (ts - last) / 1000); last = ts;
   if (phase === 'run' && speed > 0) {
     acc += rdt * speed; let n = 0;
-    try { while (acc >= DT && n < 12) { step(); acc -= DT; n++; } }
+    const tb = performance.now();
+    try { while (acc >= DT && n < 12 && performance.now() - tb < 45) { step(); acc -= DT; n++; } }   // Zeitbudget: langsame Rechner bleiben bedienbar
     catch (err) { console.error(err); setSpeed(0); toast('Interner Fehler – Simulation pausiert. Speichern ist weiter möglich.'); }
-    if (n >= 12) acc = 0;
+    if (acc >= DT) acc = Math.min(acc, DT * 2);
   }
   try { draw(); } catch (err) { console.error(err); }
   SFX.setPaused(!(phase === 'run' && speed > 0));
