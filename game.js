@@ -314,7 +314,7 @@ function spawnCivilian(inside, ymax) {
   E.push(e);
 }
 function arm(e) { e.armed = true; e.ammo = 14; e.acc = cfg.acc / 100; }
-function spawnZombie(x, y) { const e = mk(K_ZOM, x, y); e.st = 0; e.wt = rnd(0, 5); if (RULES.zmix) e.zsp = Math.random() < .5 ? rnd(1.5, 3) : rnd(5, 8); E.push(e); return e; }
+function spawnZombie(x, y, mkId) { const e = mk(K_ZOM, x, y); if (mkId) e.mk = mkId; e.st = 0; e.wt = rnd(0, 5); if (RULES.zmix) e.zsp = Math.random() < .5 ? rnd(1.5, 3) : rnd(5, 8); E.push(e); return e; }
 
 function outbreakPoints() {
   const pts = [];
@@ -654,6 +654,10 @@ function thinkZombie(e) {
   if (e.st === 1 && e.tgt && !e.tgt.dead && e.tgt.st !== 4 && e.tgt.k !== K_ZOM && Math.hypot(e.tgt.x - e.x, e.tgt.y - e.y) < vis * 1.6 && (e.lost = (e.lost || 0) + .3) < 6) return;
   if (e.st === 1) { e.st = 0; e.tgt = null; e.wt = 0; }
   // Lockruf (Kampagne): wirkt auf alle, die kein Ziel sehen oder hören
+  if (e.mk) {   // Marschbefehl (Kampagne): feste Route zu einem Zielpunkt, bis er erreicht ist
+    const mk = S.marches && S.marches[e.mk - 1];
+    if (!mk || simT >= mk.until || Math.hypot(e.x - mk.x, e.y - mk.y) < 25) e.mk = 0; else { e.st = 7; e.fz = 'march'; e.fzT = 2; return; }
+  }
   if (S.lure && simT < S.lure.until && ZF.lure) { e.st = 7; e.fz = 'lure'; e.fzT = 2; return; }
   // Geräusche
   let bn = null, bd = -1e9;
@@ -684,6 +688,11 @@ function stepZombie(e) {
   }
   if (e.st === 2) { if (!follow(e, sp * .9, true)) e.st = 0; return; }
   if (e.st === 7) {   // Feldbewegung: Lockruf oder Horde zum Evakuierungsort
+    if (e.fz === 'march') {
+      const mk = e.mk && S.marches && S.marches[e.mk - 1]; e.fzT -= DT;
+      if (!mk || e.fzT <= 0) { e.st = 0; e.wt = 0; return; }
+      fieldDescend(e, mk.D, mk.x, mk.y, sp, true); return;
+    }
     e.fzT -= DT; const lure = e.fz === 'lure', tg = lure ? S.lure : S.evac;
     if (!tg || e.fzT <= 0 || (lure && simT >= S.lure.until)) { e.st = 0; e.wt = 0; return; }
     fieldDescend(e, lure ? ZF.lure : ZF.evac, tg.x, tg.y, sp, true); return;

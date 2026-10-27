@@ -50,7 +50,9 @@ const Campaign = (() => {
       start: () => ({ sol: [{ x: 1260, y: 1540 }], pol: [{ x: 1180, y: 1480 }, { x: 1320, y: 1430 }] }),
       evac: () => ({ x: 1520, y: 1612, at: 60 }),
       evacCap: 60, evacEvery: 20,   // große Zahl Zivilisten: größere und häufigere Hubschrauber
-      spawns: () => [{ t: 0, n: 400, x: 80, y: 80, r: 45 }, { t: 120, n: 200, x: 30, y: 950, r: 45 }, { t: 300, n: 200, x: 60, y: 1750, r: 45 }],
+      spawns: () => [{ t: 0, n: 400, x: 80, y: 80, r: 45 }, { t: 120, n: 200, x: 30, y: 950, r: 45 }, { t: 300, n: 200, x: 60, y: 1750, r: 45 },
+        // 200 weitere aus dem Wald im Nordosten: marschieren sofort entlang dreier Routen Richtung Süd-Südwest (Ostrand der Stadt)
+        { t: 0, n: 67, x: 1540, y: 940, r: 30, march: { x: 1430, y: 1126 } }, { t: 0, n: 67, x: 1595, y: 935, r: 30, march: { x: 1521, y: 1198 } }, { t: 0, n: 66, x: 1725, y: 945, r: 30, march: { x: 1611, y: 1216 } }],
       lure: () => ({ x: 90, y: 1400, t: 0, dur: 120 }),   // die erste Welle marschiert 2 Minuten lang geradlinig nach Süden
       hordeAt: 0, hordeFocus: .6, hordeQuiet: true,       // danach (und für alle späteren Wellen): 60 % Zug zum Evakuierungspunkt
       civNorth: { frac: .7, ymax: 650 },
@@ -60,7 +62,7 @@ const Campaign = (() => {
       barricades: 36,
       primary: { civ: 2000, pts: 1500 }, secondary: { noLoss: true, pts: 600 },
       goal: ['Rette mindestens 2000 Zivilisten (Rettungszone auf der Ostseite der Isarbrücke).', 'Alle Einsatzkräfte müssen überleben.'],
-      info: ['3500 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
+      info: ['3500 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren, dazu 200 aus dem Nordost-Wald, die sofort Richtung Stadtrand ziehen', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
@@ -128,9 +130,11 @@ const Campaign = (() => {
     cfg.pop = m.pop;
   }
   function spawnWave(w, first) {
+    let mkId = 0;
+    if (w.march) { (S.marches = S.marches || []).push({ x: w.march.x, y: w.march.y, until: simT + (w.march.dur || 300), D: computeField(w.march.x, w.march.y, true) }); mkId = S.marches.length; }
     for (let i = 0; i < w.n; i++) {
       const p = randWalk(w.x, w.y, w.r || 30) || randWalk(w.x, w.y, 90) || anyWalk(true);
-      spawnZombie(p[0], p[1]); S.spawned++;
+      spawnZombie(p[0], p[1], mkId); S.spawned++;
     }
     if (first) alertAt(w.x, w.y, 'Infizierte dringen ein');
   }
