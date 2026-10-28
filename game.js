@@ -316,6 +316,16 @@ function spawnCivilian(inside, ymax) {
 }
 function spawnCivilianZone(inside) {   // Kampagne: alle Zivilisten innerhalb eines Rechtecks (z. B. hinter der Sperre)
   const z = RULES.civZone; let e;
+  if (z.discs) {   // mehrere Kreisgebiete (gleichmäßig verteilt)
+    const d = z.discs[z.dn = ((z.dn || 0) + 1) % z.discs.length];
+    if (inside) {
+      const bs = d.bs || (d.bs = B.filter(b => Math.hypot(b.ex - d.x, b.ey - d.y) < d.r)), b = bs.length ? bs[Math.random() * bs.length | 0] : null;
+      if (b && b.occ.length < b.cap) { e = mk(K_CIV, b.ex, b.ey); e.st = 4; e.b = b.idx; e.inT = rnd(10, 90); b.occ.push(e); }
+    }
+    if (!e) { const p = randWalk(d.x, d.y, d.r) || randWalk(d.x, d.y, d.r * 2) || [d.x, d.y]; e = mk(K_CIV, p[0], p[1]); }
+    e.brave = Math.random() < .5; if (Math.random() * 100 < cfg.armed) arm(e);
+    E.push(e); return;
+  }
   if (inside) {
     const bs = z.bs || (z.bs = B.filter(b => b.ex > z.x0 && b.ex < z.x1 && b.ey > z.y0 && b.ey < z.y1));
     const b = bs.length ? bs[Math.random() * bs.length | 0] : null;
@@ -419,6 +429,7 @@ function passable(x, y, zm, e) {
   if (x < 1 || y < 1 || x > WW - 1 || y > WH - 1) return false;
   const i = cellIdx(x, y), t = type[i];
   if (t > T_ROAD) return false;
+  if (e && e.k === K_CIV && RULES.civLine && !S.civFree && !RULES.civLine(x, y)) return false;
   if (barId[i]) { if (gate[i] && !zm && canGate(e)) return true; if (zm) bash(barId[i]); return false; }
   return true;
 }
@@ -520,6 +531,10 @@ function kill(e) { if (!e.dead) { e.dead = true; if (e.k === K_ZOM) S.kills++; e
 // ───────────────────────── KI ─────────────────────────
 function thinkCivilian(e) {
   const z = nearestZ(e.x, e.y, 38);
+  if (z && e.guard && !S.civFree && e.ammo > 0) {   // Torwache: hält die Stellung und schießt; flieht erst, wenn der Zombie durchgebrochen ist (< 6 m)
+    const d = Math.hypot(z.x - e.x, z.y - e.y);
+    if (d >= 6) { if (d < 32) { e.st = 5; e.tgt = z; e.path = null; } else { e.st = 0; e.wt = 1; } return; }
+  }
   if (z) {
     const d = Math.hypot(z.x - e.x, z.y - e.y);
     if (e.armed && e.brave && e.ammo > 0 && d < 32 && d > 6) { e.st = 5; e.tgt = z; e.path = null; return; }
@@ -552,6 +567,7 @@ function stepCivilian(e) {
   switch (e.st) {
     case 0:
       e.wt -= DT;
+      if (e.guard && !S.civFree) { if (e.wt <= 0) { e.wt = 3; if (Math.hypot(e.gx - e.x, e.gy - e.y) > 5 && setPath(e, e.gx, e.gy, false)) e.st = 1; } break; }
       if (e.wt <= 0) {
         e.wt = rnd(3, 14);
         if (Math.random() < .12) { const b = nearBuildings(e.x, e.y, 120, b => b.occ.length < b.cap); if (b && setPath(e, b.ex, b.ey, false)) { e.st = 3; e.tgt = b; return; } }
@@ -1494,6 +1510,9 @@ $('origin').addEventListener('change', () => { cfg.origin = $('origin').value; }
 const MAP_LABEL = { sat: '🛰 Satellit', osm: '🗺 OSM-Karte', vec: '▦ Vektor' };
 function applyMapMode() { preloadTiles(); $('bMap').textContent = MAP_LABEL[mapMode]; $('attr').textContent = mapMode === 'vec' ? 'Kartendaten © OpenStreetMap-Mitwirkende' : TILE_SRC[mapMode].attr; }
 const SND = { 1: '🔊', .5: '🔉', 0: '🔇' };
+try { SFX.sirenOff = localStorage.getItem('zos_sirenoff') === '1'; } catch (e) {}
+const sirLabel = () => { $('bSir').textContent = SFX.sirenOff ? '📢✕' : '📢'; $('bSir').title = SFX.sirenOff ? 'Sirenenton ist aus (klicken zum Einschalten)' : 'Sirenenton ist an (klicken zum Ausschalten)'; };
+sirLabel(); $('bSir').onclick = () => { SFX.sirenOff = !SFX.sirenOff; try { localStorage.setItem('zos_sirenoff', SFX.sirenOff ? '1' : '0'); } catch (e) {} sirLabel(); };
 $('bSnd').textContent = SND[SFX.level()];
 $('bSnd').onclick = () => { $('bSnd').textContent = SND[SFX.cycle()]; SFX.ui(); };
 addEventListener('pointerdown', SFX.resume); addEventListener('keydown', SFX.resume);
