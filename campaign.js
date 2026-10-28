@@ -113,7 +113,7 @@ const Campaign = (() => {
   // ── Spielstand ─────────────────────────────────────────────────────────
   const initialRoster = () => ({ squads: [{ k: 'sol', m: [0, 0, 0, 0] }, { k: 'pol', m: [0, 0] }, { k: 'pol', m: [0, 0] }] });
   const fresh = () => ({ v: 1, next: 0, points: 0, up: {}, trucks: 0, roster: initialRoster(), pre: null, best: {}, seen: {}, got: {}, bonus: { strike: 0, gunship: 0 } });
-  let C = (() => { try { const d = JSON.parse(localStorage.getItem(SAVE)); if (d && d.v === 1) return d; } catch (e) {} return null; })();
+  let C = (() => { try { const d = JSON.parse(localStorage.getItem(SAVE)); if (d && d.v === 1) { if (!Number.isFinite(d.points)) d.points = 0; return d; } } catch (e) {} return null; })();
   const persist = () => { try { localStorage.setItem(SAVE, JSON.stringify(C)); } catch (e) {} };
   let cur = null, curIdx = 0;
   const lvOf = kills => 1 + Math.floor(kills / 50);
@@ -292,7 +292,7 @@ const Campaign = (() => {
     const ev = S.ev, people = ev.civ + ev.pol * 5 + ev.mil * 10 + (cleared ? c.civ + c.pol * 5 + c.mil * 10 : 0);
     const priPts = Math.round(m.primary.pts * o.priFrac);
     let secPts = 0, secTxt = '';
-    if (m.secondary.clear) { secPts = o.secondary ? m.secondary.pts : Math.round(m.secondary.pts * o.killFrac * .5); secTxt = o.secondary ? '✓ Alle Zombies getötet' : `✗ ${Math.round(o.killFrac * 100)} % der Zombies getötet`; } else
+    if (m.secondary.clear === true) { secPts = o.secondary ? m.secondary.pts : Math.round(m.secondary.pts * o.killFrac * .5); secTxt = o.secondary ? '✓ Alle Zombies getötet' : `✗ ${Math.round(o.killFrac * 100)} % der Zombies getötet`; } else
     if (m.secondary.bridge != null) { secPts = (o.bridge ? m.secondary.bridge : 0) + Math.round(m.secondary.clear * (cleared ? 1 : o.killFrac)); secTxt = `${o.bridge ? '✓' : '✗'} Brücke gehalten · ${cleared ? '✓' : '✗'} alle Zombies getötet`; }
     else if (m.secondary.noLoss) { secPts = o.secondary ? m.secondary.pts : Math.round(m.secondary.pts * Math.max(0, 1 - o.ulost / Math.max(1, S.unitsStart || 1)) * .5); secTxt = o.secondary ? '✓ Keine Einsatzkraft verloren' : `✗ ${o.ulost} Einsatzkräfte verloren`; }
     else if (m.secondary.kills != null) { secPts = Math.round(m.secondary.pts * Math.min(1, S.kills / m.secondary.kills)); secTxt = `${S.kills} / ${m.secondary.kills} Zombies eliminiert`; }
