@@ -1165,6 +1165,7 @@ function useTool(tool, x, y, x2, y2) {
   }
   if (tool === 'siren') {
     const p = randWalk(x, y, 6); if (!p) return toast('Hier kann keine Sirene stehen');
+    if (!E.some(u => friendly(u) && Math.hypot(u.x - p[0], u.y - p[1]) < 50)) return toast('Sirenen lassen sich nur in der Nähe eigener Einheiten (50 m) bauen');
     S.plans.push({ id: ++S.planId, cells: [], siren: true, st: 'plan', x: p[0], y: p[1] });
     S.used.siren = (S.used.siren || 0) + 1; cooldown.siren = RULES.tools.siren.cd || 0; SFX.ui(); toast('Sirene eingeplant – „Bau abschließen“ ruft den Hubschrauber'); return;
   }
