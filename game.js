@@ -254,7 +254,7 @@ const ZHP = 4;
 // Regeln: Classic/Sandbox oder Kampagne (campaign.js setzt RULES je Mission)
 function classicRules() {
   return { mode: 'classic', barLimit: 50, barHpMul: 2, ammo: false, xp: false, zmix: false, baseAcc: null,
-    tools: { infect: {}, barricade: {}, demolish: {}, garrison: { pct: 25, max: 4, cd: 30 }, supply: { pct: 35, max: 5, cd: 20 }, strike: { pct: 50, max: 10, cd: 0 }, evac: { pct: 50 }, truck: { pct: 70, max: 2, cd: 2 }, siren: { max: 1 } } };
+    tools: { infect: {}, barricade: {}, demolish: {}, garrison: { pct: 25, max: 4, cd: 30 }, supply: { pct: 35, max: 5, cd: 20 }, strike: { pct: 50, max: 10, cd: 0 }, evac: { pct: 50 }, truck: { pct: 70, max: 2, cd: 2 }, siren: { at: 900, max: 1, cd: 300 } } };
 }
 let RULES = classicRules();
 const fmtClock = t => { t = Math.round(t); return String(t / 60 | 0).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
@@ -1166,7 +1166,7 @@ function useTool(tool, x, y, x2, y2) {
   if (tool === 'siren') {
     const p = randWalk(x, y, 6); if (!p) return toast('Hier kann keine Sirene stehen');
     S.plans.push({ id: ++S.planId, cells: [], siren: true, st: 'plan', x: p[0], y: p[1] });
-    S.used.siren = (S.used.siren || 0) + 1; SFX.ui(); toast('Sirene eingeplant – „Bau abschließen“ ruft den Hubschrauber'); return;
+    S.used.siren = (S.used.siren || 0) + 1; cooldown.siren = RULES.tools.siren.cd || 0; SFX.ui(); toast('Sirene eingeplant – „Bau abschließen“ ruft den Hubschrauber'); return;
   }
   if (tool === 'barricade') {
     const dx = x2 - x, dy = y2 - y, len = Math.hypot(dx, dy);
@@ -1184,7 +1184,7 @@ function useTool(tool, x, y, x2, y2) {
     // Baupläne (noch nicht geliefert) lassen sich jederzeit verwerfen
     let pi = -1, pd = 14 * 14;
     S.plans.forEach((q, i) => { if (q.st === 'dlv') return; if (q.siren) { const d = (q.x - x) ** 2 + (q.y - y) ** 2; if (d < pd) { pd = d; pi = i; } } for (const c of q.cells) { const d = ((c % GW + .5) * CELL - x) ** 2 + (((c / GW | 0) + .5) * CELL - y) ** 2; if (d < pd) { pd = d; pi = i; } } });
-    if (pi >= 0) { if (S.plans[pi].siren) S.used.siren--; S.plans.splice(pi, 1); toast('Bauplan verworfen'); return; }
+    if (pi >= 0) { if (S.plans[pi].siren) { S.used.siren--; cooldown.siren = 0; } S.plans.splice(pi, 1); toast('Bauplan verworfen'); return; }
     const sr = S.sirens.find(q => !q.dead && Math.hypot(q.x - x, q.y - y) < 10);
     if (sr) {
       if (!E.some(u => friendly(u) && Math.hypot(u.x - sr.x, u.y - sr.y) < 50)) return toast('Zum Einreißen muss eine Einheit (Soldat, Polizei, Truck) in der Nähe sein');
@@ -1505,7 +1505,7 @@ try { const m = localStorage.getItem('zos_mapmode'); if (MAP_LABEL[m]) mapMode =
 const selU = () => [...selected].filter(u => friendly(u) && !u.auto);
 $('bEvacU').onclick = () => startUnitEvac();
 $('bCommit').onclick = () => commitBuild();
-$('bDrop').onclick = () => { S.used.siren -= S.plans.filter(q => q.st === 'plan' && q.siren).length; S.plans = S.plans.filter(q => q.st !== 'plan'); toast('Baupläne verworfen'); };
+$('bDrop').onclick = () => { if (S.plans.some(q => q.st === 'plan' && q.siren)) cooldown.siren = 0; S.used.siren -= S.plans.filter(q => q.st === 'plan' && q.siren).length; S.plans = S.plans.filter(q => q.st !== 'plan'); toast('Baupläne verworfen'); };
 // Feuermodus: ein Menü für alle Waffenvarianten; angeboten wird nur, was zu den gewählten Einheitentypen passt
 const FM = {
   sol: [['', '🔫 Sturmgewehr', 'Standard: bremst Zombies kurz aus'], ['sil', '🔇 Dämpfer', 'Lärm −50 %, keine Mann-Stop-Wirkung', 'canSil'], ['snipe', '🎯 Sniper', 'Reichweite ×3, Feuerrate −50 %, Lärm +20 %, wirft Zombies zurück', 'canSnipe']],

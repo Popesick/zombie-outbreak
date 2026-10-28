@@ -8,7 +8,7 @@ const Campaign = (() => {
     { id: 'snipe', n: 'Sniper', d: 'Soldaten können Snipergewehre führen: Reichweite +200 %, Feuerrate −50 %, Lärm +20 %, wirft Zombies einen Schritt zurück.', p: [400] },
     { id: 'mp', n: 'MPs für Polizei', d: 'Polizisten können MPs führen: etwas mehr Reichweite, schnellere Schussfolge, keine Mann-Stop-Wirkung.', p: [200] },
     { id: 'sg', n: 'Schrotflinten für Polizei', d: 'Polizisten können Schrotflinten führen: Reichweite wie Pistole, Treffsicherheit +10 %, wirft Zombies zwei Schritte zurück.', p: [300] },
-    { id: 'siren', n: 'Weitere Sirenen', d: '+1 Sirene pro Stufe (insgesamt bis zu 4 pro Mission, die erste ist von Anfang an verfügbar).', p: [200, 300, 500] },
+    { id: 'siren', n: 'Weitere Sirenen', d: '+1 Sirene pro Stufe (insgesamt bis zu 4 pro Mission). Sirenen sind erst nach 15 Minuten verfügbar, danach alle 5 Minuten eine.', p: [200, 300, 500] },
     { id: 'barhp', n: 'Barrikaden verbessern', d: 'Barrikaden halten doppelt so lange (insgesamt 4× Classic).', p: [300] },
     { id: 'scan', n: 'Infektionsscanner', d: 'Soldaten erkennen infizierte Zivilisten und schalten sie aus. Tore sperren Infizierte aus.', p: [600] },
     { id: 'gate', n: 'Tore', d: 'Pro 12 Barrikadenelemente ein Tor: Menschen passieren, Zombies nicht.', p: [250] },
@@ -131,7 +131,7 @@ const Campaign = (() => {
     if (lv('moresupply')) tools.supply = { ...tools.supply, max: tools.supply.max + 5 * lv('moresupply') };
     if (C && C.trucks && !tools.truck) tools.truck = { at: 0, max: C.trucks, cd: 4 };
     else if (tools.truck && C) tools.truck = { ...tools.truck, max: Math.max(tools.truck.max || 0, 0) + C.trucks };
-    tools.siren = { at: 0, max: 1 + lv('siren') };
+    tools.siren = { at: 900, max: 1 + lv('siren'), cd: 300 };
     if (lv('gate')) tools.gate = {};
     if (lv('turret')) tools.turret = { at: 0, max: 2, cd: 10 };
     if (lv('flare')) tools.flare = { at: 0, max: 5, cd: 4 };
