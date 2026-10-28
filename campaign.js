@@ -65,7 +65,7 @@ const Campaign = (() => {
       info: ['3500 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren, dazu 200 aus dem Nordost-Wald, die sich langsam am Waldrand sammeln und dann zum Evakuierungspunkt stürmen', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
     },
     {
-      id: 'ap', map: 'm4', kind: 'air', name: 'Befreiung des Flughafens', sub: 'Flughafen München – Zentralbereich', pop: 1000, armed: 0, acc: 35, zs: 50,
+      id: 'ap', map: 'm4', kind: 'air', name: 'Befreiung des Flughafens', sub: 'Flughafen München – Zentralbereich', pop: 750, armed: 0, acc: 35, zs: 50,
       start: () => ({ sol: [{ x: 2845, y: 1050 }], pol: [{ x: 2815, y: 1080 }, { x: 2875, y: 1080 }] }),
       evac: () => ({ x: 2290, y: 1755, at: 600 }), noHeli: true, evacMsg: '📡 Die Zivilisten sammeln sich im Abholbereich H',   // nach 10:00 laufen die Zivilisten zu H (keine Hubschrauber)
       civZone: { x0: 1610, y0: 900, x1: 2340, y1: 2225 }, civNoGate: true,
@@ -77,10 +77,10 @@ const Campaign = (() => {
       hold: null,
       tools: { supply: { at: 0, max: 5, cd: 20 }, strike: { at: 150, max: 3, cd: 8 }, garrison: { at: 240, max: 2, cd: 30 } },
       barricades: 16,
-      primary: { civ: 1000, pts: 2000, hold: 1200 }, secondary: { clear: true, pts: 800 },
+      primary: { civ: 750, pts: 2000, hold: 1200 }, secondary: { clear: true, pts: 800 },
       reward: { strike: 4, gunship: 1 },
-      goal: ['Alle 1000 Zivilisten im Flughafen müssen 20 Minuten überleben.', 'Töte alle Zombies.'],
-      info: ['1000 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Elf eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
+      goal: ['Alle 750 Zivilisten im Flughafen müssen 20 Minuten überleben.', 'Töte alle Zombies.'],
+      info: ['750 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Elf eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
