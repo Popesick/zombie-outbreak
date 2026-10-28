@@ -80,7 +80,7 @@ const Campaign = (() => {
       primary: { civ: 750, pts: 2000, hold: 1200 }, secondary: { clear: true, pts: 800 },
       reward: { strike: 4, gunship: 1 },
       goal: ['Alle 750 Zivilisten im Flughafen müssen 20 Minuten überleben.', 'Töte alle Zombies.'],
-      info: ['750 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Elf eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten','Nach 15:00 zwei Mega-Wellen: je 1000 schnelle Zombies aus Norden und Süden', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
+      info: ['750 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Elf eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten','Nach 15:00 der finale Sturm: 3000 schnelle Zombies aus dem Westen, in vier Bahnen auf die Westmauer, dazu 500 aus dem Osten direkt auf den Abholbereich', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
@@ -99,12 +99,14 @@ const Campaign = (() => {
   ];
 
   // Flughafen: Zombie-Spawngebiete im Westen (Z1 NW, Z2 W, Z3 SW) und ihre Anmarschwege zur Sperre (Wegpunkte; Ziel liegt hinter der Barrikade)
-  const AIR_Z = { z1: { x: 195, y: 740, r: 190, rt: [[900, 860], [1400, 930], [1900, 1100]], n: 'Nordwesten' }, z2: { x: 250, y: 1700, r: 250, rt: [], n: 'Westen' }, z3: { x: 340, y: 2420, r: 260, rt: [[1500, 2330], [1880, 2150]], n: 'Südwesten' },
-    zn: { x: 1980, y: 380, r: 220, rt: [[1980, 700]], n: 'Norden' }, zs: { x: 1980, y: 2750, r: 220, rt: [[1980, 2420]], n: 'Süden' } };
+  const AIR_Z = { z1: { x: 195, y: 740, r: 190, rt: [[900, 860], [1400, 930], [1900, 1100]], n: 'Nordwesten' }, z2: { x: 250, y: 1700, r: 250, rt: [], n: 'Westen' }, z3: { x: 340, y: 2420, r: 260, rt: [[1500, 2330], [1880, 2150]], n: 'Südwesten' }     };
   const airWave = (t, k, n, fast) => ({ t, n, fast, x: AIR_Z[k].x, y: AIR_Z[k].y, r: AIR_Z[k].r, msg: '⚠ ' + n + ' Zombies stürmen aus ' + AIR_Z[k].n, march: { id: 'ap' + t + k, route: 0, routes: [AIR_Z[k].rt], gather: { x: 2040, y: 1650, r: 40 }, noWait: true, dur: 1800 } });
+  // Finaler Sturm: vier Bahnen vom Westen zur Westmauer
+  const AIR_LANES = [[[500, 1600], [900, 1290], [1560, 1300]], [[500, 1630], [900, 1400], [1560, 1413]], [[900, 1651], [1560, 1651]], [[500, 1680], [900, 1850], [1560, 1827]]];
   const AIR_WAVES = [{ t: 0, n: 200, x: 1340, y: 1600, r: 150 },
     ...[300, 480].flatMap(t => [airWave(t, 'z1', 300), airWave(t, 'z2', 200), airWave(t, 'z3', 300)]),
-    airWave(660, 'z1', 500), airWave(720, 'z2', 400), airWave(780, 'z3', 500), airWave(900, 'zn', 1000, true), airWave(900, 'zs', 1000, true)];
+    airWave(660, 'z1', 500), airWave(720, 'z2', 400), airWave(780, 'z3', 500), ...AIR_LANES.map((rt, k) => ({ t: 900, n: 750, x: 200, y: 1640, r: 230, fast: true, msg: k === 0 ? '⚠ Finaler Sturm: 3000 Zombies aus dem Westen!' : null, march: { id: 'apFinal', route: k, routes: AIR_LANES, gather: { x: 2040, y: 1650, r: 40 }, noWait: true, dur: 1800 } })),
+    { t: 900, n: 500, x: 2900, y: 1750, r: 150, fast: true, msg: '⚠ 500 Zombies aus dem Osten laufen auf den Abholbereich zu!', march: { id: 'apEast', route: 0, routes: [[]], gather: { x: 2290, y: 1755, r: 30 }, noWait: true, dur: 1800 } }];
 
   // ── Spielstand ─────────────────────────────────────────────────────────
   const initialRoster = () => ({ squads: [{ k: 'sol', m: [0, 0, 0, 0] }, { k: 'pol', m: [0, 0] }, { k: 'pol', m: [0, 0] }] });
