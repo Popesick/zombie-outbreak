@@ -67,7 +67,7 @@ const Campaign = (() => {
     {
       id: 'ap', map: 'm4', kind: 'air', name: 'Befreiung des Flughafens', sub: 'Flughafen München – Zentralbereich', pop: 1000, armed: 0, acc: 35, zs: 50,
       start: () => ({ sol: [{ x: 2845, y: 1050 }], pol: [{ x: 2815, y: 1080 }, { x: 2875, y: 1080 }] }),
-      evac: () => ({ x: 2040, y: 1650, at: 1e9 }),   // kein Evakuierungspunkt: die Zivilisten bleiben hinter der Sperre
+      evac: () => ({ x: 2290, y: 1755, at: 600 }), noHeli: true, evacMsg: '📡 Die Zivilisten sammeln sich im Abholbereich H',   // nach 10:00 laufen die Zivilisten zu H (keine Hubschrauber)
       civZone: { x0: 1610, y0: 900, x1: 2340, y1: 2225 }, civNoGate: true,
       ring: { x0: 1583, y0: 871, x1: 2362, y1: 2251, thick: 2, gates: [{ x: 2362, y: 1338 }, { x: 2362, y: 1755 }, { x: 2362, y: 1968 }] },
       turrets: [{ x: 1604, y: 1100 }, { x: 1604, y: 1450 }, { x: 1604, y: 1800 }, { x: 1604, y: 2130 }, { x: 1950, y: 892 }, { x: 1950, y: 2230 }],
@@ -77,10 +77,10 @@ const Campaign = (() => {
       hold: null,
       tools: { supply: { at: 0, max: 5, cd: 20 }, strike: { at: 150, max: 3, cd: 8 }, garrison: { at: 240, max: 2, cd: 30 } },
       barricades: 16,
-      primary: { civ: 1000, pts: 2000, hold: 900 }, secondary: { clear: true, pts: 800 },
+      primary: { civ: 1000, pts: 2000, hold: 1200 }, secondary: { clear: true, pts: 800 },
       reward: { strike: 4, gunship: 1 },
-      goal: ['Alle 1000 Zivilisten im Flughafen müssen 15 Minuten überleben.', 'Töte alle Zombies.'],
-      info: ['1000 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Sechs eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 1:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 4:00 erneut', 'Nach 7:00 stürmen 500 Zombies aus Nordwesten, nach 8:00 400 aus Westen, nach 9:00 500 aus Südwesten', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
+      goal: ['Alle 1000 Zivilisten im Flughafen müssen 20 Minuten überleben.', 'Töte alle Zombies.'],
+      info: ['1000 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Sechs eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
@@ -102,8 +102,8 @@ const Campaign = (() => {
   const AIR_Z = { z1: { x: 195, y: 740, r: 190, rt: [[900, 860], [1400, 930], [1900, 1100]], n: 'Nordwesten' }, z2: { x: 250, y: 1700, r: 250, rt: [], n: 'Westen' }, z3: { x: 340, y: 2420, r: 260, rt: [[1500, 2330], [1880, 2150]], n: 'Südwesten' } };
   const airWave = (t, k, n) => ({ t, n, x: AIR_Z[k].x, y: AIR_Z[k].y, r: AIR_Z[k].r, msg: '⚠ ' + n + ' Zombies stürmen aus ' + AIR_Z[k].n, march: { id: 'ap' + t + k, route: 0, routes: [AIR_Z[k].rt], gather: { x: 2040, y: 1650, r: 40 }, noWait: true, dur: 1800 } });
   const AIR_WAVES = [{ t: 0, n: 200, x: 1420, y: 1600, r: 200 },
-    ...[60, 240].flatMap(t => [airWave(t, 'z1', 300), airWave(t, 'z2', 200), airWave(t, 'z3', 300)]),
-    airWave(420, 'z1', 500), airWave(480, 'z2', 400), airWave(540, 'z3', 500)];
+    ...[300, 480].flatMap(t => [airWave(t, 'z1', 300), airWave(t, 'z2', 200), airWave(t, 'z3', 300)]),
+    airWave(660, 'z1', 500), airWave(720, 'z2', 400), airWave(780, 'z3', 500)];
 
   // ── Spielstand ─────────────────────────────────────────────────────────
   const initialRoster = () => ({ squads: [{ k: 'sol', m: [0, 0, 0, 0] }, { k: 'pol', m: [0, 0] }, { k: 'pol', m: [0, 0] }] });
@@ -132,7 +132,7 @@ const Campaign = (() => {
     if (bo.strike && tools.strike) tools.strike = { ...tools.strike, max: tools.strike.max + bo.strike };
     if (bo.gunship) tools.gunship = { at: 0, cd: 45, ...tools.gunship, max: ((tools.gunship && tools.gunship.max) || 0) + bo.gunship };
     const R = {
-      evacCap: m.evacCap, evacEvery: m.evacEvery, civNorth: m.civNorth, civZone: m.civZone ? { ...m.civZone } : null, civNoGate: !!m.civNoGate, rushAfter: lastSpawnT(m), mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
+      evacCap: m.evacCap, evacEvery: m.evacEvery, civNorth: m.civNorth, civZone: m.civZone ? { ...m.civZone } : null, civNoGate: !!m.civNoGate, noHeli: !!m.noHeli, rushAfter: lastSpawnT(m), mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
       barLimit: m.barricades + 12 * lv('morebar'), barHpMul: 2 * (lv('barhp') ? 2 : 1),
       gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), squadPlus: lv('squad') ? 1 : 0, ammoMul: lv('ammo') ? 2 : 1,
       spawn: () => spawnMission(m), tick: () => tick(m), hud: c => hud(m, c), checkEnd: c => checkEnd(m, c), onEnd: msg => finish(m, msg)
@@ -205,7 +205,7 @@ const Campaign = (() => {
       }
     }   // Sammelpunkt erreicht: Welle losgeschickt
     const lu = m.lure(); fire('lure', lu.t, () => { S.lure = { x: lu.x, y: lu.y, until: simT + lu.dur }; zfDirty = true; });
-    const ev = m.evac(); fire('evac', ev.at, () => { S.evac = { x: S.pad.x, y: S.pad.y }; S.evacR = 50; S.evacT = 8; S.evacPre = null; Music.play('hope'); computeEvacField(); toast('📡 Evakuierungssignal gegeben – Zivilisten laufen zum Landeplatz'); SFX.alarm(); });
+    const ev = m.evac(); fire('evac', ev.at, () => { S.evac = { x: S.pad.x, y: S.pad.y }; S.evacR = 50; S.evacT = 8; S.evacPre = null; Music.play('hope'); computeEvacField(); toast(m.evacMsg || '📡 Evakuierungssignal gegeben – Zivilisten laufen zum Landeplatz'); SFX.alarm(); });
     fire('horde', m.hordeAt, () => { S.horde = m.hordeFocus; zfDirty = true; if (!m.hordeQuiet) { toast('⚠ Die Horde zieht jetzt zielstrebig zum Evakuierungspunkt!'); SFX.alarm(); } });
     if (m.supplyBonus && simT >= m.supplyBonus.at && !RULES.supBonusOn) {   // zusätzliche Versorgungspakete (nach dem Laden stillschweigend wieder aktiv)
       RULES.supBonusOn = true; RULES.tools.supply = { ...RULES.tools.supply, max: (RULES.tools.supply.max || 0) + m.supplyBonus.n };
@@ -215,7 +215,7 @@ const Campaign = (() => {
     if (m.primary.hold && (S.astep = (S.astep || 0) + 1) % 30 === 0) {
       const o = evalAir(m, counts());
       if (o.lost && !S.fired.lossNote) { S.fired.lossNote = 1; banner('Zivilisten wurden verloren – das Primärziel ist verfehlt. Haltet die Stellung für das Sekundärziel!', 12000); }
-      if (!S.fired.holdDone && simT >= m.primary.hold) { S.fired.holdDone = 1; if (!o.lost) { banner('✓ Die Zivilisten haben 15 Minuten überlebt – Primärziel erreicht! Jetzt alle Zombies ausschalten.', 14000); SFX.ui(); } }
+      if (!S.fired.holdDone && simT >= m.primary.hold) { S.fired.holdDone = 1; if (!o.lost) { banner('✓ Die Zivilisten haben 20 Minuten überlebt – Primärziel erreicht! Jetzt alle Zombies ausschalten.', 14000); SFX.ui(); } }
     }
     // Brücke halten: kein Zombie darf das Westufer erreichen
     if (m.hold && !S.breach && (S.hstep = (S.hstep || 0) + 1) % 20 === 0) { for (const z of E) if (z.k === K_ZOM && !z.dead && m.hold(z)) { S.breach = true; alertAt(z.x, z.y, 'Brücke durchbrochen!'); break; } }
@@ -271,7 +271,7 @@ const Campaign = (() => {
   function hudAir(m, c, o, box) {
     const nxt = AIR_WAVES.filter(w => w.t > simT).map(w => w.t)[0];
     const html = `<h3>${m.name}</h3><div class="ev">Zeit ${fmtClock(simT)}</div>
-      <div class="o"><b>Primär:</b> Zivilisten am Leben <b class="${o.lost ? 'no' : 'ok'}">${o.R}</b> / ${S.civ0 || m.pop}${o.lost ? ' ✗' : ''}<div class="bar"><i style="width:${o.prog * 100}%"></i></div>${o.primary ? '✓ 15 Minuten überlebt' : o.lost ? 'Verluste – Primärziel verfehlt' : 'Noch ' + fmtClock(Math.max(0, m.primary.hold - simT))}</div>
+      <div class="o"><b>Primär:</b> Zivilisten am Leben <b class="${o.lost ? 'no' : 'ok'}">${o.R}</b> / ${S.civ0 || m.pop}${o.lost ? ' ✗' : ''}<div class="bar"><i style="width:${o.prog * 100}%"></i></div>${o.primary ? '✓ 20 Minuten überlebt' : o.lost ? 'Verluste – Primärziel verfehlt' : 'Noch ' + fmtClock(Math.max(0, m.primary.hold - simT))}</div>
       <div class="o"><b class="${o.secondary ? 'ok' : ''}">${o.secondary ? '✓ ' : ''}Sekundär:</b><div class="${o.cleared ? 'ok' : ''}">${o.cleared ? '✓' : '○'} Zombies übrig: <b>${c.zom}</b></div></div>
       ${nxt != null ? `<div class="ev">⚠ Nächste Welle in ${fmtClock(nxt - simT)}</div>` : ''}`;
     if (box.dataset.h !== html) { box.innerHTML = html; box.dataset.h = html; }
@@ -307,7 +307,7 @@ const Campaign = (() => {
     };
     const html = `<h2>${o.primary ? (o.secondary ? 'Mission erfüllt' : 'Primärziel erreicht') : 'Mission gescheitert'}</h2><p class="stars">${'★'.repeat(starN)}${'☆'.repeat(3 - starN)}</p><p>${msg}</p>
       <table>
-      <tr><td>Primär: ${m.primary.hold ? o.R + ' von ' + (S.civ0 || m.pop) + ' Zivilisten am Leben' + (o.primary ? ' (15 Minuten überlebt)' : '') : o.R + ' von ' + m.primary.civ + ' Zivilisten gerettet'} (${Math.round(o.priFrac * 100)} %)</td><td>+${priPts}</td></tr>
+      <tr><td>Primär: ${m.primary.hold ? o.R + ' von ' + (S.civ0 || m.pop) + ' Zivilisten am Leben' + (o.primary ? ' (20 Minuten überlebt)' : '') : o.R + ' von ' + m.primary.civ + ' Zivilisten gerettet'} (${Math.round(o.priFrac * 100)} %)</td><td>+${priPts}</td></tr>
       <tr><td>Sekundär: ${secTxt}</td><td>+${secPts}</td></tr>
       <tr><td>Gerettete/überlebende Personen (1 / 5 / 10 Punkte)</td><td>+${people}</td></tr>
       <tr><td><b>Summe</b></td><td><b>${total}</b></td></tr>

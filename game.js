@@ -787,7 +787,7 @@ function step() {
   // Evakuierung
   if (S.evac) {
     S.evacT -= DT; if (S.evacR != null && S.evacR < 4000) S.evacR += 25 * DT;
-    if (S.evacT <= 0) { S.evacT = RULES.evacEvery || 30; const [sx, sy] = edgeEntry(S.evac.x, S.evac.y); fx.push({ type: 'heli', kind: 'evac', x: sx, y: sy, tx: S.evac.x, ty: S.evac.y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); }
+    if (S.evacT <= 0 && RULES.noHeli) S.evacT = 99; else if (S.evacT <= 0) { S.evacT = RULES.evacEvery || 30; const [sx, sy] = edgeEntry(S.evac.x, S.evac.y); fx.push({ type: 'heli', kind: 'evac', x: sx, y: sy, tx: S.evac.x, ty: S.evac.y, ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); }
     if (evacDirty && simT - evLast > 3) computeEvacField();
   }
   // Effekte
