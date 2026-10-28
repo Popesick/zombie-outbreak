@@ -49,6 +49,7 @@ const Music = (() => {
     duck(on) { duckF = on ? .35 : 1; if (cur) cur.volume = vol(); },
     level: () => level,
     current: () => set,
-    cycle() { level = level === 1 ? .5 : level === .5 ? 0 : 1; try { localStorage.setItem('zos_music', level); } catch (e) {} for (const f of fades) fades.delete(f); if (cur) cur.volume = vol(); return level; }
+    setLevel(v) { level = v; try { localStorage.setItem('zos_music', level); } catch (e) {} if (cur) cur.volume = vol(); },
+    cycle() { level = level > .5 ? .5 : level > 0 ? 0 : 1; try { localStorage.setItem('zos_music', level); } catch (e) {} for (const f of fades) fades.delete(f); if (cur) cur.volume = vol(); return level; }
   };
 })();

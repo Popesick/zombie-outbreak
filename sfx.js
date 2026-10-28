@@ -39,7 +39,8 @@ const SFX = (() => {
     resume,
     setPaused(p) { paused = p; if (heli) heli.out.gain.value = p ? 0 : heli.out.gain.value; },
     level: () => level,
-    cycle() { level = level === 1 ? .5 : level === .5 ? 0 : 1; try { localStorage.setItem('zos_sound', level); } catch (e) {} if (master) master.gain.value = level; resume(); return level; },
+    setLevel(v) { level = v; try { localStorage.setItem('zos_sound', level); } catch (e) {} if (master) master.gain.value = level; resume(); },
+    cycle() { level = level > .5 ? .5 : level > 0 ? 0 : 1; try { localStorage.setItem('zos_sound', level); } catch (e) {} if (master) master.gain.value = level; resume(); return level; },
     shot(x, y, kind) {
       const s = sp(x, y); if (!s || !ok('shot' + kind, kind === 'mg' ? 70 : 35) || !voice(.3)) return;
       const o = out(s[1]), rifle = kind === 'rifle', amp = s[0] * (rifle ? .5 : .35);

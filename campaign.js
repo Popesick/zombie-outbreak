@@ -496,5 +496,10 @@ const Campaign = (() => {
     $('bEvacGo').onclick = () => { const m = MIS.find(x => x.id === (RULES && RULES.missionId)); if (m && m.kind === 'land') startEvac(m); };
     $('bEnd').onclick = () => modal(`<h2>Mission beenden?</h2><p>Die Mission wird jetzt gewertet. Überlebende Einsatzkräfte werden übernommen.</p><div class="btns"><button class="big" id="eYes">Mission beenden</button><button id="eNo">Weiterspielen</button></div>`, () => { $('eYes').onclick = () => { closeModal(); endGame('Rückzug – Mission vorzeitig beendet.'); }; $('eNo').onclick = closeModal; });
   }
-  return { init, rulesFor, MIS, get state() { return C; }, hub, start, UP };
+  function newGame() {
+    const prog = C && (C.next > 0 || C.points > 0 || Object.keys(C.best || {}).length);
+    if (prog && !confirm('Ein neues Spiel beginnen? Der Kampagnenfortschritt (Missionen, Punkte, Upgrades, Einheiten) geht verloren.')) return;
+    C = fresh(); persist(); $('menu').style.display = 'none'; $('mCamp').textContent = '🎖 Kampagne fortsetzen'; hub();
+  }
+  return { newGame, init, rulesFor, MIS, get state() { return C; }, hub, start, UP };
 })();

@@ -1303,6 +1303,13 @@ function fitCam() { resize(); cam.x = WW / 2; cam.y = WH / 2; cam.z = minZ / .9;
 
 let toolSel = 'pan', drag = null, hover = null;
 const COL = { civ: '#f1f5f2', armed: '#ffe066', inf: '#f0a030', zom: '#58c24a', pol: '#4a8bff', sol: '#c8b04a' };
+// Einstellungen: Farben, unauffällige Infizierte (Lautstärke liegt in SFX/Music)
+const PALETTE = [['#f1f5f2', 'Weiß'], ['#ffe066', 'Gelb'], ['#f0a030', 'Orange'], ['#e5484d', 'Rot'], ['#b06cff', 'Violett'], ['#4a8bff', 'Blau'], ['#58c24a', 'Grün'], ['#c8b04a', 'Khaki']];
+const COL_DEF = { ...COL }, OPT = { stealth: false };
+try { const o = JSON.parse(localStorage.getItem('zos_settings')); if (o) { OPT.stealth = !!o.stealth; for (const k in COL) if (o.col && PALETTE.some(p => p[0] === o.col[k])) COL[k] = o.col[k]; } } catch (e) {}
+const saveOpt = () => { try { localStorage.setItem('zos_settings', JSON.stringify({ stealth: OPT.stealth, col: COL })); } catch (e) {} };
+// Infizierte sind nur dann erkennbar, wenn ein Soldat mit Infektionsscanner (Upgrade) in der Nähe ist
+function scanSeen(e) { if (!RULES.scan) return false; for (const u of UL) if ((u.k === K_SOL || u.k === K_SEN) && (u.x - e.x) ** 2 + (u.y - e.y) ** 2 < 65 * 65) return true; return false; }
 function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = '#0b0f0c'; ctx.fillRect(0, 0, VW, VH);
@@ -1338,7 +1345,7 @@ function draw() {
   for (const e of E) {
     if (e.dead || e.st === 4 && e.k !== K_ZOM || e.x < x0 || e.x > x1 || e.y < y0 || e.y > y1) continue;
     if (e.k === K_TRK) continue;
-    (e.k === K_ZOM ? groups.zom : e.inc >= 0 ? groups.inf : e.k === K_CIV ? (e.armed ? groups.armed : groups.civ) : e.k === K_POL ? groups.pol : groups.sol).push(e);
+    (e.k === K_ZOM ? groups.zom : e.inc >= 0 && !(OPT.stealth && !scanSeen(e)) ? groups.inf : e.k === K_CIV ? (e.armed ? groups.armed : groups.civ) : e.k === K_POL ? groups.pol : groups.sol).push(e);
   }
   for (const g in groups) {
     ctx.fillStyle = COL[g]; ctx.beginPath();
@@ -1509,17 +1516,17 @@ for (const k in SL) $(k).addEventListener('input', () => { cfg[k] = +$(k).value;
 $('origin').addEventListener('change', () => { cfg.origin = $('origin').value; });
 const MAP_LABEL = { sat: '🛰 Satellit', osm: '🗺 OSM-Karte', vec: '▦ Vektor' };
 function applyMapMode() { preloadTiles(); $('bMap').textContent = MAP_LABEL[mapMode]; $('attr').textContent = mapMode === 'vec' ? 'Kartendaten © OpenStreetMap-Mitwirkende' : TILE_SRC[mapMode].attr; }
-const SND = { 1: '🔊', .5: '🔉', 0: '🔇' };
+const SND = v => v > .5 ? '🔊' : v > 0 ? '🔉' : '🔇';
 try { SFX.sirenOff = localStorage.getItem('zos_sirenoff') === '1'; } catch (e) {}
 const sirLabel = () => { $('bSir').textContent = SFX.sirenOff ? '📢✕' : '📢'; $('bSir').title = SFX.sirenOff ? 'Sirenenton ist aus (klicken zum Einschalten)' : 'Sirenenton ist an (klicken zum Ausschalten)'; };
 sirLabel(); $('bSir').onclick = () => { SFX.sirenOff = !SFX.sirenOff; try { localStorage.setItem('zos_sirenoff', SFX.sirenOff ? '1' : '0'); } catch (e) {} sirLabel(); };
-$('bSnd').textContent = SND[SFX.level()];
-$('bSnd').onclick = () => { $('bSnd').textContent = SND[SFX.cycle()]; SFX.ui(); };
+$('bSnd').textContent = SND(SFX.level());
+$('bSnd').onclick = () => { $('bSnd').textContent = SND(SFX.cycle()); SFX.ui(); };
 addEventListener('pointerdown', SFX.resume); addEventListener('keydown', SFX.resume);
 addEventListener('pointerdown', () => Music.resume()); addEventListener('keydown', () => Music.resume());
-const MUS = { 1: '🎵', .5: '🎵 ½', 0: '🎵 ✕' };
-$('bMus').textContent = MUS[Music.level()];
-$('bMus').onclick = () => { $('bMus').textContent = MUS[Music.cycle()]; SFX.ui(); };
+const MUS = v => v > .5 ? '🎵' : v > 0 ? '🎵 ½' : '🎵 ✕';
+$('bMus').textContent = MUS(Music.level());
+$('bMus').onclick = () => { $('bMus').textContent = MUS(Music.cycle()); SFX.ui(); };
 $('bMap').onclick = () => { mapMode = mapMode === 'sat' ? 'osm' : mapMode === 'osm' ? 'vec' : 'sat'; try { localStorage.setItem('zos_mapmode', mapMode); } catch (e) {} applyMapMode(); };
 try { const m = localStorage.getItem('zos_mapmode'); if (MAP_LABEL[m]) mapMode = m; } catch (e) {}
 const selU = () => [...selected].filter(u => friendly(u) && !u.auto);
@@ -1564,6 +1571,10 @@ $('sPat').onclick = () => { patrolArmed = !patrolArmed; $('sPat').classList.togg
 $('sRel').onclick = () => { for (const u of selected) { if (u.ds > 0) { if (u.ds !== 3) { u.dt = u.ds === 1 ? 60 - u.dt : 0; u.ds = 3; } u.pend = { release: true }; } else { u.ord = false; u.path = null; u.patrol = null; } } toast('Einheiten wieder selbstständig (eingegrabene räumen zuerst)'); };
 $('sClr').onclick = () => selected.clear();
 const uEnt = new Map(), uCnt = {};
+function applyColors() {
+  UCOL[K_POL] = COL.pol; UCOL[K_SOL] = COL.sol; UCOL[K_SEN] = COL.sol;
+  document.querySelectorAll('.leg i[data-c]').forEach(i => i.style.background = COL[i.dataset.c]);
+}
 const UNAME = { [K_POL]: 'Polizist', [K_SOL]: 'Soldat', [K_SEN]: 'Wache', [K_TRK]: 'Truck', [K_TUR]: 'Geschütz' }, UCOL = { [K_POL]: COL.pol, [K_SOL]: COL.sol, [K_SEN]: COL.sol, [K_TRK]: '#9fb23a', [K_TUR]: '#7d8a6a' };
 const SQNAME = { [K_POL]: 'Polizei-Squad', [K_SOL]: 'Armee-Squad', [K_SEN]: 'Garnison' };
 function centerOn(u) { cam.x = u.x; cam.y = u.y; cam.z = Math.max(cam.z, 1.6); clampCam(); }
@@ -1854,6 +1865,24 @@ function init() {
   $('mComics').onclick = comicList;
   $('mSand').onclick = () => { syncSliders(); $('menu').style.display = 'none'; $('setup').style.display = ''; };
   $('mResume').onclick = () => loadSlot(0);
+  $('mNew').onclick = () => Campaign.newGame();
+  const CNAME = { civ: 'Zivilisten', armed: 'Bewaffnete Zivilisten', inf: 'Infizierte', zom: 'Zombies', pol: 'Polizisten', sol: 'Soldaten' };
+  const settings = () => modal(`<h2>Einstellungen</h2>
+    <div class="row"><label>Soundeffekte <b id="vSfx">${Math.round(SFX.level() * 100)} %</b></label><input type="range" id="rSfx" min="0" max="100" value="${Math.round(SFX.level() * 100)}"></div>
+    <div class="row"><label>Musik <b id="vMus">${Math.round(Music.level() * 100)} %</b></label><input type="range" id="rMus" min="0" max="100" value="${Math.round(Music.level() * 100)}"></div>
+    <h3 style="margin:12px 0 4px">Farben</h3>
+    ${Object.keys(CNAME).map(k => `<div class="cr"><span>${CNAME[k]}</span><div>${PALETTE.map(p => `<button class="sw ${COL[k] === p[0] ? 'on' : ''}" data-k="${k}" data-c="${p[0]}" title="${p[1]}" style="background:${p[0]}"></button>`).join('')}</div></div>`).join('')}
+    <label class="cr" style="cursor:pointer"><span>Unauffällige Infizierte <small style="color:var(--mut)">(Infizierte behalten ihre Farbe; mit Scanner-Upgrade erkennen Soldaten in der Nähe sie trotzdem)</small></span><input type="checkbox" id="oStealth" ${OPT.stealth ? 'checked' : ''}></label>
+    <div class="btns"><button id="sReset">Farben zurücksetzen</button><button class="big" id="sOk">Fertig</button></div>`, () => {
+    $('rSfx').oninput = e => { SFX.setLevel(e.target.value / 100); $('vSfx').textContent = e.target.value + ' %'; $('bSnd').textContent = SND(SFX.level()); };
+    $('rSfx').onchange = () => SFX.ui();
+    $('rMus').oninput = e => { Music.setLevel(e.target.value / 100); $('vMus').textContent = e.target.value + ' %'; $('bMus').textContent = MUS(Music.level()); };
+    document.querySelectorAll('#mbox .sw').forEach(b => b.onclick = () => { COL[b.dataset.k] = b.dataset.c; saveOpt(); applyColors(); document.querySelectorAll('#mbox .sw[data-k="' + b.dataset.k + '"]').forEach(x => x.classList.toggle('on', x === b)); });
+    $('oStealth').onchange = e => { OPT.stealth = e.target.checked; saveOpt(); };
+    $('sReset').onclick = () => { Object.assign(COL, COL_DEF); saveOpt(); applyColors(); settings(); };
+    $('sOk').onclick = closeModal;
+  });
+  $('mSet').onclick = settings; applyColors();
   if (typeof Campaign !== 'undefined') Campaign.init();
   $('menu').style.display = 'flex'; $('setup').style.display = 'none'; Music.play('menu');
   console.log('Init', Math.round(performance.now() - t0), 'ms; Gebäude:', B.length, 'Raster', GW, GH);

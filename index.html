@@ -50,6 +50,9 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 .cat.on>.catbtn,.cat.open>.catbtn{background:#335a2d;border-color:var(--acc)}
 .tmenu{display:none;position:fixed;z-index:7;flex-direction:column;gap:4px;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(6px);min-width:210px}
 .tmenu.open{display:flex}
+.cr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0}
+.sw{width:24px;height:24px;min-width:0;padding:0;border-radius:50%;border:2px solid #0008;margin-left:4px}
+.sw.on{outline:2px solid #fff}
 #fmenu{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:6px;flex-direction:column;gap:4px;padding:6px;z-index:8;min-width:230px}
 #fmenu button{text-align:left}
 #fmenu .fh{font-size:11px;color:var(--mut);padding:2px 4px}
@@ -170,7 +173,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
   <div class="row"><label>Verwandlungszeit (Biss → Zombie) <b id="vInfT"></b></label><input type="range" id="infT" min="3" max="120"></div>
   <div class="row"><label>Zombie-Typ <b id="vZs"></b></label><input type="range" id="zs" min="0" max="100"><div class="hint">0 = klassisch (langsam) · 100 = modern (schnell, rennt Zivilisten nieder)</div></div>
   <div class="btns"><button class="big" id="bStart">▶ Simulation starten</button><button id="bResume" style="display:none">Autosave fortsetzen</button></div>
-  <div class="leg"><span><i style="background:#f1f5f2"></i>Zivilist</span><span><i style="background:#ffe066"></i>bewaffnet</span><span><i style="background:#f0a030"></i>infiziert</span><span><i style="background:#58c24a"></i>Zombie</span><span><i style="background:#4a8bff"></i>Polizei</span><span><i style="background:#b9a24a"></i>Militär</span></div>
+  <div class="leg"><span><i data-c="civ" style="background:#f1f5f2"></i>Zivilist</span><span><i data-c="armed" style="background:#ffe066"></i>bewaffnet</span><span><i data-c="inf" style="background:#f0a030"></i>infiziert</span><span><i data-c="zom" style="background:#58c24a"></i>Zombie</span><span><i data-c="pol" style="background:#4a8bff"></i>Polizei</span><span><i data-c="sol" style="background:#b9a24a"></i>Militär</span></div>
   <p class="hint" style="margin-top:10px">Bedienung: Mausrad/Pinch = Zoom, ziehen = Karte verschieben (bei aktivem Werkzeug: rechte Maustaste oder zwei Finger). Barrikade: im Baumodus Linie ziehen (Bauplan), dann „Bau abschließen“ – 30 s später liefern Hubschrauber. Einheiten: Werkzeug „Einheiten“, Einheit/Rahmen wählen, dann Ziel antippen (Desktop: rechte Maustaste). Barrikaden lassen sich mit „Einreißen“ wieder entfernen. Garnison (max. 4) ab 25 %, Versorgung (max. 5) ab 35 %, Luftschlag (max. 10) ab 50 % Verlust/Umwandlung der Bevölkerung.</p>
 </div>
 
@@ -183,9 +186,11 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 <div id="menu"><div class="mbox">
   <h1>OUTBREAK<br>THE COLLAPSE</h1><p class="sub">Zombie Defense Simulator<br>Moosburg · Pfaffenhofen · Echte Karten, echte Straßen</p>
   <button class="mbtn" id="mCamp">🎖 Kampagne</button>
+  <button class="mbtn" id="mNew">🆕 Neues Spiel starten</button>
   <button class="mbtn" id="mSand">🧪 Sandbox / Classic</button>
   <button class="mbtn" id="mComics">🎬 Intros &amp; Comics</button>
   <button class="mbtn" id="mResume" style="display:none">⏯ Autosave fortsetzen</button>
+  <button class="mbtn" id="mSet">⚙ Einstellungen</button>
   <p class="hint" style="margin-top:14px">Kampagne: feste Missionen, Munition, Erfahrung, Upgrades und Comic-Story. Sandbox: freie Parameter wie bisher.</p>
 </div></div>
 <div id="alerts"></div>
