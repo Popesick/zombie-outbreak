@@ -314,6 +314,17 @@ function spawnCivilian(inside, ymax) {
   if (Math.random() * 100 < cfg.armed) arm(e);
   E.push(e);
 }
+function spawnCivilianZone(inside) {   // Kampagne: alle Zivilisten innerhalb eines Rechtecks (z. B. hinter der Sperre)
+  const z = RULES.civZone; let e;
+  if (inside) {
+    const bs = z.bs || (z.bs = B.filter(b => b.ex > z.x0 && b.ex < z.x1 && b.ey > z.y0 && b.ey < z.y1));
+    const b = bs.length ? bs[Math.random() * bs.length | 0] : null;
+    if (b && b.occ.length < b.cap) { e = mk(K_CIV, b.ex, b.ey); e.st = 4; e.b = b.idx; e.inT = rnd(10, 90); b.occ.push(e); }
+  }
+  if (!e) { let p = null; for (let t = 0; t < 20 && !p; t++) p = randWalk(rnd(z.x0, z.x1), rnd(z.y0, z.y1), 25); p = p || [(z.x0 + z.x1) / 2, (z.y0 + z.y1) / 2]; e = mk(K_CIV, p[0], p[1]); }
+  e.brave = Math.random() < .5;
+  E.push(e);
+}
 function arm(e) { e.armed = true; e.ammo = 14; e.acc = cfg.acc / 100; }
 function spawnZombie(x, y, mkId) { const e = mk(K_ZOM, x, y); if (mkId) e.mk = mkId; e.st = 0; e.wt = rnd(0, 5); if (RULES.zmix) e.zsp = Math.random() < .5 ? rnd(1.5, 3) : rnd(5, 8); E.push(e); return e; }
 
@@ -342,11 +353,11 @@ function spawnSquads(kind, total, size, acc) {
   }
 }
 function newSim() {
-  E = []; BAR = [null]; barId.fill(0); gate.fill(0); noises = []; tracers = []; fx = []; simT = 0; finished = false;
+  E = []; BAR = [null]; barId.fill(0); gate.fill(0); noises = []; tracers = []; fx = []; simT = 0; finished = false; MF.clear();
   for (const b of B) { b.occ = []; b.siege = 0; }
   S = newStats(); cooldown = {}; evacDirty = false; zfDirty = true; ZF = { evac: null, lure: null };
   const inside = Math.round(cfg.pop * .5);
-  const cn = RULES.civNorth; for (let i = 0; i < cfg.pop; i++) spawnCivilian(i < inside, cn && Math.random() < cn.frac ? cn.ymax : 0);
+  const cn = RULES.civNorth; for (let i = 0; i < cfg.pop; i++) { if (RULES.civZone) spawnCivilianZone(i < inside); else spawnCivilian(i < inside, cn && Math.random() < cn.frac ? cn.ymax : 0); }
   document.getElementById('alerts').innerHTML = '';
   if (RULES.spawn) RULES.spawn();
   else {
@@ -402,7 +413,7 @@ function healthyNear(e) {
   for (let gy = y0; gy <= y1; gy++) for (let gx = x0; gx <= x1; gx++) for (let i = hhHead[gy * HW + gx]; i >= 0; i = hhNxt[i]) { const u = E[i]; if (u !== e && !u.dead && u.inc < 0 && (u.x - e.x) ** 2 + (u.y - e.y) ** 2 < 16) return true; }
   return false;
 }
-function canGate(e) { if (!e || e.k === K_ZOM) return false; if (RULES.scan && e.inc >= 0 && !healthyNear(e)) return false; return true; }
+function canGate(e) { if (!e || e.k === K_ZOM || (RULES.civNoGate && e.k === K_CIV)) return false; if (RULES.scan && e.inc >= 0 && !healthyNear(e)) return false; return true; }
 function killBar(i) { const b = BAR[i]; if (!b) return; for (const c of b.cells) { barId[c] = 0; gate[c] = 0; } BAR[i] = null; evacDirty = true; }
 function passable(x, y, zm, e) {
   if (x < 1 || y < 1 || x > WW - 1 || y > WH - 1) return false;
@@ -715,11 +726,10 @@ function stepZombie(e) {
       if (!mk || e.fzT <= 0) { e.st = 0; e.wt = 0; return; }
       if (e.mw) return;   // wartet am Sammelpunkt
       const rt = mk.routes[e.mr || 0] || [], fin = (e.mi || 0) >= rt.length, wp = fin ? [mk.gather.x, mk.gather.y] : rt[e.mi || 0];
-      if (!mk.F) Object.defineProperty(mk, 'F', { value: {}, enumerable: false });   // Felder nicht serialisieren
       const key = wp[0] + ',' + wp[1];
-      let f = mk.F[key];
-      if (!f) { const q = nearestWalkCell(wp[0], wp[1], 80) || wp; f = mk.F[key] = { x: q[0], y: q[1], D: computeField(q[0], q[1], true) }; }   // Wegpunkt auf begehbaren Grund legen
-      if (Math.hypot(e.x - f.x, e.y - f.y) < (fin ? mk.gather.r : 30)) { if (fin) { e.mw = 1; mk.arr++; if (mk.t1 == null) mk.t1 = simT; } else e.mi = (e.mi || 0) + 1; return; }
+      let f = MF.get(key);
+      if (!f) { const q = nearestWalkCell(wp[0], wp[1], 80) || wp; MF.set(key, f = { x: q[0], y: q[1], D: computeField(q[0], q[1], true) }); }   // Wegpunkt auf begehbaren Grund legen (Felder gemeinsam genutzt)
+      if (Math.hypot(e.x - f.x, e.y - f.y) < (fin ? mk.gather.r : 30)) { if (fin && mk.noWait) { e.mk = 0; e.st = 0; e.wt = 0; } else if (fin) { e.mw = 1; mk.arr++; if (mk.t1 == null) mk.t1 = simT; } else e.mi = (e.mi || 0) + 1; return; }
       fieldDescend(e, f.D, f.x, f.y, sp * 1.6, true); return;
     }
     e.fzT -= DT; const lure = e.fz === 'lure', tg = lure ? S.lure : S.evac;
@@ -825,6 +835,7 @@ function updateFx() {
   }
 }
 let stepN = 0;
+const MF = new Map();   // gemeinsame Wegfelder der Marschbefehle (Schlüssel: Wegpunkt)
 let evD = null, evacDirty = false, evLast = -99;
 // Allgemeines Distanzfeld (Dijkstra) für Horde/Lockruf; zm = Barrikaden durchlässig (hohe Kosten)
 function computeField(x, y, zm, D) {
@@ -958,7 +969,7 @@ function score(withAlive) {
   return { civ, pol, mil, pts: civ + pol * 5 + mil * 10 };
 }
 // ── Bauphase: Pläne werden gesammelt, nach „Bau abschließen“ liefern Hubschrauber nach 30 s ──
-function barUsed() { let n = 0; for (const q of S.plans) n += q.cells.length; for (const b of BAR) if (b) n += b.cells.length; return n; }
+function barUsed() { let n = 0; for (const q of S.plans) n += q.cells.length; for (const b of BAR) if (b && !b.pre) n += b.cells.length; return n; }   // vorgebaute Sperren zählen nicht mit
 function barHp(cells) { return (60 + cells * 35) * RULES.barHpMul; }
 function commitBuild() {
   let n = 0; for (const q of S.plans) if (q.st === 'plan') { q.st = 'ord'; q.at = simT + 30; n++; }
@@ -1031,7 +1042,7 @@ function gunFire(f) {   // Gunship: Gatling beharkt alle Zombies im Zielgebiet
 function placeTurret(x, y) {
   const e = mk(K_TUR, x, y); e.acc = RULES.baseAcc != null ? RULES.baseAcc : .7; e.armed = true; e.ord = true; e.hmx = x; e.hmy = y;
   if (RULES.ammo) { e.ammoMax = 2000 * RULES.ammoMul; e.ammo = e.ammoMax; }
-  E.push(e); SFX.thud(x, y);
+  E.push(e); SFX.thud(x, y); return e;
 }
 function landGarrison(x, y) {
   const id = ++gidN, n = 4 + (RULES.squadPlus || 0);
@@ -1160,7 +1171,7 @@ function serialize() {
   return {
     v: 2, ts: Date.now(), simT, cfg, markers, S, cooldown, fx: fx.map(f => ({ ...f })), map: curMap, mode: RULES.mode, mission: RULES.missionId || null, up: RULES.up || null,
     E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0, e.sq, e.kills, e.lvl, e.ammoMax || 0, e.snipe ? 1 : 0, e.sil ? 1 : 0, e.zsp || 0, e.lx0 ? 1 : 0]),
-    bar: BAR.filter(Boolean).map(b => ({ cells: b.cells, hp: b.hp, max: b.max, x: b.x, y: b.y, gates: b.gates || [] })),
+    bar: BAR.filter(Boolean).map(b => ({ cells: b.cells, hp: b.hp, max: b.max, x: b.x, y: b.y, gates: b.gates || [], pre: b.pre ? 1 : 0 })),
     siege: B.filter(b => b.siege > 0).map(b => [b.idx, b.siege])
   };
 }
@@ -1358,7 +1369,7 @@ cv.addEventListener('wheel', e => {
 const friendly = e => !e.dead && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN || e.k === K_TRK || e.k === K_TUR);
 const unitSpeed = u => u.k === K_POL ? 4.4 : u.k === K_TRK ? 8 : 4.8;
 let patrolArmed = false, gidN = 0;
-function addSel(u) { selected.add(u); if (u.g) for (const m of E) if (m.g === u.g && friendly(m)) selected.add(m); }
+function addSel(u) { if (u.auto) return; selected.add(u); if (u.g) for (const m of E) if (m.g === u.g && friendly(m)) selected.add(m); }
 function delSel(u) { selected.delete(u); if (u.g) for (const m of [...selected]) if (m.g === u.g) selected.delete(m); }
 function unitsPointer(d, wx, wy, add) {
   if (d.moved) {
@@ -1412,7 +1423,7 @@ $('bMus').textContent = MUS[Music.level()];
 $('bMus').onclick = () => { $('bMus').textContent = MUS[Music.cycle()]; SFX.ui(); };
 $('bMap').onclick = () => { mapMode = mapMode === 'sat' ? 'osm' : mapMode === 'osm' ? 'vec' : 'sat'; try { localStorage.setItem('zos_mapmode', mapMode); } catch (e) {} applyMapMode(); };
 try { const m = localStorage.getItem('zos_mapmode'); if (MAP_LABEL[m]) mapMode = m; } catch (e) {}
-const selU = () => [...selected].filter(friendly);
+const selU = () => [...selected].filter(u => friendly(u) && !u.auto);
 $('bEvacU').onclick = () => startUnitEvac();
 $('bCommit').onclick = () => commitBuild();
 $('bDrop').onclick = () => { S.plans = S.plans.filter(q => q.st !== 'plan'); toast('Baupläne verworfen'); };
@@ -1707,7 +1718,7 @@ function init() {
   setupMap('moosburg');
   applyMapMode(); syncSliders(); refreshResume(); resize(); fitCam(); setSpeed(0);
   addEventListener('resize', resize);
-  const COMIC_NAMES = { prologue: 'Prolog', m1_win: 'Mission 1 – Sieg (Outro)', m1_lose: 'Mission 1 – Niederlage', m2_win: 'Mission 2 – Sieg', m2_lose: 'Mission 2 – Niederlage', m3_intro: 'Mission 3 – Intro', m3_win: 'Mission 3 – Sieg', m3_lose: 'Mission 3 – Niederlage' };
+  const COMIC_NAMES = { prologue: 'Prolog', m1_win: 'Mission 1 – Sieg (Outro)', m1_lose: 'Mission 1 – Niederlage', m2_win: 'Mission 2 – Sieg', m2_lose: 'Mission 2 – Niederlage', m3_intro: 'Mission 4 – Intro', m3_win: 'Mission 4 – Sieg', m3_lose: 'Mission 4 – Niederlage' };
   const comicList = () => modal('<h2>Intros &amp; Comics</h2><div class="btns" style="flex-direction:column">' + Object.keys(Comic.SEQ).map(k => `<button data-c="${k}">▶ ${COMIC_NAMES[k] || k}</button>`).join('') + '<button id="cBack">Zurück</button></div>', () => {
     $('cBack').onclick = closeModal;
     document.querySelectorAll('#mbox button[data-c]').forEach(b => b.onclick = () => { closeModal(); Comic.play(b.dataset.c, () => { Music.play('menu'); comicList(); }); });
