@@ -102,11 +102,13 @@ const Campaign = (() => {
   const AIR_Z = { z1: { x: 195, y: 740, r: 190, rt: [[900, 860], [1400, 930], [1900, 1100]], n: 'Nordwesten' }, z2: { x: 250, y: 1700, r: 250, rt: [], n: 'Westen' }, z3: { x: 340, y: 2420, r: 260, rt: [[1500, 2330], [1880, 2150]], n: 'Südwesten' }     };
   const airWave = (t, k, n, fast) => ({ t, n, fast, x: AIR_Z[k].x, y: AIR_Z[k].y, r: AIR_Z[k].r, msg: '⚠ ' + n + ' Zombies stürmen aus ' + AIR_Z[k].n, march: { id: 'ap' + t + k, route: 0, routes: [AIR_Z[k].rt], gather: { x: 2040, y: 1650, r: 40 }, noWait: true, dur: 1800 } });
   // Finaler Sturm: vier Bahnen vom Westen zur Westmauer
-  const AIR_LANES = [[[500, 1600], [900, 1290], [1560, 1300]], [[500, 1630], [900, 1400], [1560, 1413]], [[900, 1651], [1560, 1651]], [[500, 1680], [900, 1850], [1560, 1827]]];
+  const fan = (n, f) => [...Array(n).keys()].map(f);   // Auffächern: viele Bahnen mit verteilten Endpunkten an der Mauer
+  const AIR_LANES = fan(12, k => { const ye = 1090 + k * 75; return [[600, 1650 + (ye - 1650) * .3], [1000, 1650 + (ye - 1650) * .85], [1560, ye]]; });
+  const AIR_LANES_E = fan(6, k => { const ye = 1520 + k * 90; return [[2650, 1750 + (ye - 1750) * .5], [2420, ye]]; });
   const AIR_WAVES = [{ t: 0, n: 200, x: 1340, y: 1600, r: 150 },
     ...[300, 480].flatMap(t => [airWave(t, 'z1', 300), airWave(t, 'z2', 200), airWave(t, 'z3', 300)]),
-    airWave(660, 'z1', 500), airWave(720, 'z2', 400), airWave(780, 'z3', 500), ...AIR_LANES.map((rt, k) => ({ t: 900, n: 750, x: 200, y: 1640, r: 230, fast: true, msg: k === 0 ? '⚠ Finaler Sturm: 3000 Zombies aus dem Westen!' : null, march: { id: 'apFinal', route: k, routes: AIR_LANES, gather: { x: 2040, y: 1650, r: 40 }, noWait: true, dur: 1800 } })),
-    { t: 900, n: 500, x: 2900, y: 1750, r: 150, fast: true, msg: '⚠ 500 Zombies aus dem Osten laufen auf den Abholbereich zu!', march: { id: 'apEast', route: 0, routes: [[]], gather: { x: 2290, y: 1755, r: 30 }, noWait: true, dur: 1800 } }];
+    airWave(660, 'z1', 500), airWave(720, 'z2', 400), airWave(780, 'z3', 500), ...AIR_LANES.map((rt, k) => ({ t: 900, n: 250, x: 200, y: 1640, r: 230, fast: true, msg: k === 0 ? '⚠ Finaler Sturm: 3000 Zombies aus dem Westen!' : null, march: { id: 'apFinal', route: k, routes: AIR_LANES, gather: { x: 2040, y: 1650, r: 40 }, noWait: true, dur: 1800 } })),
+    ...AIR_LANES_E.map((rt, k) => ({ t: 900, n: k < 2 ? 84 : 83, x: 2900, y: 1750, r: 150, fast: true, msg: k === 0 ? '⚠ 500 Zombies aus dem Osten laufen auf den Abholbereich zu!' : null, march: { id: 'apEast', route: k, routes: AIR_LANES_E, gather: { x: 2290, y: 1755, r: 30 }, noWait: true, dur: 1800 } }))];
 
   // ── Spielstand ─────────────────────────────────────────────────────────
   const initialRoster = () => ({ squads: [{ k: 'sol', m: [0, 0, 0, 0] }, { k: 'pol', m: [0, 0] }, { k: 'pol', m: [0, 0] }] });
