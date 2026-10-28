@@ -1141,7 +1141,7 @@ function useTool(tool, x, y, x2, y2) {
     const arr = best.o.gates || (best.o.gates = []), has = arr.includes(best.c);
     if (has) { arr.splice(arr.indexOf(best.c), 1); if (!best.plan) gate[best.c] = 0; toast('Tor entfernt'); }
     else {
-      const used = S.plans.reduce((a, q) => a + (q.gates ? q.gates.length : 0), 0) + BAR.reduce((a, b) => a + (b && b.gates ? b.gates.length : 0), 0), quota = Math.floor(barUsed() / 12);
+      const used = S.plans.reduce((a, q) => a + (q.gates ? q.gates.length : 0), 0) + BAR.reduce((a, b) => a + (b && !b.pre && b.gates ? b.gates.length : 0), 0), quota = Math.floor(barUsed() / 12);
       if (used >= quota) return toast('Pro 12 Barrikadenelemente ein Tor (' + used + '/' + quota + ' belegt)');
       arr.push(best.c); if (!best.plan) gate[best.c] = 1; toast('Tor eingeplant');
     }
