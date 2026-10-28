@@ -68,7 +68,7 @@ const Campaign = (() => {
       info: ['3500 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren, dazu 200 aus dem Nordost-Wald, die sich langsam am Waldrand sammeln und dann zum Evakuierungspunkt stürmen', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
     },
     {
-      id: 'ap', map: 'm4', kind: 'air', name: 'Befreiung des Flughafens', sub: 'Flughafen München – Zentralbereich', pop: 750, armed: 0, acc: 35, zs: 50,
+      id: 'ap', map: 'm4', kind: 'air', name: 'Befreiung des Flughafens', sub: 'Flughafen München – Zentralbereich', pop: 1000, armed: 0, acc: 35, zs: 50,
       start: () => ({ sol: [{ x: 2845, y: 1050 }], pol: [{ x: 2815, y: 1080 }, { x: 2875, y: 1080 }] }),
       evac: () => ({ x: 2290, y: 1755, at: 600 }), noHeli: true, evacMsg: '📡 Die Zivilisten sammeln sich im Abholbereich H',   // nach 10:00 laufen die Zivilisten zu H (keine Hubschrauber)
       civZone: { x0: 1610, y0: 900, x1: 2340, y1: 2225 }, civNoGate: true,
@@ -82,8 +82,8 @@ const Campaign = (() => {
       barricades: 16,
       primary: { civ: 750, pts: 2000, hold: 1200 }, secondary: { clear: true, pts: 800 },
       reward: { strike: 4, gunship: 1 },
-      goal: ['Alle 750 Zivilisten im Flughafen müssen 20 Minuten überleben.', 'Töte alle Zombies.'],
-      info: ['750 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Elf eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten','Nach 15:00 der finale Sturm: 3000 schnelle Zombies aus dem Westen, in vier Bahnen auf die Westmauer, dazu 500 aus dem Osten direkt auf den Abholbereich', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
+      goal: ['Von den 1000 Zivilisten im Flughafen müssen mindestens 750 20 Minuten überleben.', 'Töte alle Zombies.'],
+      info: ['1000 unbewaffnete Zivilisten im Innenbereich (750 müssen überleben) – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Elf eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten','Nach 15:00 der finale Sturm: 3000 schnelle Zombies aus dem Westen, in vier Bahnen auf die Westmauer, dazu 500 aus dem Osten direkt auf den Abholbereich', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
@@ -236,9 +236,9 @@ const Campaign = (() => {
   function rescued(c) { return S.ev.civ; }
   function airCiv() { let n = 0; for (const e of E) if (!e.dead && e.k === K_CIV && e.inc < 0) n++; return n; }
   function evalAir(m, c) {   // Flughafen: alle Zivilisten müssen m.primary.hold Sekunden überleben
-    const cleared = c.zom === 0 && c.inf === 0 && simT >= lastSpawnT(m) + 5, civ = airCiv(), c0 = S.civ0 || m.pop, lost = Math.max(0, c0 - civ);
+    const cleared = c.zom === 0 && c.inf === 0 && simT >= lastSpawnT(m) + 5, civ = airCiv(), c0 = S.civ0 || m.pop, lost = civ < m.primary.civ ? Math.max(1, c0 - civ) : 0;   // „lost“: Mindestzahl unterschritten
     const prog = cleared ? 1 : Math.min(1, simT / m.primary.hold);
-    return { R: civ, cleared, lost, prog, primary: lost === 0 && prog >= 1, priFrac: Math.min(1, civ / c0) * prog, secondary: cleared, killFrac: S.spawned ? Math.min(1, S.kills / S.spawned) : 0 };
+    return { R: civ, cleared, lost, prog, primary: lost === 0 && prog >= 1, priFrac: Math.min(1, civ / m.primary.civ) * prog, secondary: cleared, killFrac: S.spawned ? Math.min(1, S.kills / S.spawned) : 0 };
   }
   function evalObj(m, c) {
     if (m.primary.hold) return evalAir(m, c);
@@ -281,7 +281,7 @@ const Campaign = (() => {
   function hudAir(m, c, o, box) {
     const nxt = AIR_WAVES.filter(w => w.t > simT).map(w => w.t)[0];
     const html = `<h3>${m.name}</h3><div class="ev">Zeit ${fmtClock(simT)}</div>
-      <div class="o"><b>Primär:</b> Zivilisten am Leben <b class="${o.lost ? 'no' : 'ok'}">${o.R}</b> / ${S.civ0 || m.pop}${o.lost ? ' ✗' : ''}<div class="bar"><i style="width:${o.prog * 100}%"></i></div>${o.primary ? '✓ 20 Minuten überlebt' : o.lost ? 'Verluste – Primärziel verfehlt' : 'Noch ' + fmtClock(Math.max(0, m.primary.hold - simT))}</div>
+      <div class="o"><b>Primär:</b> Zivilisten am Leben <b class="${o.lost ? 'no' : 'ok'}">${o.R}</b> / ${S.civ0 || m.pop} (mind. ${m.primary.civ})${o.lost ? ' ✗' : ''}<div class="bar"><i style="width:${o.prog * 100}%"></i></div>${o.primary ? '✓ 20 Minuten überlebt' : o.lost ? 'Verluste – Primärziel verfehlt' : 'Noch ' + fmtClock(Math.max(0, m.primary.hold - simT))}</div>
       <div class="o"><b class="${o.secondary ? 'ok' : ''}">${o.secondary ? '✓ ' : ''}Sekundär:</b><div class="${o.cleared ? 'ok' : ''}">${o.cleared ? '✓' : '○'} Zombies übrig: <b>${c.zom}</b></div></div>
       ${nxt != null ? `<div class="ev">⚠ Nächste Welle in ${fmtClock(nxt - simT)}</div>` : ''}`;
     if (box.dataset.h !== html) { box.innerHTML = html; box.dataset.h = html; }
