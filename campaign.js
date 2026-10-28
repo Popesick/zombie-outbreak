@@ -5,7 +5,10 @@ const Campaign = (() => {
   const UP = [   // Upgrades: id, Name, Beschreibung, Preise je Stufe
     { id: 'sil', n: 'Schalldämpfer', d: 'Soldaten können Schalldämpfer tragen: Lärm −50 %.', p: [300] },
     { id: 'squad', n: 'Squadgröße', d: 'Jeder Soldaten-Squad bekommt einen weiteren Soldaten (5 pro Squad).', p: [500] },
-    { id: 'snipe', n: 'Sniper', d: 'Soldaten können Snipergewehre führen: Reichweite +200 %, Feuerrate −50 %, Lärm +20 %.', p: [400] },
+    { id: 'snipe', n: 'Sniper', d: 'Soldaten können Snipergewehre führen: Reichweite +200 %, Feuerrate −50 %, Lärm +20 %, wirft Zombies einen Schritt zurück.', p: [400] },
+    { id: 'mp', n: 'MPs für Polizei', d: 'Polizisten können MPs führen: etwas mehr Reichweite, schnellere Schussfolge, keine Mann-Stop-Wirkung.', p: [200] },
+    { id: 'sg', n: 'Schrotflinten für Polizei', d: 'Polizisten können Schrotflinten führen: Reichweite wie Pistole, Treffsicherheit +10 %, wirft Zombies zwei Schritte zurück.', p: [300] },
+    { id: 'siren', n: 'Weitere Sirenen', d: '+1 Sirene pro Stufe (insgesamt bis zu 4 pro Mission, die erste ist von Anfang an verfügbar).', p: [200, 300, 500] },
     { id: 'barhp', n: 'Barrikaden verbessern', d: 'Barrikaden halten doppelt so lange (insgesamt 4× Classic).', p: [300] },
     { id: 'scan', n: 'Infektionsscanner', d: 'Soldaten erkennen infizierte Zivilisten und schalten sie aus. Tore sperren Infizierte aus.', p: [600] },
     { id: 'gate', n: 'Tore', d: 'Pro 12 Barrikadenelemente ein Tor: Menschen passieren, Zombies nicht.', p: [250] },
@@ -128,6 +131,7 @@ const Campaign = (() => {
     if (lv('moresupply')) tools.supply = { ...tools.supply, max: tools.supply.max + 5 * lv('moresupply') };
     if (C && C.trucks && !tools.truck) tools.truck = { at: 0, max: C.trucks, cd: 4 };
     else if (tools.truck && C) tools.truck = { ...tools.truck, max: Math.max(tools.truck.max || 0, 0) + C.trucks };
+    tools.siren = { at: 0, max: 1 + lv('siren') };
     if (lv('gate')) tools.gate = {};
     if (lv('turret')) tools.turret = { at: 0, max: 2, cd: 10 };
     if (lv('flare')) tools.flare = { at: 0, max: 5, cd: 4 };
@@ -139,7 +143,7 @@ const Campaign = (() => {
     const R = {
       evacCap: m.evacCap, evacEvery: m.evacEvery, civNorth: m.civNorth, civZone: m.civZone ? { ...m.civZone } : null, civNoGate: !!m.civNoGate, noHeli: !!m.noHeli, rushAfter: lastSpawnT(m), mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
       barLimit: m.barricades + 12 * lv('morebar'), barHpMul: 2 * (lv('barhp') ? 2 : 1),
-      gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), squadPlus: lv('squad') ? 1 : 0, ammoMul: lv('ammo') ? 2 : 1,
+      gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), canMp: !!lv('mp'), canSg: !!lv('sg'), squadPlus: lv('squad') ? 1 : 0, ammoMul: lv('ammo') ? 2 : 1,
       spawn: () => spawnMission(m), tick: () => tick(m), hud: c => hud(m, c), checkEnd: c => checkEnd(m, c), onEnd: msg => finish(m, msg)
     };
     return R;

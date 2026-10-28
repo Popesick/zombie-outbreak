@@ -50,6 +50,10 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 .cat.on>.catbtn,.cat.open>.catbtn{background:#335a2d;border-color:var(--acc)}
 .tmenu{display:none;position:fixed;z-index:7;flex-direction:column;gap:4px;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(6px);min-width:210px}
 .tmenu.open{display:flex}
+#fmenu{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:6px;flex-direction:column;gap:4px;padding:6px;z-index:8;min-width:230px}
+#fmenu button{text-align:left}
+#fmenu .fh{font-size:11px;color:var(--mut);padding:2px 4px}
+#fmenu button.on,#sFire.on{outline:2px solid var(--warn)}
 .tmenu button{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;position:relative;overflow:hidden;padding:8px 10px;text-align:left}
 .tmenu button span{font-size:13px;color:var(--tx)}
 .tmenu .cd{position:absolute;left:0;bottom:0;height:3px;background:var(--warn);width:0}
@@ -131,6 +135,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
     <div class="tmenu">
       <button data-tool="barricade" title="Barrikaden planen (Linie ziehen), dann „Bau abschließen“">🧱<span data-n="Barrikade">Bauen</span><div class="cd"></div></button>
       <button data-tool="demolish" title="Barrikade einreißen (Einheit in der Nähe nötig) oder Plan verwerfen">🔨<span>Einreißen</span></button>
+      <button data-tool="siren" style="display:none" title="Sirene per Hubschrauber absetzen: lockt alle Zombies der Karte an, bis sie zerstört wird">📢<span data-n="Sirene">Sirene</span></button>
       <button data-tool="gate" style="display:none" title="Tor in eine Barrikade einsetzen (1 pro 12 Elemente)">🚪<span data-n="Tor">Tor</span></button>
     </div></div>
   <div class="cat" data-cat="air"><button class="catbtn" title="Luftschlag, Gunship, Versorgung, Signalbombe">✈<span>Luftunterstützung</span><i class="dot"></i></button>
@@ -170,7 +175,7 @@ table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px s
 
 <div id="selbar" class="panel" style="display:none;position:fixed;bottom:84px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 16px)"><span id="selTxt" style="width:100%;text-align:center"></span>
 <button id="sHold" title="Stellung halten: stehen bleiben und auf Sicht schießen">🛡 Halten</button><button id="sDig" title="Eingraben (1 Min.): +15 % Treffsicherheit, aber unbeweglich">⛏ Eingraben</button><button id="sFree" title="Stellung räumen (1 Min.)">🏃 Räumen</button><button id="sPat" title="Danach Ziel antippen: Einheiten patrouillieren dort">🔁 Patrouille</button>
-<button id="sSil" style="display:none">🔇 Dämpfer</button><button id="sSnipe" style="display:none">🎯 Sniper</button><button id="sRel">Freigeben</button><button id="sClr">Abwählen</button></div>
+<button id="sFire" style="display:none">🔫 Feuermodus ▾</button><div id="fmenu" class="panel" style="display:none"></div><button id="sRel">Freigeben</button><button id="sClr">Abwählen</button></div>
 <div id="attr" style="position:fixed;right:6px;bottom:2px;font-size:10px;color:#cfd8d2;text-shadow:0 0 3px #000;pointer-events:none"></div>
 <div id="buildbar" class="panel" style="display:none;position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:8px;align-items:center;z-index:4;white-space:nowrap;max-width:calc(100% - 16px);flex-wrap:wrap;justify-content:center"><span id="buildTxt"></span><button id="bCommit">🚁 Bau abschließen</button><button id="bDrop">Pläne verwerfen</button></div>
 <div id="objs" class="panel" style="display:none"></div>
