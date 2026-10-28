@@ -1234,7 +1234,7 @@ const SAVE_KEY = n => 'zos_moosburg_slot' + n;
 function serialize() {
   return {
     v: 2, ts: Date.now(), simT, cfg, markers, S, cooldown, fx: fx.map(f => ({ ...f })), map: curMap, mode: RULES.mode, mission: RULES.missionId || null, up: RULES.up || null,
-    E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0, e.sq, e.kills, e.lvl, e.ammoMax || 0, e.snipe ? 1 : 0, e.sil ? 1 : 0, e.zsp || 0, e.lx0 ? 1 : 0, e.mp ? 1 : 0, e.sg ? 1 : 0]),
+    E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0, e.sq, e.kills, e.lvl, e.ammoMax || 0, e.snipe ? 1 : 0, e.sil ? 1 : 0, e.zsp || 0, e.lx0 ? 1 : 0, e.mp ? 1 : 0, e.sg ? 1 : 0, e.ams || null]),
     bar: BAR.filter(Boolean).map(b => ({ cells: b.cells, hp: b.hp, max: b.max, x: b.x, y: b.y, gates: b.gates || [], pre: b.pre ? 1 : 0 })),
     siege: B.filter(b => b.siege > 0).map(b => [b.idx, b.siege])
   };
@@ -1243,7 +1243,7 @@ function deserialize(d) {
   cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; S.used = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0, ...S.used }; S.ev = S.ev || { civ: 0, pol: 0, mil: 0, trk: 0 }; S.plans = S.plans || []; S.sirens = S.sirens || []; S.planId = S.planId || 0; if (S.evacT == null) S.evacT = 10; evacDirty = !!S.evac; simT = d.simT; cooldown = d.cooldown; finished = false;
   noises = []; tracers = []; fx = d.fx || []; selected.clear(); barId.fill(0); gate.fill(0); BAR = [null];
   for (const b of B) { b.occ = []; b.siege = 0; }
-  E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; e.sq = a[17] || 0; e.kills = a[18] || 0; e.lvl = a[19] || 1; e.ammoMax = a[20] || 0; e.snipe = !!a[21]; e.sil = !!a[22]; if (a[23]) e.zsp = a[23]; e.mp = !!a[25]; e.sg = !!a[26]; if (e.g > gidN) gidN = e.g; if (e.sq > gidN) gidN = e.sq; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
+  E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; e.sq = a[17] || 0; e.kills = a[18] || 0; e.lvl = a[19] || 1; e.ammoMax = a[20] || 0; e.snipe = !!a[21]; e.sil = !!a[22]; if (a[23]) e.zsp = a[23]; e.mp = !!a[25]; e.sg = !!a[26]; if (a[27]) e.ams = a[27]; if (e.g > gidN) gidN = e.g; if (e.sq > gidN) gidN = e.sq; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
   for (const b of d.bar) { const id = BAR.length; for (const c of b.cells) barId[c] = id; for (const c of b.gates || []) gate[c] = 1; BAR.push(b); }
   for (const [i, s] of d.siege) B[i].siege = s;
 }
@@ -1514,7 +1514,12 @@ function fmAvail() {   // [{kind, modes}] für die gewählten Einheitentypen
   return out;
 }
 function setFireMode(kind, mode) {
-  for (const u of selU()) if (fmKind(u) === kind) { u.sil = mode === 'sil'; u.snipe = mode === 'snipe'; u.mp = mode === 'mp'; u.sg = mode === 'sg'; }
+  for (const u of selU()) if (fmKind(u) === kind) {
+    if (kind === 'pol' && u.ammoMax) {   // jede Waffe hat ihr eigenes Magazin: Pistole 40, MP 150, Schrotflinte 40 (× Munitions-Upgrade)
+      const old = fmOf(u), cap = m => (m === 'mp' ? 150 : 40) * (RULES.ammoMul || 1);
+      u.ams = u.ams || {}; u.ams[old] = u.ammo; u.ammoMax = cap(mode); u.ammo = u.ams[mode] != null ? Math.min(u.ams[mode], u.ammoMax) : u.ammoMax;
+    }
+    u.sil = mode === 'sil'; u.snipe = mode === 'snipe'; u.mp = mode === 'mp'; u.sg = mode === 'sg'; }
   const m = FM[kind].find(x => x[0] === mode); toast(m[1] + ': ' + m[2]); $('fmenu').style.display = 'none';
 }
 let fmKey = '';
