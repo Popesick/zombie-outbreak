@@ -127,8 +127,11 @@ const Comic = (() => {
       { s: 'squad', cap: 'Wer überlebte, sammelte sich neu. Moosburg war noch nicht verloren.', bub: ['Neu formieren. Wir gehen zurück in die Stadt.', 380, 90, 260, 360, 300] }
     ],
     m2_win: [
-      { s: 'heliLZ', cap: 'Hunderte erreichten den Landeplatz. Die Hubschrauber flogen, bis der Treibstoff knapp wurde.' },
-      { s: 'road', cap: 'Die Kolonne der Überlebenden zog nach Norden – Richtung Pfaffenhofen.' }
+      { s: 'burning', img: 'img/comic/m2_win_1.webp', cap: 'Moosburg... war gefallen. Die letzten Soldaten zogen sich zurück... und sprengten hinter sich die Brücke.' },
+      { s: 'burning', img: 'img/comic/m2_win_2.webp', cap: 'Tausende hatten ihr Zuhause verloren – aber sie durften weiterleben. Nein. Sie mussten weiterleben! Für das Überleben der Menschheit.' },
+      { s: 'road', img: 'img/comic/m2_win_3.webp', cap: 'Doch den Luxus, uns auszuruhen... den hatten wir nicht. Stattdessen wurden wir zum Münchner Flughafen beordert.' },
+      { s: 'horde', img: 'img/comic/m2_win_4.webp', cap: 'Eine gewaltige Masse Untoter wälzte sich dorthin... und bedrohte die ausharrenden Zivilisten. Eine Evakuierung war unmöglich! Der Gefechtsstand konnte keine Helikopter mehr entbehren.' },
+      { s: 'squad', img: 'img/comic/m2_win_5.webp', cap: 'Alles... was jetzt noch zwischen der Horde und den Überlebenden stand... waren wir.' }
     ],
     m2_lose: [
       { s: 'burning', cap: 'Moosburg war nicht mehr zu halten. Die Überlebenden zogen sich nach Norden zurück.' },
