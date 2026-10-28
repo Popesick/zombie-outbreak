@@ -577,13 +577,19 @@ function countZAround(x, y, r) {
   for (let gy = y0; gy <= y1; gy++) for (let gx = x0; gx <= x1; gx++) for (let i = hzHead[gy * HW + gx]; i >= 0; i = hzNxt[i]) { const z = E[i]; if (!z.dead && (z.x - x) ** 2 + (z.y - y) ** 2 <= r * r) n++; }
   return n;
 }
-function giveMove(u, p, patrol) {
+function giveMove(u, p, patrol, master) {
   u.evac = false;
   if (u.ds > 0) {   // erst Stellung räumen, Befehl wird danach ausgeführt
     if (u.ds === 1) u.dt = 60 - u.dt; else if (u.ds === 2) u.dt = 0;
     u.ds = 3; u.pend = { x: p[0], y: p[1], patrol }; return;
   }
-  const path = findPath(u.x, u.y, p[0], p[1], false, 60000);
+  let path;
+  if (master) {   // Gruppenbefehl: ein gemeinsamer Weg für nahe beieinander stehende Einheiten (A* über große Strecken kostet ~50 ms pro Aufruf)
+    let m = master.find(q => (q.x - u.x) ** 2 + (q.y - u.y) ** 2 < 900);
+    if (!m) master.push(m = { x: u.x, y: u.y, p: findPath(u.x, u.y, master.tx, master.ty, false, 400000) });
+    if (m.p) { path = m.p.slice(); path[path.length - 1] = [p[0], p[1]]; }
+    else path = findPath(u.x, u.y, p[0], p[1], false, 400000);
+  } else path = findPath(u.x, u.y, p[0], p[1], false, 400000);
   u.ord = true; u.patrol = patrol || null; u.hmx = p[0]; u.hmy = p[1]; u.bt = 0; u.wt = 1; u.sk = 0; u.nu = 0;
   if (path) { u.path = path; u.pi = 0; }
 }
@@ -630,7 +636,7 @@ function stepUnit(e) {
         else {   // erst auf die Zellmitte, danach mit wachsendem Radius versetzen; Weg ohne Kantenabkürzung neu berechnen
           const ci = cellIdx(e.x, e.y), q = e.nu === 1 && comp[ci] ? [(ci % GW + .5) * CELL, ((ci / GW | 0) + .5) * CELL] : randWalk(e.x, e.y, 2 + e.nu * 2) || nearestWalkCell(e.x, e.y, 12);
           if (q) { e.x = q[0]; e.y = q[1]; }
-          const p = findPath(e.x, e.y, e.hmx, e.hmy, false, 60000, false); e.path = p || null; e.pi = 0; e.bt = 0;
+          const p = findPath(e.x, e.y, e.hmx, e.hmy, false, 200000, false); e.path = p || null; e.pi = 0; e.bt = 0;
         }
       }
     }
@@ -1390,7 +1396,7 @@ function commandMove(x, y) {
   const gs = {};
   for (const u of us) if (u.g) { const o = gs[u.g] || (gs[u.g] = { n: 0, cx: 0, cy: 0, sp: 9 }); o.n++; o.cx += u.x; o.cy += u.y; o.sp = Math.min(o.sp, u.k === K_POL ? 4.4 : 4.8); }
   for (const k in gs) { gs[k].cx /= gs[k].n; gs[k].cy /= gs[k].n; }
-  const rad = 3 + Math.sqrt(us.length) * 3;
+  const rad = 3 + Math.sqrt(us.length) * 3, master = []; master.tx = x; master.ty = y;
   for (const u of us) {
     const o = u.g && gs[u.g]; let p;
     if (o && o.n > 1) {   // feste Formationsplätze rund ums Ziel (nicht die aktuelle Streuung übernehmen, sonst finden auseinandergelaufene Squads nie zusammen)
@@ -1398,7 +1404,7 @@ function commandMove(x, y) {
       p = randWalk(x + Math.cos(a) * r, y + Math.sin(a) * r, 2.5) || randWalk(x, y, rad) || [x, y]; u.gsp = o.sp;
     }
     else { p = randWalk(x, y, rad) || [x, y]; u.gsp = 0; }
-    giveMove(u, p, patrol ? { x, y, r: 70 } : null);
+    giveMove(u, p, patrol ? { x, y, r: 70 } : null, master);
   }
   fx.push({ type: 'ring', x, y, r: 8, t: .8, T: .8, c: patrol ? '90,170,255' : '255,255,255' });
 }
@@ -1732,4 +1738,4 @@ function init() {
   requestAnimationFrame(frame);
 }
 init();
-window.__game = { toMenu, get E() { return E; }, get S() { return S; }, cfg, cam, counts, step, setSpeed, startRun, newSim, useTool, B, commandMove, selected, get fx() { return fx; } };
+window.__game = { toMenu, get E() { return E; }, get S() { return S; }, cfg, cam, counts, step, setSpeed, startRun, newSim, useTool, B, commandMove, selected, get fx() { return fx; }, findPath, cost, cellIdx, get BAR() { return BAR; }, get type() { return type; }, get gate() { return gate; }, get barId() { return barId; } };

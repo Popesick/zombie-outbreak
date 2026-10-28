@@ -65,22 +65,22 @@ const Campaign = (() => {
       info: ['3500 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren, dazu 200 aus dem Nordost-Wald, die sich langsam am Waldrand sammeln und dann zum Evakuierungspunkt stürmen', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
     },
     {
-      id: 'ap', map: 'm4', kind: 'air', name: 'Befreiung des Flughafens', sub: 'Flughafen München – Zentralbereich', pop: 500, armed: 0, acc: 35, zs: 50,
-      start: () => ({ sol: [{ x: 3625, y: 693 }], pol: [{ x: 3585, y: 725 }, { x: 3665, y: 725 }] }),
+      id: 'ap', map: 'm4', kind: 'air', name: 'Befreiung des Flughafens', sub: 'Flughafen München – Zentralbereich', pop: 1000, armed: 0, acc: 35, zs: 50,
+      start: () => ({ sol: [{ x: 2845, y: 1050 }], pol: [{ x: 2815, y: 1080 }, { x: 2875, y: 1080 }] }),
       evac: () => ({ x: 2040, y: 1650, at: 1e9 }),   // kein Evakuierungspunkt: die Zivilisten bleiben hinter der Sperre
-      civZone: { x0: 1850, y0: 1195, x1: 2240, y1: 2140 }, civNoGate: true,
-      ring: { x0: 1825, y0: 1168, x1: 2263, y1: 2168, thick: 2, gates: [{ x: 2263, y: 1338 }, { x: 2263, y: 1755 }, { x: 2263, y: 1968 }] },
-      turrets: [{ x: 1895, y: 1248 }, { x: 2120, y: 1218 }, { x: 1955, y: 1676 }, { x: 2165, y: 1660 }, { x: 1995, y: 2101 }, { x: 2200, y: 2093 }],
+      civZone: { x0: 1610, y0: 900, x1: 2340, y1: 2225 }, civNoGate: true,
+      ring: { x0: 1583, y0: 871, x1: 2362, y1: 2251, thick: 2, gates: [{ x: 2362, y: 1338 }, { x: 2362, y: 1755 }, { x: 2362, y: 1968 }] },
+      turrets: [{ x: 1604, y: 1100 }, { x: 1604, y: 1450 }, { x: 1604, y: 1800 }, { x: 1604, y: 2130 }, { x: 1950, y: 892 }, { x: 1950, y: 2230 }],
       spawns: () => AIR_WAVES,
       lure: () => ({ x: 0, y: 0, t: 1e9, dur: 0 }),
       hordeAt: 1e9, hordeFocus: 0, hordeQuiet: true,
       hold: null,
       tools: { supply: { at: 0, max: 5, cd: 20 }, strike: { at: 150, max: 3, cd: 8 }, garrison: { at: 240, max: 2, cd: 30 } },
       barricades: 16,
-      primary: { civ: 500, pts: 2000, hold: 900 }, secondary: { clear: true, pts: 800 },
+      primary: { civ: 1000, pts: 2000, hold: 900 }, secondary: { clear: true, pts: 800 },
       reward: { strike: 4, gunship: 1 },
-      goal: ['Alle 500 Zivilisten im Flughafen müssen 15 Minuten überleben.', 'Töte alle Zombies.'],
-      info: ['500 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Sechs eingegrabene, autarke Geschütztürme (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 1:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 4:00 erneut', 'Nach 7:00 stürmen 500 Zombies aus Nordwesten, nach 8:00 400 aus Westen, nach 9:00 500 aus Südwesten', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
+      goal: ['Alle 1000 Zivilisten im Flughafen müssen 15 Minuten überleben.', 'Töte alle Zombies.'],
+      info: ['1000 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Sechs eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 1:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 4:00 erneut', 'Nach 7:00 stürmen 500 Zombies aus Nordwesten, nach 8:00 400 aus Westen, nach 9:00 500 aus Südwesten', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
@@ -99,9 +99,9 @@ const Campaign = (() => {
   ];
 
   // Flughafen: Zombie-Spawngebiete im Westen (Z1 NW, Z2 W, Z3 SW) und ihre Anmarschwege zur Sperre (Wegpunkte; Ziel liegt hinter der Barrikade)
-  const AIR_Z = { z1: { x: 150, y: 760, r: 180, rt: [[900, 880], [1500, 930], [1900, 1100]], n: 'Nordwesten' }, z2: { x: 190, y: 1550, r: 220, rt: [], n: 'Westen' }, z3: { x: 380, y: 2220, r: 190, rt: [[1500, 2230], [1880, 2130]], n: 'Südwesten' } };
+  const AIR_Z = { z1: { x: 195, y: 740, r: 190, rt: [[900, 860], [1400, 930], [1900, 1100]], n: 'Nordwesten' }, z2: { x: 250, y: 1700, r: 250, rt: [], n: 'Westen' }, z3: { x: 340, y: 2420, r: 260, rt: [[1500, 2330], [1880, 2150]], n: 'Südwesten' } };
   const airWave = (t, k, n) => ({ t, n, x: AIR_Z[k].x, y: AIR_Z[k].y, r: AIR_Z[k].r, msg: '⚠ ' + n + ' Zombies stürmen aus ' + AIR_Z[k].n, march: { id: 'ap' + t + k, route: 0, routes: [AIR_Z[k].rt], gather: { x: 2040, y: 1650, r: 40 }, noWait: true, dur: 1800 } });
-  const AIR_WAVES = [{ t: 0, n: 200, x: 1620, y: 1600, r: 230 },
+  const AIR_WAVES = [{ t: 0, n: 200, x: 1420, y: 1600, r: 200 },
     ...[60, 240].flatMap(t => [airWave(t, 'z1', 300), airWave(t, 'z2', 200), airWave(t, 'z3', 300)]),
     airWave(420, 'z1', 500), airWave(480, 'z2', 400), airWave(540, 'z3', 500)];
 
@@ -154,8 +154,8 @@ const Campaign = (() => {
     for (let x = cx1; x >= cx0; x--) per.push([...Array(th).keys()].map(k => (cy1 - k) * GW + x));
     for (let y = cy1 - th; y >= cy0 + th; y--) per.push([...Array(th).keys()].map(k => y * GW + cx0 + k));
     const gcell = c => r.gates.some(g => Math.hypot((c % GW + .5) * CELL - g.x, ((c / GW | 0) + .5) * CELL - g.y) < 9);
-    for (let i = 0; i < per.length; i += 6) {
-      const cells = per.slice(i, i + 6).flat().filter(c => type[c] <= T_ROAD && !barId[c]); if (!cells.length) continue;
+    for (const c of per.flat()) {   // jede Zelle ist ein eigener Baustein: Schaden trifft nur den getroffenen Block, nicht den ganzen Abschnitt
+      const cells = [c].filter(c => type[c] <= T_ROAD && !barId[c]); if (!cells.length) continue;
       const id = BAR.length, gs = cells.filter(gcell);
       for (const c of cells) barId[c] = id; for (const c of gs) gate[c] = 1;
       const hp = (60 + cells.length * 35) * 4, mc = cells[cells.length >> 1];
