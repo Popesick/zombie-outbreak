@@ -70,7 +70,7 @@ const Campaign = (() => {
       evac: () => ({ x: 2290, y: 1755, at: 600 }), noHeli: true, evacMsg: '📡 Die Zivilisten sammeln sich im Abholbereich H',   // nach 10:00 laufen die Zivilisten zu H (keine Hubschrauber)
       civZone: { x0: 1610, y0: 900, x1: 2340, y1: 2225 }, civNoGate: true,
       ring: { x0: 1583, y0: 871, x1: 2362, y1: 2251, thick: 2, gates: [{ x: 2362, y: 1338 }, { x: 2362, y: 1755 }, { x: 2362, y: 1968 }] },
-      turrets: [{ x: 1604, y: 1100 }, { x: 1604, y: 1450 }, { x: 1604, y: 1800 }, { x: 1604, y: 2130 }, { x: 1950, y: 892 }, { x: 1950, y: 2230 }],
+      turrets: [{ x: 1604, y: 1100 }, { x: 1604, y: 1450 }, { x: 1604, y: 1800 }, { x: 1604, y: 2130 }, { x: 1950, y: 892 }, { x: 1950, y: 2230 }, { x: 1604, y: 890 }, { x: 1604, y: 1300 }, { x: 1604, y: 1578 }, { x: 1604, y: 1702 }, { x: 1604, y: 2161 }],
       spawns: () => AIR_WAVES,
       lure: () => ({ x: 0, y: 0, t: 1e9, dur: 0 }),
       hordeAt: 1e9, hordeFocus: 0, hordeQuiet: true,
@@ -80,7 +80,7 @@ const Campaign = (() => {
       primary: { civ: 1000, pts: 2000, hold: 1200 }, secondary: { clear: true, pts: 800 },
       reward: { strike: 4, gunship: 1 },
       goal: ['Alle 1000 Zivilisten im Flughafen müssen 20 Minuten überleben.', 'Töte alle Zombies.'],
-      info: ['1000 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Sechs eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
+      info: ['1000 unbewaffnete Zivilisten im Innenbereich – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Elf eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
     },
     {
       id: 'm3', map: 'm3', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 1200, armed: 6, acc: 35, zs: 50,
@@ -101,7 +101,7 @@ const Campaign = (() => {
   // Flughafen: Zombie-Spawngebiete im Westen (Z1 NW, Z2 W, Z3 SW) und ihre Anmarschwege zur Sperre (Wegpunkte; Ziel liegt hinter der Barrikade)
   const AIR_Z = { z1: { x: 195, y: 740, r: 190, rt: [[900, 860], [1400, 930], [1900, 1100]], n: 'Nordwesten' }, z2: { x: 250, y: 1700, r: 250, rt: [], n: 'Westen' }, z3: { x: 340, y: 2420, r: 260, rt: [[1500, 2330], [1880, 2150]], n: 'Südwesten' } };
   const airWave = (t, k, n) => ({ t, n, x: AIR_Z[k].x, y: AIR_Z[k].y, r: AIR_Z[k].r, msg: '⚠ ' + n + ' Zombies stürmen aus ' + AIR_Z[k].n, march: { id: 'ap' + t + k, route: 0, routes: [AIR_Z[k].rt], gather: { x: 2040, y: 1650, r: 40 }, noWait: true, dur: 1800 } });
-  const AIR_WAVES = [{ t: 0, n: 200, x: 1420, y: 1600, r: 200 },
+  const AIR_WAVES = [{ t: 0, n: 200, x: 1340, y: 1600, r: 150 },
     ...[300, 480].flatMap(t => [airWave(t, 'z1', 300), airWave(t, 'z2', 200), airWave(t, 'z3', 300)]),
     airWave(660, 'z1', 500), airWave(720, 'z2', 400), airWave(780, 'z3', 500)];
 
