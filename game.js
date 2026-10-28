@@ -1018,7 +1018,7 @@ function dispatchBuild() {
     fx.push({ type: 'heli', kind: 'build', x: sx, y: sy, tx: route[0].x, ty: route[0].y, ex: sx, ey: sy, ph: 0, t: 0, a: 0, route: route.map(q => q.id), ri: 0 });
   }
 }
-// ── Minen: Teppich per Hubschrauber, Auslösung durch jede Figur (1,6 m), Explosion nach 1 s, keine Kettenreaktion ──
+// ── Minen: Teppich per Hubschrauber, Auslösung durch jede Figur (3 m), Explosion nach 0,3 s (schnelle Zombies sind sonst schon vorbei), keine Kettenreaktion ──
 function scatterMines(cx, cy) {
   if (!S.mines) S.mines = [];
   for (let i = 0; i < 36; i++) { const p = randWalk(cx, cy, 25); if (p) S.mines.push({ x: p[0], y: p[1], t: null }); }
@@ -1032,7 +1032,7 @@ function stepMines() {
   const M = S.mines; if (!M || !M.length) return;
   for (let i = M.length - 1; i >= 0; i--) {
     const m = M[i];
-    if (m.t == null) { if (nearest(hzHead, hzNxt, m.x, m.y, 1.6, false) || nearest(hhHead, hhNxt, m.x, m.y, 1.6, false)) m.t = 1; }
+    if (m.t == null) { if (nearest(hzHead, hzNxt, m.x, m.y, 3, false) || nearest(hhHead, hhNxt, m.x, m.y, 3, false)) m.t = .3; }
     else { m.t -= DT; if (m.t <= 0) { M.splice(i, 1); mineBlast(m.x, m.y); } }
   }
 }
