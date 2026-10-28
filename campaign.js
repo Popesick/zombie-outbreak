@@ -43,6 +43,9 @@ const Campaign = (() => {
   const PF_MARCH = { id: 'pfN', route: 0, routes: [[]], gather: { x: 559, y: 318, r: 60 }, noWait: true, dur: 1800 };
   const PF_WAVES = [{ t: 0, n: 2000, x: 559, y: 318, r: 420 },
     { t: 0, n: 1000, x: 365, y: 563, r: 200, march: PF_MARCH }, { t: 0, n: 1000, x: 804, y: 841, r: 160, march: PF_MARCH }, { t: 0, n: 1000, x: 390, y: 1355, r: 220, march: PF_MARCH }];
+  // Südwelle nach 10:00: 2000 Zombies in 20 Schüben à 100 alle 6 s, vom Süden bis in den Südwesten verteilt, Marsch direkt zum nördlichen Tor
+  const PF_SOUTH_SPOTS = [[1000, 1850], [820, 1850], [640, 1840], [460, 1790], [300, 1710], [160, 1620]];
+  const PF_SOUTH = k => { const [x, y] = PF_SOUTH_SPOTS[k % PF_SOUTH_SPOTS.length]; return { t: 0, n: 100, x, y, r: 90, msg: k === 0 ? '⚠ 2000 Zombies strömen aus dem Süden und Südwesten auf das nördliche Tor zu!' : null, march: { id: 'pfS', route: 0, routes: [[]], gather: { x: 1255, y: 702, r: 30 }, noWait: true, dur: 1800 } }; };
   const PF_NORTH2 = { t: 0, n: 2000, x: 600, y: 50, r: 320, fast: true, msg: '⚠ Der Norden ist geräumt – 2000 weitere Zombies strömen aus dem Norden!', march: { ...PF_MARCH, id: 'pfN2' } };
   const MIS = [
     {
@@ -112,7 +115,7 @@ const Campaign = (() => {
       barricades: 48,
       primary: { pts: 1500, land: 900 }, secondary: { rescue: 2000, pts: 1000 },
       goal: ['Sichere den Landeplatz „H“ im Nordwesten innerhalb von 15 Minuten und starte dann die Evakuierung.', 'Rette mindestens 2000 Zivilisten.'],
-      info: ['5000 Zombies westlich der Ilm, die Masse (2000+) im Norden; 2500 Zivilisten östlich der Ilm', 'Die Brücken sind auf der Zivilistenseite mit Barrikaden, Toren und je zwei Automatikgeschützen (unbegrenzte Munition) gesichert – gehören nicht zu deinem Inventar', 'Bewaffnete Zivilisten halten die Tore und fliehen erst, wenn Zombies durchbrechen', 'Landeplatz gesichert = 10 s lang kein Zombie im Umkreis von 80 m', 'Danach: Schaltfläche „Evakuierung starten“ – alle Zivilisten strömen durch das nördlichste Tor zum Landeplatz', 'Wird der Norden binnen 5 Minuten geräumt (1500 Zombies getötet), folgen 2000 weitere Zombies aus dem Norden', '5 Versorgungspakete, 48 Barrikadenelemente, Luftschläge ab 2:30, Garnisonen ab 3:20']
+      info: ['5000 Zombies westlich der Ilm, die Masse (2000+) im Norden; 2500 Zivilisten östlich der Ilm', 'Die Brücken sind auf der Zivilistenseite mit Barrikaden, Toren und je zwei Automatikgeschützen (unbegrenzte Munition) gesichert – gehören nicht zu deinem Inventar', 'Bewaffnete Zivilisten halten die Tore und fliehen erst, wenn Zombies durchbrechen', 'Landeplatz gesichert = 10 s lang kein Zombie im Umkreis von 80 m', 'Danach: Schaltfläche „Evakuierung starten“ – alle Zivilisten strömen durch das nördlichste Tor zum Landeplatz', 'Wird der Norden binnen 5 Minuten geräumt (1500 Zombies getötet), folgen 2000 weitere Zombies aus dem Norden', 'Nach 10:00 folgen 2000 Zombies aus Süden und Südwesten (verteilt über zwei Minuten), die direkt zum nördlichen Tor laufen', '5 Versorgungspakete, 48 Barrikadenelemente, Luftschläge ab 2:30, Garnisonen ab 3:20']
     }
   ];
 
@@ -288,6 +291,7 @@ const Campaign = (() => {
   const PAD_R = 80;
   function tickLand(m) {
     if (S.civFree && RULES.civNoGate) RULES.civNoGate = false;
+    for (let k = 0; k < 20; k++) { const id = 'south' + k; if (!S.fired[id] && simT >= 600 + k * 6) { S.fired[id] = 1; spawnWave(PF_SOUTH(k), false); } }
     if ((S.lstep = (S.lstep || 0) + 1) % 30) return;
     if (!S.padSafe) {
       if (countZAround(S.pad.x, S.pad.y, PAD_R) === 0) { if ((S.padT = (S.padT || 0) + 1) >= 10) { S.padSafe = true; banner('✓ Landeplatz gesichert – die Evakuierung kann gestartet werden!', 14000); SFX.ui(); } } else S.padT = 0;
