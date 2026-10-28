@@ -1752,7 +1752,7 @@ function updateHud() {
   g('hCiv', c.civ); g('hInf', c.inf); g('hZom', c.zom); g('hPol', c.pol); g('hMil', c.mil);
   g('hKill', S ? S.kills : 0); g('hLoss', S ? S.loss : 0); g('clock', fmtT(simT));
   for (const u of selected) if (!friendly(u)) selected.delete(u);
-  $('selbar').style.display = selected.size ? 'flex' : 'none'; refreshFire(); $('selTxt').textContent = selected.size + ' Einheit(en) ausgewählt – Ziel antippen (rechte Maustaste)';
+  $('selbar').style.display = selected.size ? 'flex' : 'none'; refreshFire(); $('sRel').style.display = RULES.mode === 'campaign' ? 'none' : ''; $('selTxt').textContent = selected.size + ' Einheit(en) ausgewählt – Ziel antippen (rechte Maustaste)';
   const pct = phase === 'run' ? lostPct(c) : 0;
   if (S && phase === 'run') {
     const bb = $('buildbar'), pl = S.plans.filter(q => q.st === 'plan').length, od = S.plans.filter(q => q.st !== 'plan');
