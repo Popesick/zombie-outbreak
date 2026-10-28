@@ -1185,6 +1185,11 @@ function useTool(tool, x, y, x2, y2) {
     let pi = -1, pd = 14 * 14;
     S.plans.forEach((q, i) => { if (q.st === 'dlv') return; if (q.siren) { const d = (q.x - x) ** 2 + (q.y - y) ** 2; if (d < pd) { pd = d; pi = i; } } for (const c of q.cells) { const d = ((c % GW + .5) * CELL - x) ** 2 + (((c / GW | 0) + .5) * CELL - y) ** 2; if (d < pd) { pd = d; pi = i; } } });
     if (pi >= 0) { if (S.plans[pi].siren) S.used.siren--; S.plans.splice(pi, 1); toast('Bauplan verworfen'); return; }
+    const sr = S.sirens.find(q => !q.dead && Math.hypot(q.x - x, q.y - y) < 10);
+    if (sr) {
+      if (!E.some(u => friendly(u) && Math.hypot(u.x - sr.x, u.y - sr.y) < 50)) return toast('Zum Einreißen muss eine Einheit (Soldat, Polizei, Truck) in der Nähe sein');
+      sr.dead = true; S.used.siren--; SFX.thud(sr.x, sr.y); toast('Sirene abgebaut – sie kann neu gesetzt werden'); return;
+    }
     let best = 0, bd = 12 * 12;
     for (let i = 1; i < BAR.length; i++) { const b = BAR[i]; if (!b) continue; for (const c of b.cells) { const d = ((c % GW + .5) * CELL - x) ** 2 + (((c / GW | 0) + .5) * CELL - y) ** 2; if (d < bd) { bd = d; best = i; } } }
     if (!best) return toast('Hier ist keine Barrikade');
