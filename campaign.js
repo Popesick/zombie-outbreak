@@ -9,6 +9,7 @@ const Campaign = (() => {
     { id: 'mp', n: 'MPs für Polizei', d: 'Polizisten können MPs führen: etwas mehr Reichweite, schnellere Schussfolge, keine Mann-Stop-Wirkung.', p: [200] },
     { id: 'sg', n: 'Schrotflinten für Polizei', d: 'Polizisten können Schrotflinten führen: Reichweite wie Pistole, Treffsicherheit +10 %, wirft Zombies zwei Schritte zurück.', p: [300] },
     { id: 'siren', n: 'Weitere Sirenen', d: '+1 Sirene pro Stufe (insgesamt bis zu 4 pro Mission). Sirenen sind erst nach 15 Minuten verfügbar, danach alle 5 Minuten eine.', p: [200, 300, 500] },
+    { id: 'third', n: 'Dritter Mann', d: 'Jeder Polizei-Squad bekommt einen dritten Polizisten (GSG-9-Einheiten bleiben unverändert).', p: [300] },
     { id: 'barhp', n: 'Barrikaden verbessern', d: 'Barrikaden halten doppelt so lange (insgesamt 4× Classic).', p: [300] },
     { id: 'scan', n: 'Infektionsscanner', d: 'Soldaten erkennen infizierte Zivilisten und schalten sie aus. Tore sperren Infizierte aus.', p: [600] },
     { id: 'gate', n: 'Tore', d: 'Pro 12 Barrikadenelemente ein Tor: Menschen passieren, Zombies nicht.', p: [250] },
@@ -23,6 +24,8 @@ const Campaign = (() => {
   const BUY = [
     { id: 'pol', n: 'Polizei-Squad', d: '+2 Polizisten (Level 1).', p: 150 },
     { id: 'sol', n: 'Soldaten-Squad', d: '+4 Soldaten (Level 1).', p: 400 },
+    { id: 'gsg', n: 'GSG-9-Einheit', d: 'Elite-Squad: Sniper (150 Schuss) + zwei Begleiter mit Sturmgewehr (150 Schuss), alle mit Pistole (40 Schuss). 10 % schneller, +5 % Treffsicherheit. Wächst nicht mit „Dritter Mann“.', p: 300 },
+    { id: 'garr', n: 'Garnison', d: 'Eine zusätzliche Garnison pro Mission, jederzeit per Hubschrauber absetzbar – schon ab Levelstart (zählt zusätzlich zu den Garnisonen der Mission).', p: 450, max: 3 },
     { id: 'truck', n: 'MG-Truck', d: 'Ein weiterer Truck pro Mission (am Kartenrand anforderbar).', p: 350, max: 2 }
   ];
 
@@ -75,11 +78,12 @@ const Campaign = (() => {
       civNorth: { frac: .7, ymax: 650 },
       supplyBonus: { at: 600, n: 3, msg: 'Das Hauptquartier meldet, dass es noch weitere Versorgungspakete bereitstellen konnte. Haltet weiter die Stellung!' },
       hold: null,
+      station: { poly: [[462, 1052], [486, 1063], [493, 1066], [485, 1090], [475, 1112], [460, 1107], [442, 1099], [447, 1090]], gate: { x: 458, y: 1106 }, units: ['pol', 'pol', 'gsg'], homes: [[472, 1092], [458, 1098], [482, 1080]], r: 30 },   // Polizeiinspektion Moosburg
       tools: { supply: { at: 0, max: 5, cd: 20 }, strike: { at: 180, max: 4, cd: 8 }, garrison: { at: 240, max: 2, cd: 30 } },
       barricades: 36,
       primary: { civ: 2000, pts: 1500 }, secondary: { noLoss: true, pts: 600 },
       goal: ['Rette mindestens 2000 Zivilisten (Rettungszone auf der Ostseite der Isarbrücke).', 'Alle Einsatzkräfte müssen überleben.'],
-      info: ['3500 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren, dazu 200 aus dem Nordost-Wald, die sich langsam am Waldrand sammeln und dann zum Evakuierungspunkt stürmen', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
+      info: ['3500 Zivilisten (die meisten im Norden) – 400 Zombies aus Nordwesten, die 2:00 lang nach Süden marschieren, dazu 200 aus dem Nordost-Wald, die sich langsam am Waldrand sammeln und dann zum Evakuierungspunkt stürmen', 'Nach 2:00: 200 Zombies aus Westen, nach 5:00: 200 aus Südwesten', '5 Versorgungspakete (nach 10:00 drei weitere), 36 Barrikadenelemente', 'Evakuierungssignal nach 1:00 – größere Hubschrauber (60 Personen alle 20 s)', 'Die Polizeiinspektion (Poststraße) ist eingezäunt (Barrikaden und Tor, zählen nicht zu deinen): darin zwei Polizei- und ein GSG-9-Squad mit Standardmunition – sie gehorchen dir, sobald eine deiner Einheiten in ihre Nähe kommt (Versorgungspaket füllt sie auf Upgrade-Niveau auf)', 'Ab 3:00: vier Luftschläge · ab 4:00: bis zu zwei weitere Soldaten-Squads', 'Zombies ziehen mit 60 % Wahrscheinlichkeit zum Evakuierungspunkt']
     },
     {
       id: 'ap', map: 'm4', kind: 'air', name: 'Befreiung des Flughafens', sub: 'Flughafen München – Zentralbereich', pop: 1000, armed: 0, acc: 35, zs: 50,
@@ -133,10 +137,10 @@ const Campaign = (() => {
 
   // ── Spielstand ─────────────────────────────────────────────────────────
   const initialRoster = () => ({ squads: [{ k: 'sol', m: [0, 0, 0, 0] }, { k: 'pol', m: [0, 0] }, { k: 'pol', m: [0, 0] }] });
-  const fresh = () => ({ v: 1, next: 0, points: 0, up: {}, trucks: 0, roster: initialRoster(), pre: null, best: {}, seen: {}, got: {}, bonus: { strike: 0, gunship: 0 } });
-  let C = (() => { try { const d = JSON.parse(localStorage.getItem(SAVE)); if (d && d.v === 1) { if (!Number.isFinite(d.points)) d.points = 0; return d; } } catch (e) {} return null; })();
+  const fresh = () => ({ v: 1, next: 0, points: 0, up: {}, trucks: 0, garr: 0, diff: 'easy', done: {}, snap: {}, roster: initialRoster(), pre: null, best: {}, seen: {}, got: {}, bonus: { strike: 0, gunship: 0 } });
+  let C = (() => { try { const d = JSON.parse(localStorage.getItem(SAVE)); if (d && d.v === 1) { if (!Number.isFinite(d.points)) d.points = 0; d.diff = d.diff || 'easy'; d.done = d.done || {}; d.snap = d.snap || {}; d.garr = d.garr || 0; return d; } } catch (e) {} return null; })();
   const persist = () => { try { localStorage.setItem(SAVE, JSON.stringify(C)); } catch (e) {} };
-  let cur = null, curIdx = 0;
+  let cur = null, curIdx = 0, playRoster = null, curReplay = false;
   const lvOf = kills => 1 + Math.floor(kills / 50);
   const upLv = id => (C && C.up[id]) || 0;
 
@@ -144,11 +148,15 @@ const Campaign = (() => {
   function rulesFor(missionId, up) {
     const m = MIS.find(x => x.id === missionId) || MIS[0];
     const u = up || (C ? C.up : {});
+    const replay = !!(C && C.diff === 'hard' && C.done && C.done[m.id] && C.snap && C.snap[m.id]);
     const lv = id => u[id] || 0;
     const tools = { barricade: {}, demolish: {}, ...m.tools };
     if (lv('moresupply')) tools.supply = { ...tools.supply, max: tools.supply.max + 5 * lv('moresupply') };
-    if (C && C.trucks && !tools.truck) tools.truck = { at: 0, max: C.trucks, cd: 4 };
-    else if (tools.truck && C) tools.truck = { ...tools.truck, max: Math.max(tools.truck.max || 0, 0) + C.trucks };
+    const trucks = C ? (replay ? C.snap[m.id].trucks : C.trucks) : 0;
+    if (trucks && !tools.truck) tools.truck = { at: 0, max: trucks, cd: 4 };
+    else if (tools.truck && C) tools.truck = { ...tools.truck, max: Math.max(tools.truck.max || 0, 0) + trucks };
+    const garr = C ? C.garr || 0 : 0;
+    if (garr) tools.garrison = { at: 0, cd: 30, ...tools.garrison, max: ((tools.garrison && tools.garrison.max) || 0) + garr, at: (tools.garrison && tools.garrison.at) || 0 };
     tools.siren = { at: 900, max: 1 + lv('siren'), cd: 300 };
     if (lv('gate')) tools.gate = {};
     if (lv('turret')) tools.turret = { at: 0, max: 2, cd: 10 };
@@ -161,17 +169,45 @@ const Campaign = (() => {
     const R = {
       evacCap: m.evacCap, evacEvery: m.evacEvery, civNorth: m.civNorth, civZone: m.civZone ? { ...m.civZone } : null, civNoGate: !!m.civNoGate, civLine: m.civLine || null, noHeli: !!m.noHeli, rushAfter: lastSpawnT(m), mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
       barLimit: m.barricades + 12 * lv('morebar'), barHpMul: 2 * (lv('barhp') ? 2 : 1),
-      gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), canMp: !!lv('mp'), canSg: !!lv('sg'), squadPlus: lv('squad') ? 1 : 0, ammoMul: lv('ammo') ? 2 : 1,
+      gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), canMp: !!lv('mp'), canSg: !!lv('sg'), squadPlus: lv('squad') ? 1 : 0, polPlus: lv('third') ? 1 : 0, garr, ammoMul: lv('ammo') ? 2 : 1,
       spawn: () => spawnMission(m), tick: () => tick(m), hud: c => hud(m, c), checkEnd: c => checkEnd(m, c), onEnd: msg => finish(m, msg)
     };
     return R;
   }
 
-  function unitFrom(kind, x, y, sq, kills) {
+  function unitFrom(kind, x, y, sq, kills, idx) {
     const k = kind === 'pol' ? K_POL : K_SOL, e = mk(k, x, y), lvl = lvOf(kills);
     e.armed = true; e.kills = kills; e.lvl = lvl; e.acc = .35 + .05 * (lvl - 1);
     e.ammoMax = (kind === 'pol' ? 40 : 150) * RULES.ammoMul; e.ammo = e.ammoMax; e.g = sq; e.sq = sq; e.hmx = x; e.hmy = y;
+    if (kind === 'gsg') { e.gsg = idx === 0 ? 1 : 2; e.snipe = idx === 0; e.acc += .05; e.pisMax = e.pis = 40 * RULES.ammoMul; }   // Elite: Sniper + zwei Begleiter, Pistole als Reserve
     E.push(e); return e;
+  }
+  const inPoly = (x, y, P) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) if ((P[i][1] > y) !== (P[j][1] > y) && x < (P[j][0] - P[i][0]) * (y - P[i][1]) / (P[j][1] - P[i][1]) + P[i][0]) c = !c; return c; };
+  // Polizeiwache: Zaun (vorgebaute Barrikaden mit Tor, kein Spielerinventar) um ein Polygon; Einsatzkräfte darin gehören dem Spieler, sobald eine seiner Einheiten nahe genug kommt
+  function buildStation(m) {
+    const st = m.station, P = st.poly, cells = [], seen = new Set();
+    const add = (cx, cy) => { const c = cy * GW + cx; if (cx >= 0 && cy >= 0 && cx < GW && cy < GH && !seen.has(c)) { seen.add(c); cells.push(c); } };
+    let px = null, py = null;
+    for (let i = 0; i < P.length; i++) {
+      const [x0, y0] = P[i], [x1, y1] = P[(i + 1) % P.length], n = Math.ceil(Math.hypot(x1 - x0, y1 - y0));
+      for (let k = 0; k <= n; k++) {
+        const cx = (x0 + (x1 - x0) * k / n) / CELL | 0, cy = (y0 + (y1 - y0) * k / n) / CELL | 0;
+        if (px != null && cx !== px && cy !== py) add(px, cy);   // Diagonalschritte zu einer lückenlosen 4er-Kette ergänzen
+        add(cx, cy); px = cx; py = cy;
+      }
+    }
+    addPre(cells, c => Math.hypot((c % GW + .5) * CELL - st.gate.x, ((c / GW | 0) + .5) * CELL - st.gate.y) < 5);
+    const pos = [];
+    for (const k of st.units) {
+      const id = ++gidN, n = k === 'gsg' ? 3 : 2 + RULES.polPlus, home = st.homes[pos.length % st.homes.length]; pos.push(1);
+      for (let i = 0; i < n; i++) {
+        let q = null; for (let t = 0; t < 40 && !q; t++) { const r = randWalk(home[0], home[1], 10); if (r && inPoly(r[0], r[1], P)) q = r; }
+        q = q || [home[0], home[1]];
+        const e = unitFrom(k, q[0], q[1], id, 0, i); e.lock = true; e.ord = true;
+        const mul = RULES.ammoMul; if (mul > 1) { e.ammoMax /= mul; e.ammo = e.ammoMax; e.upMul = mul; if (e.gsg) e.pisMax = e.pis = 40; }   // Standardvorrat; Versorgungspaket füllt auf Upgrade-Niveau
+      }
+    }
+    S.station = true;
   }
   // Vorgebaute Sperre (höchste Ausbaustufe, nicht Teil des Barrikadenlimits): rechteckiger Ring aus Segmenten mit Toren
   function buildRing(r) {
@@ -227,15 +263,17 @@ const Campaign = (() => {
     }
   }
   function spawnMission(m) {
-    const st = m.start(), cnt = { sol: 0, pol: 0 };
-    for (const sq of C.roster.squads) {
-      const list = st[sq.k], p0 = list[cnt[sq.k]++ % list.length], p = nearestWalkCell(p0.x, p0.y, 40) ? { x: nearestWalkCell(p0.x, p0.y, 40)[0], y: nearestWalkCell(p0.x, p0.y, 40)[1] } : p0, id = ++gidN, kills = sq.m.slice();
+    const st = m.start(), cnt = { sol: 0, pol: 0, gsg: 0 };
+    for (const sq of (playRoster || C.roster).squads) {
+      const list = sq.k === 'sol' ? st.sol : st.pol, p0 = list[cnt[sq.k]++ % list.length], p = nearestWalkCell(p0.x, p0.y, 40) ? { x: nearestWalkCell(p0.x, p0.y, 40)[0], y: nearestWalkCell(p0.x, p0.y, 40)[1] } : p0, id = ++gidN, kills = sq.m.slice();
       if (sq.k === 'sol') while (kills.length < 4 + RULES.squadPlus) kills.push(0);
-      for (const kl of kills) { const q = randWalk(p.x, p.y, 6) || [p.x, p.y]; unitFrom(sq.k, q[0], q[1], id, kl); }
+      if (sq.k === 'pol') while (kills.length < 2 + RULES.polPlus) kills.push(0);
+      kills.forEach((kl, i) => { const q = randWalk(p.x, p.y, 6) || [p.x, p.y]; unitFrom(sq.k, q[0], q[1], id, kl, i); });
     }
     S.fired = {}; S.evU = []; S.spawned = 0; S.breach = false; S.civ0 = E.filter(e => e.k === K_CIV).length;
     if (m.ring) buildRing(m.ring);
     if (m.seals) buildSeals(m);
+    if (m.station) buildStation(m);
     for (const t of m.turrets || []) { const q = nearestWalkCell(t.x, t.y, 30) || [t.x, t.y], e = placeTurret(q[0], q[1]); e.ds = 2; e.dt = 0; e.auto = true; e.acc = .6; e.ammo = e.ammoMax = 1e9; }
     { const ev = m.evac(), p = randWalk(ev.x, ev.y, 25) || randWalk(ev.x, ev.y, 80) || [ev.x, ev.y]; S.pad = { x: p[0], y: p[1] }; S.evacPre = S.pad; }
     cfg.pop = m.pop;
@@ -283,6 +321,10 @@ const Campaign = (() => {
       if (!S.fired.holdDone && simT >= m.primary.hold) { S.fired.holdDone = 1; if (!o.lost) { banner('✓ Die Zivilisten haben 20 Minuten überlebt – Primärziel erreicht! Jetzt alle Zombies ausschalten.', 14000); SFX.ui(); } }
     }
     if (m.kind === 'land') tickLand(m);
+    if (m.station && (S.sstep = (S.sstep || 0) + 1) % 30 === 0) {   // Wache übernehmen, sobald eine eigene Einheit nah genug ist
+      const lk = E.filter(e => e.lock && !e.dead);
+      if (lk.length && UL.some(u => !u.lock && (u.k === K_POL || u.k === K_SOL || u.k === K_SEN) && lk.some(l => (l.x - u.x) ** 2 + (l.y - u.y) ** 2 < m.station.r ** 2))) { for (const l of lk) l.lock = false; toast('👮 Die Einsatzkräfte der Polizeiwache stehen unter deinem Kommando'); SFX.ui(); }
+    }
     // Brücke halten: kein Zombie darf das Westufer erreichen
     if (m.hold && !S.breach && (S.hstep = (S.hstep || 0) + 1) % 20 === 0) { for (const z of E) if (z.k === K_ZOM && !z.dead && m.hold(z)) { S.breach = true; alertAt(z.x, z.y, 'Brücke durchbrochen!'); break; } }
   }
@@ -388,7 +430,7 @@ const Campaign = (() => {
     const c = counts(), o = evalObj(m, c), cleared = o.cleared;
     // Überlebende (auf der Karte oder evakuiert) gehen ins Roster
     const surv = [...(S.evU || [])];
-    for (const u of E) if (friendly(u) && (u.k === K_POL || u.k === K_SOL || u.k === K_SEN)) surv.push({ k: u.k === K_POL ? 'pol' : 'sol', kills: u.kills, sq: u.sq });
+    for (const u of E) if (friendly(u) && (u.k === K_POL || u.k === K_SOL || u.k === K_SEN)) surv.push({ k: u.gsg ? 'gsg' : u.k === K_POL ? 'pol' : 'sol', kills: u.kills, sq: u.sq });
     const grp = new Map(); for (const s of surv) { if (!grp.has(s.sq)) grp.set(s.sq, { k: s.k, m: [] }); grp.get(s.sq).m.push(s.kills); }
     const ev = S.ev, people = ev.civ + ev.pol * 5 + ev.mil * 10 + (cleared ? c.civ + c.pol * 5 + c.mil * 10 : 0);
     const priPts = Math.round(m.primary.pts * o.priFrac);
@@ -405,10 +447,12 @@ const Campaign = (() => {
     const idx = MIS.indexOf(m);
     const old = C.best[m.id] || 0; if (total > old) C.best[m.id] = total;
     const keep = () => {
+      if (curReplay) { persist(); return; }   // Hard: Wiederholung bringt weder Punkte noch Einheiten
+      if (C.diff === 'hard' && o.primary) { C.done[m.id] = 1; const pre = JSON.parse(C.pre || 'null'); if (pre) C.snap[m.id] = { roster: pre.roster, trucks: pre.trucks || 0 }; }
       C.points += total; C.trucks = Math.max(0, (C.trucks || 0) - (S.trkLost || 0));   // zerstörte Trucks werden nicht ersetzt
       let squads = res.squads.filter(s => s.m.length);
       if (!squads.some(s => s.k === 'sol')) squads.push({ k: 'sol', m: [0, 0, 0, 0] });   // Reserve, damit die Kampagne nie ohne Truppen dasteht
-      if (!squads.some(s => s.k === 'pol')) squads.push({ k: 'pol', m: [0, 0] });
+      if (!squads.some(s => s.k === 'pol' || s.k === 'gsg')) squads.push({ k: 'pol', m: [0, 0] });
       if (o.primary && m.reward && !(C.got || (C.got = {}))[m.id]) { C.got[m.id] = 1; C.bonus = C.bonus || { strike: 0, gunship: 0 }; for (const k in m.reward) C.bonus[k] = (C.bonus[k] || 0) + m.reward[k]; }
       C.roster = { squads }; if (o.primary || idx + 1 > C.next - 1) C.next = Math.max(C.next, idx + 1);
       persist();
@@ -419,7 +463,7 @@ const Campaign = (() => {
       <tr><td>Sekundär: ${secTxt}</td><td>+${secPts}</td></tr>
       <tr><td>Gerettete/überlebende Personen (1 / 5 / 10 Punkte)</td><td>+${people}</td></tr>
       <tr><td><b>Summe</b></td><td><b>${total}</b></td></tr>
-      <tr><td>Überlebende Einsatzkräfte übernommen</td><td>${res.squads.reduce((a, s) => a + s.m.length, 0)}</td></tr></table>${o.primary && m.reward && !(C.got && C.got[m.id]) ? '<p class="stars" style="font-size:15px">🎁 Belohnung: +' + m.reward.strike + ' Luftschläge und +' + m.reward.gunship + ' Gunship (ab der nächsten Mission)</p>' : ''}
+      <tr><td>Überlebende Einsatzkräfte übernommen</td><td>${curReplay ? 0 : res.squads.reduce((a, s) => a + s.m.length, 0)}</td></tr></table>${curReplay ? '<p class="hint">Hard: Wiederholung einer abgeschlossenen Mission – keine Punkte, keine neuen Einheiten.</p>' : ''}${o.primary && m.reward && !(C.got && C.got[m.id]) ? '<p class="stars" style="font-size:15px">🎁 Belohnung: +' + m.reward.strike + ' Luftschläge und +' + m.reward.gunship + ' Gunship (ab der nächsten Mission)</p>' : ''}
       <div class="btns"><button class="big" id="cNext">Weiter</button>${o.primary ? '' : '<button id="cRetry">Mission wiederholen</button>'}</div>`;
     modal(html, () => {
       document.getElementById('cNext').onclick = () => { keep(); closeModal(); Comic.play(o.primary ? m.id + '_win' : m.id + '_lose', () => hub()); };
@@ -428,9 +472,13 @@ const Campaign = (() => {
   }
 
   // ── Start ──────────────────────────────────────────────────────────────
+  const isReplay = m => !!(C && C.diff === 'hard' && C.done[m.id] && C.snap[m.id]);
+  const SQN = { sol: 'Soldaten', pol: 'Polizei', gsg: 'GSG-9' };
   function start(idx, retry) {
     const m = MIS[idx]; cur = m; curIdx = idx;
-    if (!retry || !C.pre) C.pre = JSON.stringify({ roster: C.roster, points: C.points });
+    curReplay = isReplay(m); playRoster = null;
+    if (curReplay) playRoster = JSON.parse(JSON.stringify(C.snap[m.id].roster));   // Hard: nur die Einheiten des ersten Anlaufs
+    else if (!retry || !C.pre) C.pre = JSON.stringify({ roster: C.roster, points: C.points, trucks: C.trucks });
     else { const p = JSON.parse(C.pre); C.roster = p.roster; }
     persist();
     document.body.classList.remove('inhub'); $('menu').style.display = 'none'; $('setup').style.display = 'none';
@@ -446,10 +494,10 @@ const Campaign = (() => {
     modal(`<h2>Mission ${idx + 1}: ${m.name}</h2><p style="color:var(--mut)">${m.sub}</p>
       <h3 style="margin:10px 0 4px">Ziele</h3><p><b>Primär:</b> ${m.goal[0]}<br><b>Sekundär:</b> ${m.goal[1]}</p>
       <h3 style="margin:10px 0 4px">Rahmenbedingungen</h3><ul style="margin:0;padding-left:18px">${m.info.map(t => '<li>' + t + '</li>').join('')}</ul>
-      <p class="hint" style="margin-top:10px">Einheiten: ${C.roster.squads.map(s => (s.k === 'sol' ? 'Soldaten' : 'Polizei') + '-Squad (' + s.m.length + ')').join(', ')} · Munition begrenzt · Erfahrung: alle 50 Abschüsse +1 Level (+5 % Treffsicherheit)</p>
-      <div class="btns"><button class="big" id="cGo">▶ Mission starten</button><button id="cShop">🛒 Shop</button><button id="cBack">Zurück</button></div>`, () => {
+      <p class="hint" style="margin-top:10px">${isReplay(m) ? '<b>Hard – Wiederholung:</b> keine Punkte, nur die Einheiten des ersten Anlaufs. ' : ''}Einheiten: ${(isReplay(m) ? C.snap[m.id].roster : C.roster).squads.map(s => SQN[s.k] + '-Squad (' + s.m.length + ')').join(', ')} · Munition begrenzt · Erfahrung: alle 50 Abschüsse +1 Level (+5 % Treffsicherheit)</p>
+      <div class="btns"><button class="big" id="cGo">▶ Mission starten</button>${isReplay(m) ? '' : '<button id="cShop">🛒 Shop</button>'}<button id="cBack">Zurück</button></div>`, () => {
       $('cGo').onclick = () => { closeModal(); start(idx); };
-      $('cShop').onclick = () => shop(() => briefing(idx));
+      if ($('cShop')) $('cShop').onclick = () => shop(() => briefing(idx));
       $('cBack').onclick = () => hub();
     });
   }
@@ -458,14 +506,14 @@ const Campaign = (() => {
     Music.play('menu');
     const rows = MIS.map((m, i) => {
       const ok = i <= C.next, b = C.best[m.id];
-      return `<div class="card ${ok ? '' : 'dis'}"><div><b>${i + 1}. ${m.name}</b><small>${m.sub}${b ? ' · Bestwert ' + b : ''}</small></div><button data-i="${i}" ${ok ? '' : 'disabled'}>${b ? 'Erneut spielen' : 'Briefing'}</button></div>`;
+      return `<div class="card ${ok ? '' : 'dis'}"><div><b>${i + 1}. ${m.name}</b><small>${m.sub}${b ? ' · Bestwert ' + b : ''}</small></div><button data-i="${i}" ${ok ? '' : 'disabled'}>${b ? (isReplay(m) ? 'Erneut (ohne Punkte)' : 'Erneut spielen') : 'Briefing'}</button></div>`;
     }).join('');
-    const ro = C.roster.squads.map(s => { const lv = s.m.map(lvOf); return `<div class="card"><div><b>${s.k === 'sol' ? 'Soldaten' : 'Polizei'}-Squad</b><small>${s.m.length} Mitglieder · Level ${lv.join('/')} · Abschüsse ${s.m.reduce((a, b) => a + b, 0)}</small></div></div>`; }).join('');
-    modal(`<h2>Kampagne</h2><p>Punkte: <b>${C.points}</b></p>${rows}<h3 style="margin:12px 0 4px">Einheiten</h3><div class="cgrid">${ro}</div>
+    const ro = C.roster.squads.map(s => { const lv = s.m.map(lvOf); return `<div class="card"><div><b>${SQN[s.k]}-Squad</b><small>${s.m.length} Mitglieder · Level ${lv.join('/')} · Abschüsse ${s.m.reduce((a, b) => a + b, 0)}</small></div></div>`; }).join('');
+    modal(`<h2>Kampagne</h2><p>Punkte: <b>${C.points}</b> · Schwierigkeit: <b>${C.diff === 'hard' ? 'Hard' : 'Easy'}</b></p>${rows}<h3 style="margin:12px 0 4px">Einheiten</h3><div class="cgrid">${ro}</div>
       <div class="btns"><button id="cShop">🛒 Shop</button><button id="cNew">Neue Kampagne</button><button id="cMenu">Hauptmenü</button></div>`, () => {
       document.querySelectorAll('#mbox button[data-i]').forEach(b => b.onclick = () => { const i = +b.dataset.i; closeModal(); const go = () => briefing(i); if (!C.seen['intro' + i]) { C.seen['intro' + i] = 1; persist(); Comic.play(i === 0 ? 'prologue' : MIS[i].id + '_intro', go); } else go(); });
       $('cShop').onclick = () => shop(hub);
-      $('cNew').onclick = () => { if (confirm('Die Kampagne wirklich neu beginnen? Fortschritt und Upgrades gehen verloren.')) { C = fresh(); persist(); hub(); } };
+      $('cNew').onclick = () => { if (confirm('Die Kampagne wirklich neu beginnen? Fortschritt und Upgrades gehen verloren.')) pickDiff(hub); };
       $('cMenu').onclick = () => { closeModal(); document.body.classList.remove('inhub'); toMenu(); };
     });
   }
@@ -475,15 +523,15 @@ const Campaign = (() => {
       return `<div class="card"><div><b>${u.n}${max > 1 ? ' (Stufe ' + lv + '/' + max + ')' : ''}</b><small>${u.d}</small></div>${lv >= max ? '<span class="ok" style="color:var(--acc)">✓ gekauft</span>' : `<button data-up="${u.id}" ${C.points >= price ? '' : 'disabled'}>${price} P</button>`}</div>`;
     }).join('');
     const bu = BUY.map(u => {
-      const have = u.id === 'truck' ? C.trucks : 0, ex = u.max && have >= u.max;
-      return `<div class="card"><div><b>${u.n}${u.id === 'truck' ? ' (' + have + '/' + u.max + ')' : ''}</b><small>${u.d}</small></div>${ex ? '<span style="color:var(--acc)">✓ max.</span>' : `<button data-buy="${u.id}" ${C.points >= u.p ? '' : 'disabled'}>${u.p} P</button>`}</div>`;
+      const have = u.id === 'truck' ? C.trucks : u.id === 'garr' ? C.garr : 0, ex = u.max && have >= u.max;
+      return `<div class="card"><div><b>${u.n}${u.max ? ' (' + have + '/' + u.max + ')' : ''}</b><small>${u.d}</small></div>${ex ? '<span style="color:var(--acc)">✓ max.</span>' : `<button data-buy="${u.id}" ${C.points >= u.p ? '' : 'disabled'}>${u.p} P</button>`}</div>`;
     }).join('');
     modal(`<h2>Shop</h2><p>Verfügbare Punkte: <b>${C.points}</b></p><h3 style="margin:8px 0 2px">Neue Einheiten</h3>${bu}<h3 style="margin:10px 0 2px">Upgrades</h3>${up}<div class="btns"><button class="big" id="sBack">Zurück</button></div>`, () => {
       document.querySelectorAll('#mbox button[data-up]').forEach(b => b.onclick = () => { const u = UP.find(x => x.id === b.dataset.up), lv = upLv(u.id), p = u.p[lv]; if (C.points >= p) { C.points -= p; C.up[u.id] = lv + 1; persist(); shop(back); } });
       document.querySelectorAll('#mbox button[data-buy]').forEach(b => b.onclick = () => {
         const u = BUY.find(x => x.id === b.dataset.buy); if (C.points < u.p) return;
         C.points -= u.p;
-        if (u.id === 'pol') C.roster.squads.push({ k: 'pol', m: [0, 0] }); else if (u.id === 'sol') C.roster.squads.push({ k: 'sol', m: [0, 0, 0, 0] }); else C.trucks++;
+        if (u.id === 'pol') C.roster.squads.push({ k: 'pol', m: [0, 0] }); else if (u.id === 'gsg') C.roster.squads.push({ k: 'gsg', m: [0, 0, 0] }); else if (u.id === 'garr') C.garr++; else if (u.id === 'sol') C.roster.squads.push({ k: 'sol', m: [0, 0, 0, 0] }); else C.trucks++;
         persist(); shop(back);
       });
       $('sBack').onclick = () => back();
@@ -492,14 +540,22 @@ const Campaign = (() => {
   function init() {
     const has = !!C;
     $('mCamp').textContent = has ? '🎖 Kampagne fortsetzen' : '🎖 Kampagne starten';
-    $('mCamp').onclick = () => { if (!C) { C = fresh(); persist(); } $('menu').style.display = 'none'; hub(); };
+    $('mCamp').onclick = () => { $('menu').style.display = 'none'; if (!C) pickDiff(hub); else hub(); };
     $('bEvacGo').onclick = () => { const m = MIS.find(x => x.id === (RULES && RULES.missionId)); if (m && m.kind === 'land') startEvac(m); };
     $('bEnd').onclick = () => modal(`<h2>Mission beenden?</h2><p>Die Mission wird jetzt gewertet. Überlebende Einsatzkräfte werden übernommen.</p><div class="btns"><button class="big" id="eYes">Mission beenden</button><button id="eNo">Weiterspielen</button></div>`, () => { $('eYes').onclick = () => { closeModal(); endGame('Rückzug – Mission vorzeitig beendet.'); }; $('eNo').onclick = closeModal; });
   }
   function newGame() {
     const prog = C && (C.next > 0 || C.points > 0 || Object.keys(C.best || {}).length);
     if (prog && !confirm('Ein neues Spiel beginnen? Der Kampagnenfortschritt (Missionen, Punkte, Upgrades, Einheiten) geht verloren.')) return;
-    C = fresh(); persist(); $('menu').style.display = 'none'; $('mCamp').textContent = '🎖 Kampagne fortsetzen'; hub();
+    pickDiff(() => { $('menu').style.display = 'none'; $('mCamp').textContent = '🎖 Kampagne fortsetzen'; hub(); });
+  }
+  function pickDiff(go) {
+    modal(`<h2>Schwierigkeit</h2><div class="card"><div><b>Easy</b><small>Einheiten, Punkte und Upgrades bleiben bei Wiederholungen erhalten.</small></div><button id="dEasy">Easy</button></div>
+      <div class="card"><div><b>Hard</b><small>Bei der Wiederholung einer abgeschlossenen Mission startest du nur mit den Einheiten des ersten Anlaufs – ohne zusätzliche Punkte.</small></div><button id="dHard">Hard</button></div>
+      <div class="btns"><button id="dBack">Abbrechen</button></div>`, () => {
+      const pick = d => { closeModal(); C = fresh(); C.diff = d; persist(); go(); };
+      $('dEasy').onclick = () => pick('easy'); $('dHard').onclick = () => pick('hard'); $('dBack').onclick = () => { closeModal(); if (!C) toMenu(); else $('menu').style.display = ''; };
+    });
   }
   return { newGame, init, rulesFor, MIS, get state() { return C; }, hub, start, UP };
 })();

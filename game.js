@@ -261,7 +261,8 @@ const fmtClock = t => { t = Math.round(t); return String(t / 60 | 0).padStart(2,
 function toolGate(tool) {
   const t = RULES.tools[tool]; if (!t) return { hidden: true };
   let locked = false, label = '', why = '';
-  if (t.at != null) { if (simT < t.at) { locked = true; label = 'ab ' + fmtClock(t.at); why = 'Verfügbar ab ' + fmtClock(t.at) + ' Spielzeit'; } }
+  if (t.at != null && !(tool === 'garrison' && RULES.garr && S && (S.used.garrison || 0) < RULES.garr)) {   // gekaufte Garnisonen sind sofort verfügbar
+    if (simT < t.at) { locked = true; label = 'ab ' + fmtClock(t.at); why = 'Verfügbar ab ' + fmtClock(t.at) + ' Spielzeit'; } }
   else if (t.pct != null) { const pc = lostPct(); if (pc < t.pct) { locked = true; label = 'ab ' + t.pct + ' % (' + pc.toFixed(0) + ')'; why = `Erst verfügbar, wenn ${t.pct} % der Bevölkerung tot oder verwandelt sind (aktuell ${pc.toFixed(0)} %)`; } }
   const used = S && S.used[tool] || 0, left = t.max != null ? t.max - used : 99;
   return { hidden: false, locked, label, why, left, max: t.max, cd: t.cd || 0 };
@@ -473,6 +474,7 @@ function stopPower(e, z, d) {
   let kb = 0, stun = 0;
   if (e.k === K_TRK || e.k === K_TUR || (e.snipe && e.k !== K_POL)) kb = 1;
   else if (e.k === K_POL) kb = e.sg ? 2 : 0;
+  else if (e.pg) kb = 0;
   else if (e.k === K_SOL || e.k === K_SEN) stun = e.sil ? 0 : .5;
   if (kb) {
     const ux = (z.x - e.x) / (d || 1), uy = (z.y - e.y) / (d || 1);
@@ -488,14 +490,14 @@ function stopPower(e, z, d) {
 function shoot(e, z, rng, dmg) {
   S.shots++;
   if (RULES.ammo && e.k !== K_CIV) e.ammo--;
-  SFX.shot(e.x, e.y, e.k === K_TRK || e.k === K_TUR ? 'mg' : e.k === K_CIV ? 'civ' : e.k === K_POL ? 'pistol' : 'rifle');
+  SFX.shot(e.x, e.y, e.k === K_TRK || e.k === K_TUR ? 'mg' : e.k === K_CIV ? 'civ' : e.k === K_POL || e.pg ? 'pistol' : 'rifle');
   tracers.push({ x1: e.x, y1: e.y, x2: z.x, y2: z.y, t: .12 });
   if (!((e.k === K_TRK || e.k === K_TUR) && simT - (e.nt || 0) < .8)) { e.nt = simT; noise(e.x, e.y, (e.k === K_CIV ? 130 : e.k === K_POL ? 170 : e.k === K_TRK || e.k === K_TUR ? 260 : 230) * (e.sil ? .5 : 1) * (e.snipe ? 1.2 : 1)); }
   const d = Math.hypot(z.x - e.x, z.y - e.y);
   if (Math.random() < ((e.ae || e.acc) + (e.sg ? .1 : 0)) * (1 - .45 * d / rng)) {
     z.hp -= dmg;
     if (z.hp > 0 && z.k === K_ZOM) stopPower(e, z, d);
-    if (z.hp <= 0 && !z.dead) { z.dead = true; S.kills++; if (RULES.xp && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN)) { e.kills++; const nl = 1 + Math.floor(e.kills / 50); if (nl > e.lvl) { e.lvl = nl; e.acc = RULES.baseAcc + .05 * (nl - 1); toast('⭐ Einheit steigt auf Level ' + nl + ' (Treffsicherheit ' + Math.round(e.acc * 100) + ' %)'); } } }
+    if (z.hp <= 0 && !z.dead) { z.dead = true; S.kills++; if (RULES.xp && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN)) { e.kills++; const nl = 1 + Math.floor(e.kills / 50); if (nl > e.lvl) { e.lvl = nl; e.acc = RULES.baseAcc + .05 * (nl - 1) + (e.gsg ? .05 : 0); toast('⭐ Einheit steigt auf Level ' + nl + ' (Treffsicherheit ' + Math.round(e.acc * 100) + ' %)'); } } }
   }
 }
 function infect(e) {
@@ -642,7 +644,8 @@ function stepUnit(e) {
     if (!moveDir(e, e.fhx, e.fhy, 3.6, false)) { const a = Math.atan2(e.fhy, e.fhx) + rnd(-1.5, 1.5); e.fhx = Math.cos(a); e.fhy = Math.sin(a); }
     e.path = null; return;
   }
-  const trk = e.k === K_TRK || e.k === K_TUR, sn = !!e.snipe && !trk && e.k !== K_POL, rng = (trk ? 70 : e.k === K_SOL || e.k === K_SEN ? 65 : e.mp ? 46 : 38) * (sn ? 3 : 1), rate = (trk ? .12 : e.k === K_POL ? (e.mp ? .6 : 1.1) : .7) * (sn ? 2 : 1), dmg = trk ? 1 : e.k === K_POL ? 1.5 : 2.5, mobile = e.k !== K_SEN && e.k !== K_TUR;
+  if (e.gsg && !e.pg && RULES.ammo && e.ammo <= 0 && e.pis > 0) { e.pg = 1; e.snipe = false; e.ammo = e.pis; e.pis = 0; }   // GSG-9: Gewehr leer → Pistole
+  const pst = e.k === K_POL || e.pg, trk = e.k === K_TRK || e.k === K_TUR, sn = !!e.snipe && !trk && e.k !== K_POL, rng = (trk ? 70 : !pst && (e.k === K_SOL || e.k === K_SEN) ? 65 : e.mp ? 46 : 38) * (sn ? 3 : 1), rate = (trk ? .12 : pst ? (e.mp ? .6 : 1.1) : .7) * (sn ? 2 : 1), dmg = trk ? 1 : pst ? 1.5 : 2.5, mobile = e.k !== K_SEN && e.k !== K_TUR;
   // Eingraben / Stellung räumen
   if (e.ds === 1) { e.dt += DT; if (e.dt >= 60) { e.ds = 2; e.dt = 0; } }
   else if (e.ds === 3) {
@@ -999,7 +1002,7 @@ function doEvac(x, y) {
   const cap = RULES.evacCap || 20;
   if (cand.length < cap) for (const e of E) if (!e.dead && e.k === K_CIV && e.inc < 0 && e.st !== 4 && (e.stk || 0) > 10 && !cand.some(c => c[2] === e)) cand.push([0, 1e5, e]);   // Hubschrauber sammelt Festsitzende ein
   const take = cand.slice(0, cap);
-  for (const [, , e] of take) { e.dead = true; S.ev[evKind(e)]++; if (S.evU && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN)) S.evU.push({ k: e.k === K_POL ? 'pol' : 'sol', kills: e.kills, sq: e.sq }); }
+  for (const [, , e] of take) { e.dead = true; S.ev[evKind(e)]++; if (S.evU && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN)) S.evU.push({ k: e.gsg ? 'gsg' : e.k === K_POL ? 'pol' : 'sol', kills: e.kills, sq: e.sq }); }
   fx.push({ type: 'ring', x, y, r: 30, t: 1, T: 1, c: '255,255,255' });
   if (take.length) { toast('🚁 ' + take.length + ' evakuiert'); SFX.chime(x, y); }
 }
@@ -1158,6 +1161,10 @@ function explode(x, y, r) {
 function drop(x, y) {
   if (RULES.ammo) {   // Kampagne: erst Einsatzkräfte auffüllen, der Rest bewaffnet Zivilisten
     let budget = 800;
+    for (const u of E) if (friendly(u) && u.ammoMax && Math.hypot(u.x - x, u.y - y) < 40) {   // Wachen mit Standardvorrat: erst jetzt auf Upgrade-Niveau; GSG-9 wieder zum Gewehr
+      if (u.upMul > 1) { u.ammoMax *= u.upMul; u.pisMax = (u.pisMax || 40) * u.upMul; u.upMul = 0; }
+      if (u.gsg) { u.pis = u.pisMax || 40 * (RULES.ammoMul || 1); if (u.pg) { u.pg = 0; u.snipe = u.gsg === 1; u.ammo = 0; } }
+    }
     for (const u of E) if (friendly(u) && u.ammoMax && Math.hypot(u.x - x, u.y - y) < 40) { const need = u.ammoMax - u.ammo; if (need > 0) { const g = Math.min(need, budget); u.ammo += g; budget -= g; } }
     for (const e of E) { if (budget < 14) break; if (!e.dead && e.k === K_CIV && e.st !== 4 && Math.hypot(e.x - x, e.y - y) < 40) { if (!e.armed) { arm(e); e.brave = Math.random() < .7; budget -= 14; } else { e.ammo += 14; budget -= 14; } } }
     return;
@@ -1256,7 +1263,7 @@ const SAVE_KEY = n => 'zos_moosburg_slot' + n;
 function serialize() {
   return {
     v: 2, ts: Date.now(), simT, cfg, markers, S, cooldown, fx: fx.map(f => ({ ...f })), map: curMap, mode: RULES.mode, mission: RULES.missionId || null, up: RULES.up || null,
-    E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0, e.sq, e.kills, e.lvl, e.ammoMax || 0, e.snipe ? 1 : 0, e.sil ? 1 : 0, e.zsp || 0, e.lx0 ? 1 : 0, e.mp ? 1 : 0, e.sg ? 1 : 0, e.ams || null]),
+    E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0, e.sq, e.kills, e.lvl, e.ammoMax || 0, e.snipe ? 1 : 0, e.sil ? 1 : 0, e.zsp || 0, e.lx0 ? 1 : 0, e.mp ? 1 : 0, e.sg ? 1 : 0, e.ams || null, e.gsg || 0, e.pis || 0, e.pg ? 1 : 0, e.upMul || 0, e.lock ? 1 : 0, e.pisMax || 0]),
     bar: BAR.filter(Boolean).map(b => ({ cells: b.cells, hp: b.hp, max: b.max, x: b.x, y: b.y, gates: b.gates || [], pre: b.pre ? 1 : 0 })),
     siege: B.filter(b => b.siege > 0).map(b => [b.idx, b.siege])
   };
@@ -1265,7 +1272,7 @@ function deserialize(d) {
   cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; S.used = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0, ...S.used }; S.ev = S.ev || { civ: 0, pol: 0, mil: 0, trk: 0 }; S.plans = S.plans || []; S.sirens = S.sirens || []; S.planId = S.planId || 0; if (S.evacT == null) S.evacT = 10; evacDirty = !!S.evac; simT = d.simT; cooldown = d.cooldown; finished = false;
   noises = []; tracers = []; fx = d.fx || []; selected.clear(); barId.fill(0); gate.fill(0); BAR = [null];
   for (const b of B) { b.occ = []; b.siege = 0; }
-  E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; e.sq = a[17] || 0; e.kills = a[18] || 0; e.lvl = a[19] || 1; e.ammoMax = a[20] || 0; e.snipe = !!a[21]; e.sil = !!a[22]; if (a[23]) e.zsp = a[23]; e.mp = !!a[25]; e.sg = !!a[26]; if (a[27]) e.ams = a[27]; if (e.g > gidN) gidN = e.g; if (e.sq > gidN) gidN = e.sq; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
+  E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; e.sq = a[17] || 0; e.kills = a[18] || 0; e.lvl = a[19] || 1; e.ammoMax = a[20] || 0; e.snipe = !!a[21]; e.sil = !!a[22]; if (a[23]) e.zsp = a[23]; e.mp = !!a[25]; e.sg = !!a[26]; if (a[27]) e.ams = a[27]; if (a[28]) { e.gsg = a[28]; e.pis = a[29] || 0; e.pg = !!a[30]; e.pisMax = a[33] || 0; } e.upMul = a[31] || 0; e.lock = !!a[32]; if (e.g > gidN) gidN = e.g; if (e.sq > gidN) gidN = e.sq; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
   for (const b of d.bar) { const id = BAR.length; for (const c of b.cells) barId[c] = id; for (const c of b.gates || []) gate[c] = 1; BAR.push(b); }
   for (const [i, s] of d.siege) B[i].siege = s;
 }
@@ -1470,9 +1477,9 @@ cv.addEventListener('wheel', e => {
   cam.x = wx - (e.clientX - VW / 2) / cam.z; cam.y = wy - (e.clientY - VH / 2) / cam.z; clampCam();
 }, { passive: false });
 const friendly = e => !e.dead && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN || e.k === K_TRK || e.k === K_TUR);
-const unitSpeed = u => u.k === K_POL ? 4.4 : u.k === K_TRK ? 8 : 4.8;
+const unitSpeed = u => (u.k === K_POL ? 4.4 : u.k === K_TRK ? 8 : 4.8) * (u.gsg ? 1.1 : 1);
 let patrolArmed = false, gidN = 0;
-function addSel(u) { if (u.auto) return; selected.add(u); if (u.g) for (const m of E) if (m.g === u.g && friendly(m)) selected.add(m); }
+function addSel(u) { if (u.auto || u.lock) return; selected.add(u); if (u.g) for (const m of E) if (m.g === u.g && friendly(m)) selected.add(m); }
 function delSel(u) { selected.delete(u); if (u.g) for (const m of [...selected]) if (m.g === u.g) selected.delete(m); }
 function unitsPointer(d, wx, wy, add) {
   if (d.moved) {
@@ -1529,7 +1536,7 @@ $('bMus').textContent = MUS(Music.level());
 $('bMus').onclick = () => { $('bMus').textContent = MUS(Music.cycle()); SFX.ui(); };
 $('bMap').onclick = () => { mapMode = mapMode === 'sat' ? 'osm' : mapMode === 'osm' ? 'vec' : 'sat'; try { localStorage.setItem('zos_mapmode', mapMode); } catch (e) {} applyMapMode(); };
 try { const m = localStorage.getItem('zos_mapmode'); if (MAP_LABEL[m]) mapMode = m; } catch (e) {}
-const selU = () => [...selected].filter(u => friendly(u) && !u.auto);
+const selU = () => [...selected].filter(u => friendly(u) && !u.auto && !u.lock);
 $('bEvacU').onclick = () => startUnitEvac();
 $('bCommit').onclick = () => commitBuild();
 $('bDrop').onclick = () => { if (S.plans.some(q => q.st === 'plan' && q.siren)) cooldown.siren = 0; S.used.siren -= S.plans.filter(q => q.st === 'plan' && q.siren).length; S.plans = S.plans.filter(q => q.st !== 'plan'); toast('Baupläne verworfen'); };
@@ -1539,7 +1546,7 @@ const FM = {
   pol: [['', '🔫 Pistole', 'Standard: keine Mann-Stop-Wirkung'], ['mp', '🔫 MP', 'Mehr Reichweite, schnellere Schussfolge, keine Mann-Stop-Wirkung', 'canMp'], ['sg', '💥 Schrotflinte', 'Reichweite wie Pistole, Treffer +10 %, wirft Zombies 2 Schritte zurück', 'canSg']]
 };
 const fmOf = u => u.sil ? 'sil' : u.snipe ? 'snipe' : u.mp ? 'mp' : u.sg ? 'sg' : '';
-const fmKind = u => u.k === K_POL ? 'pol' : u.k === K_SOL || u.k === K_SEN ? 'sol' : null;
+const fmKind = u => u.gsg ? null : u.k === K_POL ? 'pol' : u.k === K_SOL || u.k === K_SEN ? 'sol' : null;
 function fmAvail() {   // [{kind, modes}] für die gewählten Einheitentypen
   const kinds = new Set(selU().map(fmKind).filter(Boolean)), out = [];
   for (const k of ['sol', 'pol']) if (kinds.has(k)) { const m = FM[k].filter(x => !x[3] || RULES[x[3]]); if (m.length > 1) out.push({ kind: k, modes: m }); }
@@ -1548,7 +1555,7 @@ function fmAvail() {   // [{kind, modes}] für die gewählten Einheitentypen
 function setFireMode(kind, mode) {
   for (const u of selU()) if (fmKind(u) === kind) {
     if (kind === 'pol' && u.ammoMax) {   // jede Waffe hat ihr eigenes Magazin: Pistole 40, MP 150, Schrotflinte 40 (× Munitions-Upgrade)
-      const old = fmOf(u), cap = m => (m === 'mp' ? 150 : 40) * (RULES.ammoMul || 1);
+      const old = fmOf(u), cap = m => (m === 'mp' ? 150 : 40) * (u.upMul > 1 ? 1 : RULES.ammoMul || 1);
       u.ams = u.ams || {}; u.ams[old] = u.ammo; u.ammoMax = cap(mode); u.ammo = u.ams[mode] != null ? Math.min(u.ams[mode], u.ammoMax) : u.ammoMax;
     }
     u.sil = mode === 'sil'; u.snipe = mode === 'snipe'; u.mp = mode === 'mp'; u.sg = mode === 'sg'; }
@@ -1589,7 +1596,7 @@ function setTxt(el, t) { if (el.textContent !== t) el.textContent = t; }
 function updateUnitList() {
   const box = $('units'); if (phase !== 'run') { box.style.display = 'none'; return; }
   box.style.display = 'flex';
-  const us = E.filter(friendly);
+  const us = E.filter(u => friendly(u) && !u.lock);
   us.sort((a, b) => a.k - b.k || a.id - b.id);
   const groups = new Map();
   for (const u of us) { const key = u.sq && u.k !== K_TRK ? 's' + u.sq : 'u' + u.id; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(u); }
@@ -1603,7 +1610,7 @@ function updateUnitList() {
       const el = document.createElement('div'), head = document.createElement('div'), body = document.createElement('div');
       head.className = 'urow'; body.className = 'ubody';
       head.innerHTML = `${squad ? '<b class="plus">+</b>' : ''}<i style="background:${UCOL[k]}"></i><u></u><em></em><span></span>`;
-      const name = (squad ? SQNAME[k] : UNAME[k]) + ' ' + uCnt[squad ? 'q' + k : k];
+      const name = (squad ? (ms[0].gsg ? 'GSG-9' : SQNAME[k]) : UNAME[k]) + ' ' + uCnt[squad ? 'q' + k : k];
       head.children[squad ? 2 : 1].textContent = name;
       el.append(head, body); $('uList').appendChild(el);
       ent = { el, head, body, rows: new Map(), size: ms.length, open: false, squad };
