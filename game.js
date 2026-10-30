@@ -735,6 +735,7 @@ function thinkZombie(e) {
       if (mk && mk.go && S.evac && ZF.evac && (mk.focus == null || Math.random() < mk.focus)) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; return; }
     } else { e.st = 7; e.fz = 'march'; e.fzT = 2; return; }
   }
+  if (e.pd && S.padT && Math.hypot(e.x - S.padT.x, e.y - S.padT.y) < 30) { e.pd = 0; e.sk = Math.random() < .95; }   // am Ziel angekommen: ausschwärmen, 95 % zu den Einsatzkräften
   if (e.pd && S.padT && ZF.pad) { e.st = 7; e.fz = 'pad'; e.fzT = 2; return; }   // Kampagne (Trek): 100 % zum Zielpunkt
   if (e.sk && S.seek && ZF.seek) { e.st = 7; e.fz = 'seek'; e.fzT = 2; return; }   // Kampagne (Trek): Zug zu den Einsatzkräften
   if (S.lure && simT < S.lure.until && ZF.lure) { e.st = 7; e.fz = 'lure'; e.fzT = 2; return; }
@@ -783,6 +784,7 @@ function stepZombie(e) {
     if (e.fz === 'seek' || e.fz === 'pad') {
       const pd = e.fz === 'pad', t = pd ? S.padT : S.seek, D = pd ? ZF.pad : ZF.seek; e.fzT -= DT;
       if (!t || !D || e.fzT <= 0) { e.st = 0; e.wt = 0; return; }
+      if (pd && Math.hypot(e.x - t.x, e.y - t.y) < 30) { e.st = 0; e.wt = 0; return; }
       fieldDescend(e, D, t.x, t.y, sp, true); return;
     }
     if (e.fz === 'march') {

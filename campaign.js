@@ -125,7 +125,7 @@ const Campaign = (() => {
     {
       id: 'm5', map: 'm5', kind: 'trek', name: 'Der Weg nach Kelheim', sub: 'Abensberg – Weltenburg', pop: 0, armed: 0, acc: 35, zs: 50,
       start: () => ({ sol: [{ x: 858, y: 3586 }], pol: [{ x: 835, y: 3560 }, { x: 882, y: 3612 }] }),
-      evac: () => ({ x: 2508, y: 770, at: 1e9 }),   // Evakuierungsstelle im Norden
+      evac: () => ({ x: 2230, y: 335, at: 1e9 }),   // Evakuierungsstelle: Kloster Weltenburg
       spawns: () => [],
       lure: () => ({ x: 0, y: 0, t: 1e9, dur: 0 }),
       hordeAt: 1e9, hordeFocus: 0, hordeQuiet: true,
@@ -135,7 +135,7 @@ const Campaign = (() => {
       tools: { supply: { at: 0, max: 6, cd: 20 }, strike: { at: 0, max: 5, cd: 8 }, garrison: { at: 240, max: 2, cd: 30 }, truck: { at: 0, max: 2, cd: 4 } },
       barricades: 36,
       primary: { pts: 2500 }, secondary: { clear: true, pts: 1000 },
-      goal: ['Erreiche die Evakuierungsstelle bei Weltenburg im Norden, sichere sie (200 m im Umkreis zombiefrei) und halte sie 5 Minuten lang.', 'Töte alle Zombies.'],
+      goal: ['Erreiche die Evakuierungsstelle am Kloster Weltenburg im Norden, sichere sie (200 m im Umkreis zombiefrei) und halte sie 5 Minuten lang.', 'Töte alle Zombies.'],
       info: ['Die Karte ist zu Beginn frei von Zombies – Start im Süden bei Abensberg, Ziel im Norden an der Donau', 'Je weiter ihr vorrückt, desto mehr Untote werden auf euch aufmerksam', 'Der Weg ist lang: Trucks, Versorgung und Luftschläge stehen von Anfang an bereit', 'Die Karte ist zur besseren Spielbarkeit auf 35 % gestaucht']
     }
   ];
@@ -399,10 +399,12 @@ const Campaign = (() => {
       let n = 0, sx = 0, sy = 0; for (const e of E) if (isT(e)) { n++; sx += e.x; sy += e.y; }
       if (n) { sx /= n; sy /= n; if (!S.seek || Math.hypot(S.seek.x - sx, S.seek.y - sy) > 50) { S.seek = { x: sx, y: sy }; zsDirty = true; } }
     }
+    if (tr.drops && !RULES.trekDrop) { RULES.trekDrop = 1; RULES.tools.supply = { ...RULES.tools.supply, max: (RULES.tools.supply.max || 0) + 3 }; }   // nach dem Laden stillschweigend wieder aktiv
     if (stp % 30 === 0 && !tr.primary) {
       tr.own = E.some(e => isT(e) && Math.hypot(e.x - S.pad.x, e.y - S.pad.y) < TK_R);
       tr.near = countZAround(S.pad.x, S.pad.y, TK_R);
       if (tr.own && !tr.near) tr.hold++; else tr.hold = 0;
+      if (tr.own && !tr.drops) { tr.drops = 1; RULES.trekDrop = 1; RULES.tools.supply = { ...RULES.tools.supply, max: (RULES.tools.supply.max || 0) + 3 }; banner('📦 Kloster Weltenburg erreicht – das Hauptquartier stellt drei weitere Versorgungsabwürfe bereit.', 12000); SFX.ui(); }
       if (tr.hold >= TK_HOLD) { tr.primary = true; banner('✓ Evakuierungsstelle gesichert – Primärziel erreicht! Jetzt alle Zombies ausschalten.', 14000); SFX.ui(); }
     }
   }
