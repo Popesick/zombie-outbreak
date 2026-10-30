@@ -105,7 +105,7 @@ const Campaign = (() => {
       info: ['1000 unbewaffnete Zivilisten im Innenbereich (750 müssen überleben) – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Elf eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten','5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
     },
     {
-      id: 'm3', map: 'm3', kind: 'land', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 2500, armed: 6, acc: 35, zs: 50,
+      id: 'm3', map: 'm3', kind: 'land', name: 'Die Brücke von Pfaffenhofen', sub: 'Pfaffenhofen an der Ilm', pop: 2500, armed: 6, acc: 35, zs: 50,
       start: () => ({ sol: [{ x: 1790, y: 670 }], pol: [{ x: 1775, y: 650 }, { x: 1775, y: 695 }] }),
       evac: () => ({ x: 640, y: 118, at: 1e9 }),   // Landeplatz „H“; das Signal gibt der Spieler selbst
       spawns: () => PF_WAVES,
@@ -121,6 +121,22 @@ const Campaign = (() => {
       primary: { pts: 1500, land: 900 }, secondary: { rescue: 2000, pts: 1000 },
       goal: ['Sichere den Landeplatz „H“ im Nordwesten innerhalb von 15 Minuten und starte dann die Evakuierung.', 'Rette mindestens 2000 Zivilisten.'],
       info: ['5000 Zombies westlich der Ilm, die Masse (2000+) im Norden; 2500 Zivilisten östlich der Ilm', 'Die Brücken sind auf der Zivilistenseite mit Barrikaden, Toren und je zwei Automatikgeschützen (unbegrenzte Munition) gesichert – gehören nicht zu deinem Inventar', 'Bewaffnete Zivilisten halten die Tore und fliehen erst, wenn Zombies durchbrechen', 'Landeplatz gesichert = 10 s lang kein Zombie im Umkreis von 80 m', 'Danach: Schaltfläche „Evakuierung starten“ – alle Zivilisten strömen durch das nördlichste Tor zum Landeplatz', 'Wird der Norden binnen 5 Minuten geräumt (1500 Zombies getötet), folgen 2000 weitere Zombies aus dem Norden', 'Nach 10:00 folgen 2000 Zombies aus Süden und Südwesten (verteilt über zwei Minuten), die direkt zum nördlichen Tor laufen', '5 Versorgungspakete, 48 Barrikadenelemente, Luftschläge ab 2:30, Garnisonen ab 3:20']
+    },
+    {
+      id: 'm5', map: 'm5', kind: 'trek', name: 'Der Weg nach Kelheim', sub: 'Abensberg – Weltenburg', pop: 0, armed: 0, acc: 35, zs: 50,
+      start: () => ({ sol: [{ x: 858, y: 3586 }], pol: [{ x: 835, y: 3560 }, { x: 882, y: 3612 }] }),
+      evac: () => ({ x: 2508, y: 770, at: 1e9 }),   // Evakuierungsstelle im Norden
+      spawns: () => [],
+      lure: () => ({ x: 0, y: 0, t: 1e9, dur: 0 }),
+      hordeAt: 1e9, hordeFocus: 0, hordeQuiet: true,
+      hold: null,
+      // Linien L1–L3 (Weltkoordinaten, y): wer sie als Erster überschreitet, löst die nächste Welle aus; Späher-Zone im Wald; Ostzüge starten in zwei Reihen am Ostrand
+      trek: { lines: [2706, 2033, 1285], east: [2200, 2882], zone: { x: 3432, y: 946, r: 240 }, msgs: ['⚠ Wir sind entdeckt worden! Zombies aus Süden und Osten nähern sich.', '⚠ Die nächste Welle rollt heran – aus Süden und Osten!', '⚠ Die größte Welle kommt – aus Süden und Osten! Haltet durch, bis die Evakuierungsstelle gesichert ist.'] },
+      tools: { supply: { at: 0, max: 6, cd: 20 }, strike: { at: 0, max: 5, cd: 8 }, garrison: { at: 240, max: 2, cd: 30 }, truck: { at: 0, max: 2, cd: 4 } },
+      barricades: 36,
+      primary: { pts: 2500 }, secondary: { clear: true, pts: 1000 },
+      goal: ['Erreiche die Evakuierungsstelle bei Weltenburg im Norden, sichere sie (200 m im Umkreis zombiefrei) und halte sie 5 Minuten lang.', 'Töte alle Zombies.'],
+      info: ['Die Karte ist zu Beginn frei von Zombies – Start im Süden bei Abensberg, Ziel im Norden an der Donau', 'Je weiter ihr vorrückt, desto mehr Untote werden auf euch aufmerksam', 'Der Weg ist lang: Trucks, Versorgung und Luftschläge stehen von Anfang an bereit', 'Die Karte ist zur besseren Spielbarkeit auf 35 % gestaucht']
     }
   ];
 
@@ -277,6 +293,7 @@ const Campaign = (() => {
     if (m.station) buildStation(m);
     for (const t of m.turrets || []) { const q = nearestWalkCell(t.x, t.y, 30) || [t.x, t.y], e = placeTurret(q[0], q[1]); e.ds = 2; e.dt = 0; e.auto = true; e.acc = .6; e.ammo = e.ammoMax = 1e9; }
     { const ev = m.evac(), p = randWalk(ev.x, ev.y, 25) || randWalk(ev.x, ev.y, 80) || [ev.x, ev.y]; S.pad = { x: p[0], y: p[1] }; S.evacPre = S.pad; }
+    if (m.kind === 'trek') { S.padT = { x: S.pad.x, y: S.pad.y }; zpDirty = true; trekPrewarm(m); }
     cfg.pop = m.pop;
   }
   const NE_ROUTES = [[[1430, 300], [1440, 600], [1500, 800]], [[1670, 200], [1680, 500], [1690, 740]], [[1830, 200], [1830, 500], [1790, 700]]];   // links am Waldrand, mittig, rechts am Isarufer
@@ -285,7 +302,7 @@ const Campaign = (() => {
     if (w.march) {
       S.marches = S.marches || [];
       let m = S.marches.find(q => q.id === w.march.id);
-      if (!m) S.marches.push(m = { id: w.march.id, routes: w.march.routes, gather: w.march.gather, until: simT + (w.march.dur || 900), total: w.march.total || 0, focus: w.march.focus, arr: 0, n: 0, t1: null, go: false });
+      if (!m) S.marches.push(m = { id: w.march.id, routes: w.march.routes, gather: w.march.gather, spd: w.march.spd, pre: w.march.pre, until: simT + (w.march.dur || 900), total: w.march.total || 0, focus: w.march.focus, arr: 0, n: 0, t1: null, go: false });
       m.n += w.n; mkId = S.marches.indexOf(m) + 1;
     }
     for (let i = 0; i < w.n; i++) {
@@ -293,6 +310,8 @@ const Campaign = (() => {
       const z = spawnZombie(p[0], p[1], mkId); S.spawned++;
       if (w.march) z.mr = w.march.route;
       if (w.fast) z.zsp = rnd(6, 8);
+      if (w.seek != null) z.sk = Math.random() < w.seek;
+      if (w.pad) z.pd = 1;
     }
     if (first) alertAt(w.x, w.y, 'Infizierte dringen ein');
     if (w.msg) { toast(w.msg, 4000); SFX.alarm(); }
@@ -329,12 +348,76 @@ const Campaign = (() => {
       if (!S.fired.apHQ) { S.fired.apHQ = 1; S.evacT = 5; banner('📻 Ein Funkspruch vom Leutnant: „Uns wurden für diesen Kampf zusätzliche Ressourcen gewährt, um den Kampf fortzuführen. Helikopter, um die Zivilisten aufzunehmen, sind unterwegs. Haltet durch, solange ihr könnt, und rettet so viele Zivilisten, wie ihr könnt.“', 22000); SFX.alarm(); }
     }
     if (m.kind === 'land') tickLand(m);
+    if (m.kind === 'trek') tickTrek(m);
     if (m.station && (S.sstep = (S.sstep || 0) + 1) % 30 === 0) {   // Wache übernehmen, sobald eine eigene Einheit nah genug ist
       const lk = E.filter(e => e.lock && !e.dead);
       if (lk.length && UL.some(u => !u.lock && (u.k === K_POL || u.k === K_SOL || u.k === K_SEN) && lk.some(l => (l.x - u.x) ** 2 + (l.y - u.y) ** 2 < m.station.r ** 2))) { for (const l of lk) l.lock = false; toast('👮 Die Einsatzkräfte der Polizeiwache stehen unter deinem Kommando'); SFX.ui(); }
     }
     // Brücke halten: kein Zombie darf das Westufer erreichen
     if (m.hold && !S.breach && (S.hstep = (S.hstep || 0) + 1) % 20 === 0) { for (const z of E) if (z.k === K_ZOM && !z.dead && m.hold(z)) { S.breach = true; alertAt(z.x, z.y, 'Brücke durchbrochen!'); break; } }
+  }
+
+
+  // ── Mission 5 „Der Weg nach Kelheim“: Linien lösen Wellen aus, Evakuierungsstelle muss gesichert und gehalten werden ──
+  const TK_R = 200, TK_HOLD = 300;
+  const TK_WAVES = [{ sn: 1000, dt: 15, e: 1000 }, { sn: 2000, dt: 10, e: 2000 }, { sn: 2000, dt: 10, e: 2000, z: 1000 }];
+  const TK_SPOTS = [...Array(10).keys()].map(k => 600 + k * 400);
+  function danubeBank(y) {   // Ufer der Donau auf Höhe y (Sammelpunkt der Ostzüge)
+    let b = null, bd = 1e9;
+    for (const w of MD.water) if (w.w === 40) for (let i = 0; i < w.p.length; i += 2) { const d = Math.abs(w.p[i + 1] - y); if (d < bd) { bd = d; b = [w.p[i], w.p[i + 1]]; } }
+    return b ? { x: b[0] + 30, y: b[1] } : { x: 600, y };
+  }
+  const trekBanks = [];
+  function trekBank(k, r, row) { return trekBanks[r] || (trekBanks[r] = danubeBank(row)); }
+  function trekPrewarm(m) {   // Wegfelder für die Ostzüge im Hintergrund vorberechnen (sonst ruckelt es beim Auslösen)
+    trekBanks.length = 0;
+    m.trek.east.forEach((row, r) => { const bk = trekBank(0, r, row), q = nearestWalkCell(bk.x, bk.y, 80) || [bk.x, bk.y]; queueField('mf', bk.x + ',' + bk.y, q[0], q[1]); });
+  }
+  function tickTrek(m) {
+    const T = m.trek, tr = S.trek || (S.trek = { lines: 0, t: [], hold: 0, primary: false, own: false, fin: false });
+    const stp = S.tkstep = (S.tkstep || 0) + 1, isT = e => !e.dead && friendly(e) && (e.k === K_SOL || e.k === K_POL || e.k === K_TRK);
+    if (stp % 15 === 0 && tr.lines < 3) {
+      let any = false; for (const e of E) if (isT(e) && e.y <= T.lines[tr.lines]) { any = true; break; }
+      if (any) { tr.t[tr.lines] = simT; banner(T.msgs[tr.lines], 9000); SFX.alarm(); tr.lines++; }
+    }
+    for (let k = 0; k < tr.lines; k++) {
+      const W = TK_WAVES[k], t0 = tr.t[k];
+      for (let j = 0; j < W.sn / 100; j++) { const id = 'ts' + k + '_' + j; if (!S.fired[id] && simT >= t0 + j * W.dt) { S.fired[id] = 1; spawnWave({ t: 0, n: 100, x: TK_SPOTS[j % 10], y: WH - 70, r: 60, seek: .95 }, false); } }
+      T.east.forEach((row, r) => {
+        const id = 'te' + k + '_' + r; if (S.fired[id] || simT < t0 + 5) return; S.fired[id] = 1;
+        const bk = trekBank(k, r, row);
+        spawnWave({ t: 0, n: W.e / 2, x: WW - 40, y: row, r: 160, seek: .95, march: { id: 'trkE' + k + '_' + r, route: 0, routes: [[]], gather: { x: bk.x, y: bk.y, r: 70 }, noWait: true, spd: 2, pre: true, dur: 2400 } }, false);
+      });
+      if (W.z) {
+        const z = T.zone;
+        if (!S.fired.tzMsg && simT >= t0 + 20) { S.fired.tzMsg = 1; banner('📡 Späher melden versteckte Untote zwischen den Bäumen. Sie kommen auf uns zu!', 12000); SFX.alarm(); }
+        for (let j = 0; j < W.z / 100; j++) { const id = 'tz' + j; if (!S.fired[id] && simT >= t0 + 20 + j * 3) { S.fired[id] = 1; const a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * (z.r - 90); spawnWave({ t: 0, n: 100, x: z.x + Math.cos(a) * d, y: z.y + Math.sin(a) * d, r: 90, pad: true }, false); } }
+      }
+    }
+    if (tr.lines === 3 && S.fired.ts2_19 && S.fired.te2_1 && S.fired.tz9) tr.fin = true;
+    if (tr.lines && (stp % 300 === 0 || (!S.seek && stp % 15 === 0))) {   // Ziel der Suchzüge: Schwerpunkt der Einsatzkräfte
+      let n = 0, sx = 0, sy = 0; for (const e of E) if (isT(e)) { n++; sx += e.x; sy += e.y; }
+      if (n) { sx /= n; sy /= n; if (!S.seek || Math.hypot(S.seek.x - sx, S.seek.y - sy) > 50) { S.seek = { x: sx, y: sy }; zsDirty = true; } }
+    }
+    if (stp % 30 === 0 && !tr.primary) {
+      tr.own = E.some(e => isT(e) && Math.hypot(e.x - S.pad.x, e.y - S.pad.y) < TK_R);
+      tr.near = countZAround(S.pad.x, S.pad.y, TK_R);
+      if (tr.own && !tr.near) tr.hold++; else tr.hold = 0;
+      if (tr.hold >= TK_HOLD) { tr.primary = true; banner('✓ Evakuierungsstelle gesichert – Primärziel erreicht! Jetzt alle Zombies ausschalten.', 14000); SFX.ui(); }
+    }
+  }
+  function evalTrek(m, c) {
+    const tr = S.trek || { lines: 0, hold: 0, primary: false }, cleared = !!tr.fin && c.zom === 0 && c.inf === 0;
+    return { R: 0, cleared, primary: tr.primary, priFrac: tr.primary ? 1 : Math.min(.6, tr.lines * .1 + tr.hold / TK_HOLD * .3), secondary: cleared, killFrac: S.spawned ? Math.min(1, S.kills / S.spawned) : 0, hold: tr.hold, lines: tr.lines };
+  }
+  function hudTrek(m, c, o, box) {
+    const tr = S.trek || {}, left = Math.max(0, TK_HOLD - (tr.hold || 0));
+    const st = o.primary ? '<div class="ok">✓ Evakuierungsstelle gesichert</div>' : `<div class="${tr.own ? '' : 'ev'}">${tr.own ? '○ Zombies im Umkreis: <b>' + (tr.near || 0) + '</b>' : '○ Einsatzkräfte noch nicht vor Ort'} · gehalten ${fmtClock(tr.hold || 0)} / ${fmtClock(TK_HOLD)}</div><div class="bar"><i style="width:${(tr.hold || 0) / TK_HOLD * 100}%"></i></div>`;
+    const html = `<h3>${m.name}</h3><div class="ev">Zeit ${fmtClock(simT)}</div>
+      <div class="o"><b class="${o.primary ? 'ok' : ''}">${o.primary ? '✓ ' : ''}Primär:</b> Evakuierungsstelle sichern (${TK_R} m zombiefrei, ${fmtClock(TK_HOLD)} halten)${st}</div>
+      <div class="o"><b class="${o.secondary ? 'ok' : ''}">${o.secondary ? '✓ ' : ''}Sekundär:</b><div class="${o.cleared ? 'ok' : ''}">${o.cleared ? '✓' : '○'} Zombies übrig: <b>${c.zom}</b>${tr.fin ? '' : ' <span class="ev">(weitere Wellen möglich)</span>'}</div></div>`;
+    if (box.dataset.h !== html) { box.innerHTML = html; box.dataset.h = html; }
+    document.getElementById('bEnd').style.display = simT > 30 ? '' : 'none';
   }
 
   // ── Pfaffenhofen: Landeplatz sichern, dann Evakuierung per Schaltfläche ──
@@ -369,7 +452,7 @@ const Campaign = (() => {
   }
 
   // ── Ziele & Punkte ─────────────────────────────────────────────────────
-  function lastSpawnT(m) { return Math.max(...m.spawns().map(w => w.t)); }
+  function lastSpawnT(m) { if (m.kind === 'trek') return 1e9; return Math.max(...m.spawns().map(w => w.t)); }
   function rescued(c) { return S.ev.civ; }
   function airCiv() { let n = 0; for (const e of E) if (!e.dead && e.k === K_CIV && e.inc < 0) n++; return n; }
   function evalAir(m, c) {   // Flughafen: alle Zivilisten müssen m.primary.hold Sekunden überleben
@@ -379,6 +462,7 @@ const Campaign = (() => {
   }
   function evalObj(m, c) {
     if (m.primary.hold) return evalAir(m, c);
+    if (m.kind === 'trek') return evalTrek(m, c);
     if (m.kind === 'land') return evalLand(m, c);
     const cleared = c.zom === 0 && c.inf === 0 && simT >= lastSpawnT(m) + 5;
     const R = rescued(c) + (cleared ? c.civ : 0);
@@ -394,6 +478,7 @@ const Campaign = (() => {
     if (!S.unitsStart) S.unitsStart = E.filter(u => friendly(u) && u.k !== K_TRK && u.k !== K_TUR).length;
     if (c.civ + c.pol + c.mil + c.trk === 0) return endGame('Mission beendet – keine Überlebenden auf der Karte.');
     if (m.primary.hold && airCiv() === 0) return endGame(S.ev.civ > 0 ? 'Evakuierung abgeschlossen.' : 'Alle Zivilisten im Flughafen sind gefallen.');
+    if (m.kind === 'trek') { if (evalTrek(m, c).cleared && S.trek.primary) return endGame('Sieg – Evakuierungsstelle gesichert und alle Zombies ausgeschaltet!'); return; }
     if (m.kind === 'land') {
       if (!S.padSafe && simT >= m.primary.land) return endGame('Der Landeplatz wurde nicht rechtzeitig gesichert.');
       if (airCiv() === 0) return endGame(S.fired.evacGo ? 'Evakuierung abgeschlossen.' : 'Alle Zivilisten sind gefallen.');
@@ -405,6 +490,7 @@ const Campaign = (() => {
     box.style.display = '';
     const o = evalObj(m, c), pri = m.primary.civ;
     if (m.primary.hold) return hudAir(m, c, o, box);
+    if (m.kind === 'trek') return hudTrek(m, c, o, box);
     if (m.kind === 'land') return hudLand(m, c, o, box);
     const evs = []; const up = (name, t) => { if (simT < t && t < 1e8) evs.push(`${name} in ${fmtClock(t - simT)}`); };
     const ev = m.evac(); up('📡 Evakuierungssignal', ev.at); up('💥 Luftschläge', m.tools.strike.at); if (m.tools.garrison) up('🪖 Verstärkung', m.tools.garrison.at); up('⚠ Horde stürmt', m.hordeAt);
@@ -474,7 +560,7 @@ const Campaign = (() => {
     };
     const html = `<h2>${o.primary ? (o.secondary ? 'Mission erfüllt' : 'Primärziel erreicht') : 'Mission gescheitert'}</h2><p class="stars">${'★'.repeat(starN)}${'☆'.repeat(3 - starN)}</p><p>${msg}</p>
       <table>
-      <tr><td>Primär: ${m.kind === 'land' ? (o.primary ? '✓ Landeplatz gesichert' : '✗ Landeplatz nicht gesichert') : m.primary.hold ? o.R + ' von ' + (S.civ0 || m.pop) + ' Zivilisten am Leben' + (o.primary ? ' (20 Minuten überlebt)' : '') : o.R + ' von ' + m.primary.civ + ' Zivilisten gerettet'} (${Math.round(o.priFrac * 100)} %)</td><td>+${priPts}</td></tr>
+      <tr><td>Primär: ${m.kind === 'trek' ? (o.primary ? '✓ Evakuierungsstelle gesichert' : '✗ Evakuierungsstelle nicht gesichert') : m.kind === 'land' ? (o.primary ? '✓ Landeplatz gesichert' : '✗ Landeplatz nicht gesichert') : m.primary.hold ? o.R + ' von ' + (S.civ0 || m.pop) + ' Zivilisten am Leben' + (o.primary ? ' (20 Minuten überlebt)' : '') : o.R + ' von ' + m.primary.civ + ' Zivilisten gerettet'} (${Math.round(o.priFrac * 100)} %)</td><td>+${priPts}</td></tr>
       <tr><td>Sekundär: ${secTxt}</td><td>+${secPts}</td></tr>
       <tr><td>Gerettete/überlebende Personen (1 / 5 / 10 Punkte)</td><td>+${people}</td></tr>
       <tr><td><b>Summe</b></td><td><b>${total}</b></td></tr>

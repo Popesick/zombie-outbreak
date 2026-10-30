@@ -151,8 +151,11 @@ const Comic = (() => {
       { s: 'squad', cap: 'Die Einsatzkräfte stellen sich ein letztes Mal der Horde.', bub: ['Das ist unsere letzte Linie. Niemand kommt hier durch!', 380, 90, 260, 360, 300] }
     ],
     m3_win: [
-      { s: 'blast', cap: 'Die Linie hielt. Der letzte Zug der Horde zerschellte an den Barrikaden.' },
-      { s: 'heliLZ', cap: 'Die Überlebenden flogen in die Sicherheit. Die Geschichte endet hier – vorerst.' }
+      { s: 'road', img: 'img/comic/m3_win_1.webp', cap: 'Die Überlebenden wurden ins Auffanglager nach Kelheim transportiert... und auch wir wurden dorthin beordert. Kurz vor Kelheim hieß es dann: Absteigen.' },
+      { s: 'road', img: 'img/comic/m3_win_2.webp', cap: 'Man wollte nicht riskieren, die Untoten durch unsere Motorengeräusche direkt zur Sicherheitszone zu führen. Also setzten wir den Weg zu Fuß fort. Die Donau im Westen bot uns Schutz... und es war kein einziger Feind zu sehen.' },
+      { s: 'dawn', img: 'img/comic/m3_win_3.webp', cap: 'Uns erwartete ein Zweistundenmarsch... bei wunderschönem Wetter. Nach all den Entbehrungen, den Verlusten und Kämpfen der letzten Tage... erschien uns das wie ein kurzes Aufatmen. Ein winziger Moment der Normalität – in einer Welt, in der absolut nichts mehr normal war.' },
+      { s: 'squad', img: 'img/comic/m3_win_4.webp', cap: 'Zumindest so lange... bis plötzlich dieses Stöhnen um uns herum zu hören war.' },
+      { s: 'horde', img: 'img/comic/m3_win_5.webp', cap: 'Der Wandertag war vorbei. Wir entsicherten unsere Gewehre... und marschierten weiter. Jetzt waren wir wieder in der Welt der Untoten angekommen.' }
     ],
     m3_lose: [
       { s: 'burning', cap: 'Pfaffenhofen fiel. Wer konnte, floh weiter nach Süden.' },

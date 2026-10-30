@@ -105,6 +105,7 @@ function preloadTiles() {
   const src = TILE_SRC[mapMode]; if (!src) return;
   for (let z = 13; z <= Math.min(17, src.max); z++) {
     const [la0, lo0] = w2ll(0, 0), [la1, lo1] = w2ll(WW, WH);
+    if ((Math.floor(lat2t(la1, z)) - Math.floor(lat2t(la0, z)) + 1) * (Math.floor(lon2t(lo1, z)) - Math.floor(lon2t(lo0, z)) + 1) > 500) break;   // große Karten: nur grobe Stufen vorladen
     for (let ty = Math.floor(lat2t(la0, z)); ty <= Math.floor(lat2t(la1, z)); ty++) for (let tx = Math.floor(lon2t(lo0, z)); tx <= Math.floor(lon2t(lo1, z)); tx++) getTile(mapMode, z, tx, ty);
   }
 }
@@ -366,7 +367,7 @@ function spawnSquads(kind, total, size, acc) {
 function newSim() {
   E = []; BAR = [null]; barId.fill(0); gate.fill(0); noises = []; tracers = []; fx = []; simT = 0; finished = false; MF.clear();
   for (const b of B) { b.occ = []; b.siege = 0; }
-  S = newStats(); cooldown = {}; evacDirty = false; zfDirty = true; ZF = { evac: null, lure: null };
+  S = newStats(); cooldown = {}; evacDirty = false; zfDirty = true; FJ.length = 0; zsDirty = zpDirty = false; ZF = { evac: null, lure: null, seek: null, pad: null };
   const inside = Math.round(cfg.pop * .5);
   const cn = RULES.civNorth; for (let i = 0; i < cfg.pop; i++) { if (RULES.civZone) spawnCivilianZone(i < inside); else spawnCivilian(i < inside, cn && Math.random() < cn.frac ? cn.ymax : 0); }
   document.getElementById('alerts').innerHTML = '';
@@ -734,6 +735,8 @@ function thinkZombie(e) {
       if (mk && mk.go && S.evac && ZF.evac && (mk.focus == null || Math.random() < mk.focus)) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; return; }
     } else { e.st = 7; e.fz = 'march'; e.fzT = 2; return; }
   }
+  if (e.pd && S.padT && ZF.pad) { e.st = 7; e.fz = 'pad'; e.fzT = 2; return; }   // Kampagne (Trek): 100 % zum Zielpunkt
+  if (e.sk && S.seek && ZF.seek) { e.st = 7; e.fz = 'seek'; e.fzT = 2; return; }   // Kampagne (Trek): Zug zu den Einsatzkräften
   if (S.lure && simT < S.lure.until && ZF.lure) { e.st = 7; e.fz = 'lure'; e.fzT = 2; return; }
   // Geräusche
   let bn = null, bd = -1e9;
@@ -777,6 +780,11 @@ function stepZombie(e) {
       if (!f || f.t <= 0 || e.fzT <= 0 || Math.hypot(f.x - e.x, f.y - e.y) < 10) { e.st = 0; e.wt = 0; return; }
       fieldDescend(e, f.D, f.x, f.y, sp, true); return;
     }
+    if (e.fz === 'seek' || e.fz === 'pad') {
+      const pd = e.fz === 'pad', t = pd ? S.padT : S.seek, D = pd ? ZF.pad : ZF.seek; e.fzT -= DT;
+      if (!t || !D || e.fzT <= 0) { e.st = 0; e.wt = 0; return; }
+      fieldDescend(e, D, t.x, t.y, sp, true); return;
+    }
     if (e.fz === 'march') {
       const mk = e.mk && S.marches && S.marches[e.mk - 1]; e.fzT -= DT;
       if (!mk || e.fzT <= 0) { e.st = 0; e.wt = 0; return; }
@@ -784,9 +792,10 @@ function stepZombie(e) {
       const rt = mk.routes[e.mr || 0] || [], fin = (e.mi || 0) >= rt.length, wp = fin ? [mk.gather.x, mk.gather.y] : rt[e.mi || 0];
       const key = wp[0] + ',' + wp[1];
       let f = MF.get(key);
+      if (!f && mk.pre) return;   // Feld wird im Hintergrund berechnet: bis dahin abwarten
       if (!f) { const q = nearestWalkCell(wp[0], wp[1], 80) || wp; MF.set(key, f = { x: q[0], y: q[1], D: computeField(q[0], q[1], true) }); }   // Wegpunkt auf begehbaren Grund legen (Felder gemeinsam genutzt)
       if (Math.hypot(e.x - f.x, e.y - f.y) < (fin ? mk.gather.r : 30)) { if (fin && mk.noWait) { e.mk = 0; e.st = 0; e.wt = 0; if (mk.toEvac && S.evac && ZF.evac) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; } } else if (fin) { e.mw = 1; mk.arr++; if (mk.t1 == null) mk.t1 = simT; } else e.mi = (e.mi || 0) + 1; return; }
-      fieldDescend(e, f.D, f.x, f.y, sp * 1.6, true); return;
+      fieldDescend(e, f.D, f.x, f.y, sp * (mk.spd || 1.6), true); return;
     }
     e.fzT -= DT; const lure = e.fz === 'lure', tg = lure ? S.lure : S.evac;
     if (!tg || e.fzT <= 0 || (lure && simT >= S.lure.until)) { e.st = 0; e.wt = 0; return; }
@@ -925,8 +934,35 @@ function fieldDescend(e, D, tx, ty, sp, zm) {
   }
   moveTo(e, px, py, sp, zm);
 }
-let ZF = { evac: null, lure: null }, zfDirty = true;
+let ZF = { evac: null, lure: null, seek: null, pad: null }, zfDirty = true, zsDirty = false, zpDirty = false;
+// Zeitscheibenweise berechnete Wegfelder (große Karten): Aufträge laufen in kleinen Portionen pro Simulationsschritt, bis das Feld fertig ist
+const FJ = [];
+function queueField(kind, key, x, y) { FJ.push({ kind, key, x, y, D: null, hI: [], hF: [], hN: 0 }); }
+function stepFieldJob(budget) {
+  const j = FJ[0]; if (!j) return;
+  const hI = j.hI, hF = j.hF;
+  const push = (i, f) => { let k = j.hN++; while (k > 0) { const p = (k - 1) >> 1; if (hF[p] <= f) break; hI[k] = hI[p]; hF[k] = hF[p]; k = p; } hI[k] = i; hF[k] = f; };
+  const pop = () => { const r = hI[0]; j.hN--; const n = j.hN; if (n > 0) { const i = hI[n], f = hF[n]; let k = 0; for (;;) { let c = 2 * k + 1; if (c >= n) break; if (c + 1 < n && hF[c + 1] < hF[c]) c++; if (hF[c] >= f) break; hI[k] = hI[c]; hF[k] = hF[c]; k = c; } hI[k] = i; hF[k] = f; } return r; };
+  if (!j.D) { j.D = new Float64Array(GW * GH).fill(1e9); const s0 = cellIdx(j.x, j.y); j.D[s0] = 0; push(s0, 0); }
+  const D = j.D; let n = 0;
+  while (j.hN > 0 && n++ < budget) {
+    const f = hF[0], cur = pop(); if (f > D[cur]) continue;
+    const cx = cur % GW, cy = cur / GW | 0;
+    for (const [dx, dy, m] of NB) {
+      const nx = cx + dx, ny = cy + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+      const ni = ny * GW + nx, c = cost(ni, true); if (!c) continue;
+      if (dx && dy && (!cost(cy * GW + nx, true) || !cost(ny * GW + cx, true))) continue;
+      const nd = f + c * m; if (nd < D[ni]) { D[ni] = nd; push(ni, nd); }
+    }
+  }
+  if (j.hN > 0) return;
+  FJ.shift();
+  if (j.kind === 'seek') ZF.seek = D; else if (j.kind === 'pad') ZF.pad = D; else MF.set(j.key, { x: j.x, y: j.y, D });
+}
 function updateZF() {   // Felder für Zombies bei Bedarf neu berechnen
+  if (S && zsDirty) { zsDirty = false; if (S.seek && !FJ.some(j => j.kind === 'seek')) queueField('seek', '', S.seek.x, S.seek.y); }
+  if (S && zpDirty) { zpDirty = false; if (S.padT) queueField('pad', '', S.padT.x, S.padT.y); }
+  if (FJ.length) stepFieldJob(7000);
   if (!S || !zfDirty) return; zfDirty = false;
   if (S.evac) ZF.evac = computeField(S.evac.x, S.evac.y, true, ZF.evac); else ZF.evac = null;
   if (S.lure) ZF.lure = computeField(S.lure.x, S.lure.y, true, ZF.lure); else ZF.lure = null;
