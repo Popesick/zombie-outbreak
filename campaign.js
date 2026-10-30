@@ -111,7 +111,7 @@ const Campaign = (() => {
       spawns: () => PF_WAVES,
       lure: () => ({ x: 0, y: 0, t: 1e9, dur: 0 }),
       hordeAt: 1e9, hordeFocus: 0, hordeQuiet: true,
-      evacCap: 120, evacEvery: 10,
+      evacCap: 60, evacEvery: 20,
       civZone: { discs: [{ x: 1612, y: 414, r: 110 }, { x: 1549, y: 926, r: 130 }, { x: 1421, y: 1374, r: 130 }] },
       civLine: (x, y) => x >= ilmX(y),
       seals: PF_SEALS, guards: 8,
