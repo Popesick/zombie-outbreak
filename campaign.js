@@ -17,7 +17,7 @@ const Campaign = (() => {
     { id: 'turret', n: 'Automatikgeschütze', d: 'Zwei feste MG-Geschütze pro Mission, per Hubschrauber (30 s Verzögerung). Zerstörung erst durch 10 Zombies.', p: [600] },
     { id: 'ammo', n: 'Mehr Munition', d: 'Munitionsvorrat +100 %.', p: [350] },
     { id: 'moresupply', n: 'Mehr Versorgungspakete', d: '+5 Versorgungspakete pro Stufe.', p: [200, 300] },
-    { id: 'supqty', n: 'Versorgungsupgrade', d: 'Die Menge der Versorgungsgüter pro Paket verdoppelt sich (Munition und Waffen für Zivilisten).', p: [500] },
+    { id: 'supqty', n: 'Versorgungsupgrade', d: 'Die Menge der Versorgungsgüter pro Paket verdoppelt sich je Stufe (Munition und Waffen für Zivilisten): Stufe 1 = 2×, Stufe 2 = 4×.', p: [500, 1000] },
     { id: 'flare', n: 'Signalbomben', d: '5 Signalbomben: 20 s lauter Lockton, danach Explosion (60 % Radius eines Luftschlags).', p: [250] },
     { id: 'mines', n: 'Minenteppiche', d: 'Ein Hubschrauber legt einen Minenteppich (Radius 25 m, 36 Minen). Jede Figur löst aus, Explosion nach 1 s. Je Stufe 3 Teppiche pro Mission.', p: [250, 300, 350] },
     { id: 'gunship', n: 'Gunship', d: 'Ein Hubschrauber schwebt 30 s über dem Ziel und beschießt es mit der Gatling (2 Einsätze pro Mission).', p: [700] }
@@ -186,7 +186,7 @@ const Campaign = (() => {
     const R = {
       evacCap: m.evacCap, evacEvery: m.evacEvery, civNorth: m.civNorth, civZone: m.civZone ? { ...m.civZone } : null, civNoGate: !!m.civNoGate, civLine: m.civLine || null, noHeli: !!m.noHeli, rushAfter: lastSpawnT(m), mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
       barLimit: m.barricades + 12 * lv('morebar'), barHpMul: 2 * (lv('barhp') ? 2 : 1),
-      gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), canMp: !!lv('mp'), canSg: !!lv('sg'), squadPlus: lv('squad') ? 1 : 0, polPlus: lv('third') ? 1 : 0, supMul: lv('supqty') ? 2 : 1, garr, ammoMul: lv('ammo') ? 2 : 1,
+      gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), canMp: !!lv('mp'), canSg: !!lv('sg'), squadPlus: lv('squad') ? 1 : 0, polPlus: lv('third') ? 1 : 0, supMul: 2 ** lv('supqty'), garr, ammoMul: lv('ammo') ? 2 : 1,
       spawn: () => spawnMission(m), tick: () => tick(m), hud: c => hud(m, c), checkEnd: c => checkEnd(m, c), onEnd: msg => finish(m, msg)
     };
     return R;
