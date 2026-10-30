@@ -321,6 +321,12 @@ const Campaign = (() => {
       if (o.lost && !S.fired.lossNote) { S.fired.lossNote = 1; banner('Zivilisten wurden verloren – das Primärziel ist verfehlt. Haltet die Stellung für das Sekundärziel!', 12000); }
       if (!S.fired.holdDone && simT >= m.primary.hold) { S.fired.holdDone = 1; if (!o.lost) { banner('✓ Die Zivilisten haben 20 Minuten überlebt – Primärziel erreicht! Jetzt alle Zombies ausschalten.', 14000); SFX.ui(); } }
     }
+    if (m.id === 'ap' && simT >= 900 && !RULES.apHQ) {   // gescriptete Überraschung: Verstärkung vom Hauptquartier und Evakuierung per Hubschrauber
+      RULES.apHQ = true; const T = RULES.tools, add = (k, n, d) => { T[k] = { at: 0, cd: 20, ...d, ...T[k], max: ((T[k] && T[k].max) || 0) + n, at: 0 }; };
+      add('gunship', 3); T.gunship.cd = 0; add('strike', 5); add('supply', 5); add('flare', 5, { cd: 4 });
+      cooldown.gunship = 0; RULES.noHeli = false; RULES.evacCap = 40; RULES.evacEvery = 30;
+      if (!S.fired.apHQ) { S.fired.apHQ = 1; S.evacT = 5; banner('📻 Ein Funkspruch vom Leutnant: „Uns wurden für diesen Kampf zusätzliche Ressourcen gewährt, um den Kampf fortzuführen. Helikopter, um die Zivilisten aufzunehmen, sind unterwegs. Haltet durch, solange ihr könnt, und rettet so viele Zivilisten, wie ihr könnt.“', 22000); SFX.alarm(); }
+    }
     if (m.kind === 'land') tickLand(m);
     if (m.station && (S.sstep = (S.sstep || 0) + 1) % 30 === 0) {   // Wache übernehmen, sobald eine eigene Einheit nah genug ist
       const lk = E.filter(e => e.lock && !e.dead);
@@ -359,8 +365,8 @@ const Campaign = (() => {
   function rescued(c) { return S.ev.civ; }
   function airCiv() { let n = 0; for (const e of E) if (!e.dead && e.k === K_CIV && e.inc < 0) n++; return n; }
   function evalAir(m, c) {   // Flughafen: alle Zivilisten müssen m.primary.hold Sekunden überleben
-    const cleared = c.zom === 0 && c.inf === 0 && simT >= lastSpawnT(m) + 5, civ = airCiv(), c0 = S.civ0 || m.pop, lost = civ < m.primary.civ ? Math.max(1, c0 - civ) : 0;   // „lost“: Mindestzahl unterschritten
-    const prog = cleared ? 1 : Math.min(1, simT / m.primary.hold);
+    const cleared = c.zom === 0 && c.inf === 0 && simT >= lastSpawnT(m) + 5, civ = airCiv() + S.ev.civ, c0 = S.civ0 || m.pop, lost = civ < m.primary.civ ? Math.max(1, c0 - civ) : 0;   // „lost“: Mindestzahl unterschritten
+    const prog = cleared || (civ - S.ev.civ === 0 && S.ev.civ > 0) ? 1 : Math.min(1, simT / m.primary.hold);   // alles evakuiert: nichts mehr zu halten
     return { R: civ, cleared, lost, prog, primary: lost === 0 && prog >= 1, priFrac: Math.min(1, civ / m.primary.civ) * prog, secondary: cleared, killFrac: S.spawned ? Math.min(1, S.kills / S.spawned) : 0 };
   }
   function evalObj(m, c) {
@@ -379,7 +385,7 @@ const Campaign = (() => {
     if (simT < 5) return;
     if (!S.unitsStart) S.unitsStart = E.filter(u => friendly(u) && u.k !== K_TRK && u.k !== K_TUR).length;
     if (c.civ + c.pol + c.mil + c.trk === 0) return endGame('Mission beendet – keine Überlebenden auf der Karte.');
-    if (m.primary.hold && airCiv() === 0) return endGame('Alle Zivilisten im Flughafen sind gefallen.');
+    if (m.primary.hold && airCiv() === 0) return endGame(S.ev.civ > 0 ? 'Evakuierung abgeschlossen.' : 'Alle Zivilisten im Flughafen sind gefallen.');
     if (m.kind === 'land') {
       if (!S.padSafe && simT >= m.primary.land) return endGame('Der Landeplatz wurde nicht rechtzeitig gesichert.');
       if (airCiv() === 0) return endGame(S.fired.evacGo ? 'Evakuierung abgeschlossen.' : 'Alle Zivilisten sind gefallen.');
