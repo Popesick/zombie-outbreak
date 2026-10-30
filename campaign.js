@@ -342,10 +342,11 @@ const Campaign = (() => {
   function tickLand(m) {
     if (S.civFree && RULES.civNoGate) RULES.civNoGate = false;
     for (let k = 0; k < 20; k++) { const id = 'south' + k; if (!S.fired[id] && simT >= 600 + k * 6) { S.fired[id] = 1; spawnWave(PF_SOUTH(k), false); } }
-    if (S.fired.evacGo) {   // nach Evakuierungsbeginn: Strom aus dem Nordwesten (40 x 50, alle 10 s) und 500 aus dem Osten nach 8:00
+    if (S.fired.evacGo) {   // nach Evakuierungsbeginn: Strom aus dem Nordwesten ab 5:00 (40 x 50, alle 10 s) und 500 aus dem Osten nach 8:00
       if (S.evacGoT == null) S.evacGoT = simT;
       const toPad = id => ({ id, route: 0, routes: [[]], gather: { x: S.pad.x, y: S.pad.y, r: 50 }, noWait: true, toEvac: true, dur: 1800 });
-      for (let k = 0; k < 40; k++) { const id = 'nw' + k; if (!S.fired[id] && simT >= S.evacGoT + k * 10) { S.fired[id] = 1; spawnWave({ t: 0, n: 50, x: 45, y: 45, r: 30, msg: k === 0 ? '⚠ Ein endloser Strom von Zombies ergießt sich aus dem Nordwesten auf den Landeplatz zu!' : null, march: toPad('pfNW') }, false); } }
+      if (!S.fired.nwMsg && simT >= S.evacGoT + 300) { S.fired.nwMsg = 1; banner('📻 Achtung: Sie haben unsere nördliche Absperrung durchbrochen und bewegen sich auf die Extraktionszone zu. Ihr müsst die Stellung unter allen Umständen halten.', 16000); SFX.alarm(); }
+      for (let k = 0; k < 40; k++) { const id = 'nw' + k; if (!S.fired[id] && simT >= S.evacGoT + 300 + k * 10) { S.fired[id] = 1; spawnWave({ t: 0, n: 50, x: 45, y: 45, r: 30, msg: null, march: toPad('pfNW') }, false); } }
       if (!S.fired.east500 && simT >= S.evacGoT + 480) { S.fired.east500 = 1; spawnWave({ t: 0, n: 500, x: WW - 30, y: 950, r: 380, msg: '⚠ 500 Zombies stürmen aus dem Osten heran!', march: toPad('pfE') }, false); SFX.alarm(); }
     }
     if ((S.lstep = (S.lstep || 0) + 1) % 30) return;
