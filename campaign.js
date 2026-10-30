@@ -125,7 +125,7 @@ const Campaign = (() => {
     {
       id: 'm5', map: 'm5', kind: 'trek', name: 'Der Weg nach Kelheim', sub: 'Abensberg – Weltenburg', pop: 0, armed: 0, acc: 35, zs: 50,
       start: () => ({ sol: [{ x: 858, y: 3586 }], pol: [{ x: 835, y: 3560 }, { x: 882, y: 3612 }] }),
-      evac: () => ({ x: 2230, y: 335, at: 1e9 }),   // Evakuierungsstelle: Kloster Weltenburg
+      evac: () => ({ x: 2272, y: 505, at: 1e9 }),   // Evakuierungsstelle: Kloster Weltenburg (innerhalb der Donauschleife)
       spawns: () => [],
       lure: () => ({ x: 0, y: 0, t: 1e9, dur: 0 }),
       hordeAt: 1e9, hordeFocus: 0, hordeQuiet: true,
