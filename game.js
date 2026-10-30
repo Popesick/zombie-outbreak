@@ -644,7 +644,11 @@ function stepUnit(e) {
     if (!moveDir(e, e.fhx, e.fhy, 3.6, false)) { const a = Math.atan2(e.fhy, e.fhx) + rnd(-1.5, 1.5); e.fhx = Math.cos(a); e.fhy = Math.sin(a); }
     e.path = null; return;
   }
-  if (e.gsg && !e.pg && RULES.ammo && e.ammo <= 0 && e.pis > 0) { e.pg = 1; e.snipe = false; e.ammo = e.pis; e.pis = 0; }   // GSG-9: Gewehr leer → Pistole
+  if (e.gsg && !e.pg && RULES.ammo && e.ammo <= 0 && e.pis > 0) { e.pg = 1; e.wsn = e.snipe; e.snipe = false; e.ammo = e.pis; e.pis = 0; }   // GSG-9: Gewehr leer → Pistole
+  if (e.k === K_POL && (e.mp || e.sg) && RULES.ammo && e.ammoMax && e.ammo <= 0) {   // Polizei: MP/Schrotflinte leer → Pistole (eigenes Magazin)
+    const mul = e.upMul > 1 ? 1 : RULES.ammoMul || 1, pa = e.ams && e.ams[''] != null ? e.ams[''] : 40 * mul;
+    if (pa > 0) { e.ams = e.ams || {}; e.ams[e.mp ? 'mp' : 'sg'] = 0; e.mp = e.sg = false; e.ammoMax = 40 * mul; e.ammo = Math.min(pa, e.ammoMax); }
+  }
   const pst = e.k === K_POL || e.pg, trk = e.k === K_TRK || e.k === K_TUR, sn = !!e.snipe && !trk && e.k !== K_POL, rng = (trk ? 70 : !pst && (e.k === K_SOL || e.k === K_SEN) ? 65 : e.mp ? 46 : 38) * (sn ? 3 : 1), rate = (trk ? .12 : pst ? (e.mp ? .6 : 1.1) : .7) * (sn ? 2 : 1), dmg = trk ? 1 : pst ? 1.5 : 2.5, mobile = e.k !== K_SEN && e.k !== K_TUR;
   // Eingraben / Stellung räumen
   if (e.ds === 1) { e.dt += DT; if (e.dt >= 60) { e.ds = 2; e.dt = 0; } }
@@ -990,7 +994,7 @@ function setEvac(x, y) {
   const first = !S.evac; S.evac = { x: p[0], y: p[1] }; S.evacR = 50; if (first) S.evacT = 10;
   if (first) Music.play('hope'); computeEvacField(); toast(first ? 'Evakuierungsort festgelegt – erster Hubschrauber in ca. 10 s' : 'Evakuierungsort verlegt');
 }
-function evKind(e) { return e.k === K_CIV ? 'civ' : e.k === K_POL ? 'pol' : e.k === K_TRK ? 'trk' : 'mil'; }
+function evKind(e) { return e.k === K_CIV ? 'civ' : e.k === K_POL || e.gsg ? 'pol' : e.k === K_TRK ? 'trk' : 'mil'; }
 function doEvac(x, y) {
   const cand = [];
   for (const e of E) {
@@ -1135,7 +1139,7 @@ function counts() {
     else if (e.k === K_CIV) { c.civ++; if (e.inc >= 0) c.inf++; }
     else if (e.k === K_TUR) { }
     else if (e.k === K_TRK) c.trk++;
-    else if (e.k === K_POL) { c.pol++; if (e.inc >= 0) c.inf++; }
+    else if (e.k === K_POL || e.gsg) { c.pol++; if (e.inc >= 0) c.inf++; }
     else { c.mil++; if (e.inc >= 0) c.inf++; }
   }
   return c;
@@ -1160,10 +1164,10 @@ function explode(x, y, r) {
 }
 function drop(x, y) {
   if (RULES.ammo) {   // Kampagne: erst Einsatzkräfte auffüllen, der Rest bewaffnet Zivilisten
-    let budget = 800;
+    let budget = 800 * (RULES.supMul || 1);
     for (const u of E) if (friendly(u) && u.ammoMax && Math.hypot(u.x - x, u.y - y) < 40) {   // Wachen mit Standardvorrat: erst jetzt auf Upgrade-Niveau; GSG-9 wieder zum Gewehr
       if (u.upMul > 1) { u.ammoMax *= u.upMul; u.pisMax = (u.pisMax || 40) * u.upMul; u.upMul = 0; }
-      if (u.gsg) { u.pis = u.pisMax || 40 * (RULES.ammoMul || 1); if (u.pg) { u.pg = 0; u.snipe = u.gsg === 1; u.ammo = 0; } }
+      if (u.gsg) { u.pis = u.pisMax || 40 * (RULES.ammoMul || 1); if (u.pg) { u.pg = 0; u.snipe = u.wsn != null ? u.wsn : u.gsg === 1; u.ammo = 0; } }
     }
     for (const u of E) if (friendly(u) && u.ammoMax && Math.hypot(u.x - x, u.y - y) < 40) { const need = u.ammoMax - u.ammo; if (need > 0) { const g = Math.min(need, budget); u.ammo += g; budget -= g; } }
     for (const e of E) { if (budget < 14) break; if (!e.dead && e.k === K_CIV && e.st !== 4 && Math.hypot(e.x - x, e.y - y) < 40) { if (!e.armed) { arm(e); e.brave = Math.random() < .7; budget -= 14; } else { e.ammo += 14; budget -= 14; } } }
@@ -1309,9 +1313,9 @@ const s2w = (x, y) => [(x - VW / 2) / cam.z + cam.x, (y - VH / 2) / cam.z + cam.
 function fitCam() { resize(); cam.x = WW / 2; cam.y = WH / 2; cam.z = minZ / .9; }
 
 let toolSel = 'pan', drag = null, hover = null;
-const COL = { civ: '#f1f5f2', armed: '#ffe066', inf: '#f0a030', zom: '#58c24a', pol: '#4a8bff', sol: '#c8b04a' };
+const COL = { civ: '#f1f5f2', armed: '#ffe066', inf: '#f0a030', zom: '#58c24a', pol: '#4a8bff', gsg: '#8fd3ff', sol: '#c8b04a' };
 // Einstellungen: Farben, unauffällige Infizierte (Lautstärke liegt in SFX/Music)
-const PALETTE = [['#f1f5f2', 'Weiß'], ['#ffe066', 'Gelb'], ['#f0a030', 'Orange'], ['#e5484d', 'Rot'], ['#b06cff', 'Violett'], ['#4a8bff', 'Blau'], ['#58c24a', 'Grün'], ['#c8b04a', 'Khaki']];
+const PALETTE = [['#f1f5f2', 'Weiß'], ['#ffe066', 'Gelb'], ['#f0a030', 'Orange'], ['#e5484d', 'Rot'], ['#b06cff', 'Violett'], ['#4a8bff', 'Blau'], ['#8fd3ff', 'Hellblau'], ['#58c24a', 'Grün'], ['#c8b04a', 'Khaki']];
 const COL_DEF = { ...COL }, OPT = { stealth: false };
 try { const o = JSON.parse(localStorage.getItem('zos_settings')); if (o) { OPT.stealth = !!o.stealth; for (const k in COL) if (o.col && PALETTE.some(p => p[0] === o.col[k])) COL[k] = o.col[k]; } } catch (e) {}
 const saveOpt = () => { try { localStorage.setItem('zos_settings', JSON.stringify({ stealth: OPT.stealth, col: COL })); } catch (e) {} };
@@ -1347,12 +1351,12 @@ function draw() {
   if (phase === 'setup') for (const m of markers) { const p = 6 + Math.sin(performance.now() / 250) * 2; ctx.strokeStyle = '#58c24a'; ctx.lineWidth = 2 / cam.z; ctx.beginPath(); ctx.arc(m.x, m.y, p * 2, 0, 6.283); ctx.stroke(); ctx.fillStyle = '#58c24a'; ctx.beginPath(); ctx.arc(m.x, m.y, 3, 0, 6.283); ctx.fill(); }
   // Entitäten
   const r = Math.max(1.3, 1.5 * cam.z) / cam.z;
-  const groups = { civ: [], armed: [], inf: [], zom: [], pol: [], sol: [] };
+  const groups = { civ: [], armed: [], inf: [], zom: [], pol: [], gsg: [], sol: [] };
   const x0 = cam.x - VW / 2 / cam.z - 5, x1 = cam.x + VW / 2 / cam.z + 5, y0 = cam.y - VH / 2 / cam.z - 5, y1 = cam.y + VH / 2 / cam.z + 5;
   for (const e of E) {
     if (e.dead || e.st === 4 && e.k !== K_ZOM || e.x < x0 || e.x > x1 || e.y < y0 || e.y > y1) continue;
     if (e.k === K_TRK) continue;
-    (e.k === K_ZOM ? groups.zom : e.inc >= 0 && !(OPT.stealth && !scanSeen(e)) ? groups.inf : e.k === K_CIV ? (e.armed ? groups.armed : groups.civ) : e.k === K_POL ? groups.pol : groups.sol).push(e);
+    (e.k === K_ZOM ? groups.zom : e.inc >= 0 && !(OPT.stealth && !scanSeen(e)) ? groups.inf : e.k === K_CIV ? (e.armed ? groups.armed : groups.civ) : e.gsg ? groups.gsg : e.k === K_POL ? groups.pol : groups.sol).push(e);
   }
   for (const g in groups) {
     ctx.fillStyle = COL[g]; ctx.beginPath();
@@ -1543,17 +1547,19 @@ $('bDrop').onclick = () => { if (S.plans.some(q => q.st === 'plan' && q.siren)) 
 // Feuermodus: ein Menü für alle Waffenvarianten; angeboten wird nur, was zu den gewählten Einheitentypen passt
 const FM = {
   sol: [['', '🔫 Sturmgewehr', 'Standard: bremst Zombies kurz aus'], ['sil', '🔇 Dämpfer', 'Lärm −50 %, keine Mann-Stop-Wirkung', 'canSil'], ['snipe', '🎯 Sniper', 'Reichweite ×3, Feuerrate −50 %, Lärm +20 %, wirft Zombies zurück', 'canSnipe']],
+  gsg: [['', '🔫 Sturmgewehr', 'Bremst Zombies kurz aus'], ['snipe', '🎯 Sniper', 'Reichweite ×3, Feuerrate −50 %, Lärm +20 %, wirft Zombies zurück'], ['sil', '🔇 Dämpfer', 'Lärm −50 %, keine Mann-Stop-Wirkung', 'canSil']],
   pol: [['', '🔫 Pistole', 'Standard: keine Mann-Stop-Wirkung'], ['mp', '🔫 MP', 'Mehr Reichweite, schnellere Schussfolge, keine Mann-Stop-Wirkung', 'canMp'], ['sg', '💥 Schrotflinte', 'Reichweite wie Pistole, Treffer +10 %, wirft Zombies 2 Schritte zurück', 'canSg']]
 };
 const fmOf = u => u.sil ? 'sil' : u.snipe ? 'snipe' : u.mp ? 'mp' : u.sg ? 'sg' : '';
-const fmKind = u => u.gsg ? null : u.k === K_POL ? 'pol' : u.k === K_SOL || u.k === K_SEN ? 'sol' : null;
+const fmKind = u => u.gsg ? 'gsg' : u.k === K_POL ? 'pol' : u.k === K_SOL || u.k === K_SEN ? 'sol' : null;
 function fmAvail() {   // [{kind, modes}] für die gewählten Einheitentypen
   const kinds = new Set(selU().map(fmKind).filter(Boolean)), out = [];
-  for (const k of ['sol', 'pol']) if (kinds.has(k)) { const m = FM[k].filter(x => !x[3] || RULES[x[3]]); if (m.length > 1) out.push({ kind: k, modes: m }); }
+  for (const k of ['sol', 'pol', 'gsg']) if (kinds.has(k)) { const m = FM[k].filter(x => !x[3] || RULES[x[3]]); if (m.length > 1) out.push({ kind: k, modes: m }); }
   return out;
 }
 function setFireMode(kind, mode) {
   for (const u of selU()) if (fmKind(u) === kind) {
+    if (u.pg) { u.wsn = mode === 'snipe'; u.sil = mode === 'sil'; continue; }   // gerade auf Pistole: Wahl gilt fürs Gewehr
     if (kind === 'pol' && u.ammoMax) {   // jede Waffe hat ihr eigenes Magazin: Pistole 40, MP 150, Schrotflinte 40 (× Munitions-Upgrade)
       const old = fmOf(u), cap = m => (m === 'mp' ? 150 : 40) * (u.upMul > 1 ? 1 : RULES.ammoMul || 1);
       u.ams = u.ams || {}; u.ams[old] = u.ammo; u.ammoMax = cap(mode); u.ammo = u.ams[mode] != null ? Math.min(u.ams[mode], u.ammoMax) : u.ammoMax;
@@ -1567,7 +1573,7 @@ function refreshFire() {
   if (!av.length) { $('fmenu').style.display = 'none'; fmKey = ''; return; }
   const us = selU(), key = av.map(a => a.kind + a.modes.map(m => m[0]).join('.') + us.filter(u => fmKind(u) === a.kind).map(fmOf).join('')).join('|');
   if (key === fmKey) return; fmKey = key;
-  $('fmenu').innerHTML = av.map(a => (av.length > 1 ? `<div class="fh">${a.kind === 'sol' ? 'Soldaten' : 'Polizei'}</div>` : '') + a.modes.map(m => `<button data-k="${a.kind}" data-m="${m[0]}" title="${m[2]}" class="${us.filter(u => fmKind(u) === a.kind).every(u => fmOf(u) === m[0]) ? 'on' : ''}">${m[1]}</button>`).join('')).join('');
+  $('fmenu').innerHTML = av.map(a => (av.length > 1 ? `<div class="fh">${a.kind === 'sol' ? 'Soldaten' : a.kind === 'gsg' ? 'GSG-9' : 'Polizei'}</div>` : '') + a.modes.map(m => `<button data-k="${a.kind}" data-m="${m[0]}" title="${m[2]}" class="${us.filter(u => fmKind(u) === a.kind).every(u => fmOf(u) === m[0]) ? 'on' : ''}">${m[1]}</button>`).join('')).join('');
   $('fmenu').querySelectorAll('button').forEach(x => x.onclick = () => setFireMode(x.dataset.k, x.dataset.m));
 }
 $('sFire').onclick = () => { const m = $('fmenu'); m.style.display = m.style.display === 'flex' ? 'none' : 'flex'; };
@@ -1609,7 +1615,7 @@ function updateUnitList() {
       const k = ms[0].k; uCnt[squad ? 'q' + k : k] = (uCnt[squad ? 'q' + k : k] || 0) + 1;
       const el = document.createElement('div'), head = document.createElement('div'), body = document.createElement('div');
       head.className = 'urow'; body.className = 'ubody';
-      head.innerHTML = `${squad ? '<b class="plus">+</b>' : ''}<i style="background:${UCOL[k]}"></i><u></u><em></em><span></span>`;
+      head.innerHTML = `${squad ? '<b class="plus">+</b>' : ''}<i style="background:${ms[0].gsg ? COL.gsg : UCOL[k]}"></i><u></u><em></em><span></span>`;
       const name = (squad ? (ms[0].gsg ? 'GSG-9' : SQNAME[k]) : UNAME[k]) + ' ' + uCnt[squad ? 'q' + k : k];
       head.children[squad ? 2 : 1].textContent = name;
       el.append(head, body); $('uList').appendChild(el);
@@ -1641,7 +1647,7 @@ function updateUnitList() {
       let row = ent.rows.get(u);
       if (!row) {
         row = document.createElement('div'); row.className = 'urow mem';
-        row.innerHTML = `<i style="background:${UCOL[u.k]}"></i><u>${UNAME[u.k]} ${i + 1}</u><span></span>`; row.dataset.n = UNAME[u.k] + ' ' + (i + 1);
+        row.innerHTML = `<i style="background:${u.gsg ? COL.gsg : UCOL[u.k]}"></i><u>${u.gsg ? 'Polizist' : UNAME[u.k]} ${i + 1}</u><span></span>`; row.dataset.n = (u.gsg ? 'Polizist' : UNAME[u.k]) + ' ' + (i + 1);
         row.onclick = ev => { if (!ev.shiftKey) selected.clear(); addSel(u); };
         row.ondblclick = () => { selected.clear(); addSel(u); centerOn(u); };
         ent.rows.set(u, row); ent.body.appendChild(row);
@@ -1873,7 +1879,7 @@ function init() {
   $('mSand').onclick = () => { syncSliders(); $('menu').style.display = 'none'; $('setup').style.display = ''; };
   $('mResume').onclick = () => loadSlot(0);
   $('mNew').onclick = () => Campaign.newGame();
-  const CNAME = { civ: 'Zivilisten', armed: 'Bewaffnete Zivilisten', inf: 'Infizierte', zom: 'Zombies', pol: 'Polizisten', sol: 'Soldaten' };
+  const CNAME = { civ: 'Zivilisten', armed: 'Bewaffnete Zivilisten', inf: 'Infizierte', zom: 'Zombies', pol: 'Polizisten', gsg: 'GSG-9', sol: 'Soldaten' };
   const settings = () => modal(`<h2>Einstellungen</h2>
     <div class="row"><label>Soundeffekte <b id="vSfx">${Math.round(SFX.level() * 100)} %</b></label><input type="range" id="rSfx" min="0" max="100" value="${Math.round(SFX.level() * 100)}"></div>
     <div class="row"><label>Musik <b id="vMus">${Math.round(Music.level() * 100)} %</b></label><input type="range" id="rMus" min="0" max="100" value="${Math.round(Music.level() * 100)}"></div>
