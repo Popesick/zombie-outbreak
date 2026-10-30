@@ -137,6 +137,14 @@ const Comic = (() => {
       { s: 'burning', cap: 'Moosburg war nicht mehr zu halten. Die Überlebenden zogen sich nach Norden zurück.' },
       { s: 'road', cap: 'Pfaffenhofen sollte die letzte Linie werden.' }
     ],
+    ap_win: [
+      { s: 'blast', img: 'img/comic/ap_win_1.webp', cap: 'Die Zivilisten waren in Sicherheit... Danach legte die Armee das gesamte Gelände in Schutt und Asche. Die Bedrohung war vorerst eliminiert.' },
+      { s: 'heliLZ', img: 'img/comic/ap_win_2.webp', cap: 'Wir errichteten neue Barrikaden... und sicherten die Flugfelder. Endlich hatten wir eine feste Basis für unsere Operationen.' },
+      { s: 'squad', img: 'img/comic/ap_win_3.webp', cap: 'Doch Zeit... blieb ein Luxus, den wir einfach nicht hatten. Pfaffenhofen stand kurz davor, überrannt zu werden!' },
+      { s: 'bridgeNight', img: 'img/comic/ap_win_4.webp', cap: 'Die Ilm führte Hochwasser – und spaltete die Stadt in zwei Hälften. Der Westen war bereits verloren... bevölkert von den Toten. Wer entkommen konnte, hatte sich ans andere Ufer gerettet und die Brücken verbarrikadiert.' },
+      { s: 'horde', img: 'img/comic/ap_win_5.webp', cap: 'Aber das Wasser ging zurück. Und mit dem sinkenden Pegel... strömten neue Horden auf sie zu!' },
+      { s: 'squad', img: 'img/comic/ap_win_6.webp', cap: 'Wir mussten die Evakuierungszone sichern und die Menschen herausholen. Bevor die Armee der Untoten... die restliche Stadt verschlang.' }
+    ],
     m3_intro: [
       { s: 'road', cap: 'Pfaffenhofen an der Ilm. Die Kolonne erreicht die Stadt im Morgengrauen.' },
       { s: 'dawn', cap: 'Hier gibt es einen Hubschrauberlandeplatz – und diesmal bleibt keine Zeit zum Zögern.' },
