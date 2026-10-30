@@ -102,7 +102,7 @@ const Campaign = (() => {
       primary: { civ: 750, pts: 2000, hold: 1200 }, secondary: { clear: true, pts: 800 },
       reward: { strike: 4, gunship: 1 },
       goal: ['Von den 1000 Zivilisten im Flughafen müssen mindestens 750 20 Minuten überleben.', 'Töte alle Zombies.'],
-      info: ['1000 unbewaffnete Zivilisten im Innenbereich (750 müssen überleben) – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Elf eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten','Nach 15:00 der finale Sturm: 3000 schnelle Zombies aus dem Westen, in vier Bahnen auf die Westmauer, dazu 500 aus dem Osten direkt auf den Abholbereich', '5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
+      info: ['1000 unbewaffnete Zivilisten im Innenbereich (750 müssen überleben) – umgeben von einer Hochsicherheits-Barrikade (drei Tore im Osten, zählt nicht zu deinen Barrikaden)', 'Elf eingegrabene, autarke Geschütztürme am Mauerrand (nicht steuerbar, unbegrenzte Munition)', '200 Zombies stehen westlich der Barrikade, wenn ihr eintrefft', 'Nach 5:00: 800 Zombies aus drei Richtungen (NW, W, SW), nach 8:00 erneut; nach 10:00 sammeln sich die Zivilisten im Abholbereich H', 'Nach 11:00 stürmen 500 Zombies aus Nordwesten, nach 12:00 400 aus Westen, nach 13:00 500 aus Südwesten','5 Versorgungspakete, 16 eigene Barrikadenelemente', 'Belohnung: 4 weitere Luftschläge und 1 Gunship (ab der nächsten Mission)']
     },
     {
       id: 'm3', map: 'm3', kind: 'land', name: 'Letzte Linie', sub: 'Pfaffenhofen an der Ilm', pop: 2500, armed: 6, acc: 35, zs: 50,
@@ -321,7 +321,7 @@ const Campaign = (() => {
       if (o.lost && !S.fired.lossNote) { S.fired.lossNote = 1; banner('Zivilisten wurden verloren – das Primärziel ist verfehlt. Haltet die Stellung für das Sekundärziel!', 12000); }
       if (!S.fired.holdDone && simT >= m.primary.hold) { S.fired.holdDone = 1; if (!o.lost) { banner('✓ Die Zivilisten haben 20 Minuten überlebt – Primärziel erreicht! Jetzt alle Zombies ausschalten.', 14000); SFX.ui(); } }
     }
-    if (m.id === 'ap' && simT >= 900 && !RULES.apHQ) {   // gescriptete Überraschung: Verstärkung vom Hauptquartier und Evakuierung per Hubschrauber
+    if (m.id === 'ap' && simT >= 910 && !RULES.apHQ) {   // gescriptete Überraschung: Verstärkung vom Hauptquartier und Evakuierung per Hubschrauber
       RULES.apHQ = true; const T = RULES.tools, add = (k, n, d) => { T[k] = { at: 0, cd: 20, ...d, ...T[k], max: ((T[k] && T[k].max) || 0) + n, at: 0 }; };
       add('gunship', 3); T.gunship.cd = 0; add('strike', 5); add('supply', 5); add('flare', 5, { cd: 4 });
       cooldown.gunship = 0; RULES.noHeli = false; RULES.evacCap = 40; RULES.evacEvery = 30;
@@ -425,7 +425,7 @@ const Campaign = (() => {
     b.textContent = S.fired.evacGo ? '📡 Evakuierung läuft' : '📡 Evakuierung starten'; b.title = o.padSafe ? '' : 'Erst den Landeplatz sichern';
   }
   function hudAir(m, c, o, box) {
-    const nxt = AIR_WAVES.filter(w => w.t > simT).map(w => w.t)[0];
+    const nxt = AIR_WAVES.filter(w => w.t > simT && w.t < 900).map(w => w.t)[0];
     const html = `<h3>${m.name}</h3><div class="ev">Zeit ${fmtClock(simT)}</div>
       <div class="o"><b>Primär:</b> Zivilisten am Leben <b class="${o.lost ? 'no' : 'ok'}">${o.R}</b> / ${S.civ0 || m.pop} (mind. ${m.primary.civ})${o.lost ? ' ✗' : ''}<div class="bar"><i style="width:${o.prog * 100}%"></i></div>${o.primary ? '✓ 20 Minuten überlebt' : o.lost ? 'Verluste – Primärziel verfehlt' : 'Noch ' + fmtClock(Math.max(0, m.primary.hold - simT))}</div>
       <div class="o"><b class="${o.secondary ? 'ok' : ''}">${o.secondary ? '✓ ' : ''}Sekundär:</b><div class="${o.cleared ? 'ok' : ''}">${o.cleared ? '✓' : '○'} Zombies übrig: <b>${c.zom}</b></div></div>
