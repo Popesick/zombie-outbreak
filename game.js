@@ -1483,6 +1483,7 @@ cv.addEventListener('wheel', e => {
 const friendly = e => !e.dead && (e.k === K_POL || e.k === K_SOL || e.k === K_SEN || e.k === K_TRK || e.k === K_TUR);
 const unitSpeed = u => (u.k === K_POL ? 4.4 : u.k === K_TRK ? 8 : 4.8) * (u.gsg ? 1.1 : 1);
 let patrolArmed = false, gidN = 0;
+let lastClick = { u: null, t: 0 };
 function addSel(u) { if (u.auto || u.lock) return; selected.add(u); if (u.g) for (const m of E) if (m.g === u.g && friendly(m)) selected.add(m); }
 function delSel(u) { selected.delete(u); if (u.g) for (const m of [...selected]) if (m.g === u.g) selected.delete(m); }
 function unitsPointer(d, wx, wy, add) {
@@ -1494,7 +1495,15 @@ function unitsPointer(d, wx, wy, add) {
   }
   let best = null, bd = (16 / cam.z + 2) ** 2;
   for (const e of E) if (friendly(e)) { const q = (e.x - wx) ** 2 + (e.y - wy) ** 2; if (q < bd) { bd = q; best = e; } }
-  if (best) { if (add) { selected.has(best) ? delSel(best) : addSel(best); } else { selected.clear(); addSel(best); } }
+  if (best) {
+    const now = performance.now(), dbl = lastClick.u === best && now - lastClick.t < 380; lastClick = { u: best, t: now };
+    if (dbl) {   // Doppelklick: alle sichtbaren Einheiten des gleichen Typs
+      const ty = u => u.gsg ? 'g' : u.k, [x0, y0] = s2w(0, 0), [x1, y1] = s2w(VW, VH);
+      selected.clear();
+      for (const e of E) if (friendly(e) && ty(e) === ty(best) && e.x >= x0 && e.x <= x1 && e.y >= y0 && e.y <= y1) addSel(e);
+      toast(selected.size + ' ' + (best.gsg ? 'GSG-9' : UNAME[best.k]) + '-Einheiten markiert');
+    } else if (add) { selected.has(best) ? delSel(best) : addSel(best); } else { selected.clear(); addSel(best); }
+  }
   else if (selected.size) commandMove(wx, wy);
 }
 function commandMove(x, y) {
