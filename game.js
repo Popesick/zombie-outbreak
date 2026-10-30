@@ -731,7 +731,7 @@ function thinkZombie(e) {
     const mk = S.marches && S.marches[e.mk - 1];
     if (!mk || simT >= mk.until || mk.go) {
       e.mk = 0;
-      if (mk && mk.go && S.evac && ZF.evac) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; return; }
+      if (mk && mk.go && S.evac && ZF.evac && (mk.focus == null || Math.random() < mk.focus)) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; return; }
     } else { e.st = 7; e.fz = 'march'; e.fzT = 2; return; }
   }
   if (S.lure && simT < S.lure.until && ZF.lure) { e.st = 7; e.fz = 'lure'; e.fzT = 2; return; }
@@ -785,7 +785,7 @@ function stepZombie(e) {
       const key = wp[0] + ',' + wp[1];
       let f = MF.get(key);
       if (!f) { const q = nearestWalkCell(wp[0], wp[1], 80) || wp; MF.set(key, f = { x: q[0], y: q[1], D: computeField(q[0], q[1], true) }); }   // Wegpunkt auf begehbaren Grund legen (Felder gemeinsam genutzt)
-      if (Math.hypot(e.x - f.x, e.y - f.y) < (fin ? mk.gather.r : 30)) { if (fin && mk.noWait) { e.mk = 0; e.st = 0; e.wt = 0; } else if (fin) { e.mw = 1; mk.arr++; if (mk.t1 == null) mk.t1 = simT; } else e.mi = (e.mi || 0) + 1; return; }
+      if (Math.hypot(e.x - f.x, e.y - f.y) < (fin ? mk.gather.r : 30)) { if (fin && mk.noWait) { e.mk = 0; e.st = 0; e.wt = 0; if (mk.toEvac && S.evac && ZF.evac) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; } } else if (fin) { e.mw = 1; mk.arr++; if (mk.t1 == null) mk.t1 = simT; } else e.mi = (e.mi || 0) + 1; return; }
       fieldDescend(e, f.D, f.x, f.y, sp * 1.6, true); return;
     }
     e.fzT -= DT; const lure = e.fz === 'lure', tg = lure ? S.lure : S.evac;

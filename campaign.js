@@ -49,7 +49,7 @@ const Campaign = (() => {
     { t: 0, n: 1000, x: 365, y: 563, r: 200, march: PF_MARCH }, { t: 0, n: 1000, x: 804, y: 841, r: 160, march: PF_MARCH }, { t: 0, n: 1000, x: 390, y: 1355, r: 220, march: PF_MARCH }];
   // Südwelle nach 10:00: 2000 Zombies in 20 Schüben à 100 alle 6 s, vom Süden bis in den Südwesten verteilt, Marsch direkt zum nördlichen Tor
   const PF_SOUTH_SPOTS = [[1000, 1850], [820, 1850], [640, 1840], [460, 1790], [300, 1710], [160, 1620]];
-  const PF_SOUTH = k => { const [x, y] = PF_SOUTH_SPOTS[k % PF_SOUTH_SPOTS.length]; return { t: 0, n: 100, x, y, r: 90, msg: k === 0 ? '⚠ 2000 Zombies strömen aus dem Süden und Südwesten auf das nördliche Tor zu!' : null, march: { id: 'pfS', route: 0, routes: [[]], gather: { x: 1255, y: 702, r: 30 }, noWait: true, dur: 1800 } }; };
+  const PF_SOUTH = k => { const [x, y] = PF_SOUTH_SPOTS[k % PF_SOUTH_SPOTS.length]; return { t: 0, n: 100, x, y, r: 90, msg: k === 0 ? '⚠ 2000 Zombies strömen aus dem Süden und Südwesten auf das nördliche Tor zu!' : null, march: { id: 'pfS', route: 0, routes: [[]], gather: { x: 1255, y: 702, r: 30 }, total: 2000, focus: .8, dur: 3600 } }; };
   const PF_NORTH2 = { t: 0, n: 2000, x: 600, y: 50, r: 320, fast: true, msg: '⚠ Der Norden ist geräumt – 2000 weitere Zombies strömen aus dem Norden!', march: { ...PF_MARCH, id: 'pfN2' } };
   const MIS = [
     {
@@ -285,7 +285,7 @@ const Campaign = (() => {
     if (w.march) {
       S.marches = S.marches || [];
       let m = S.marches.find(q => q.id === w.march.id);
-      if (!m) S.marches.push(m = { id: w.march.id, routes: w.march.routes, gather: w.march.gather, until: simT + (w.march.dur || 900), arr: 0, n: 0, t1: null, go: false });
+      if (!m) S.marches.push(m = { id: w.march.id, routes: w.march.routes, gather: w.march.gather, until: simT + (w.march.dur || 900), total: w.march.total || 0, focus: w.march.focus, arr: 0, n: 0, t1: null, go: false });
       m.n += w.n; mkId = S.marches.indexOf(m) + 1;
     }
     for (let i = 0; i < w.n; i++) {
@@ -305,6 +305,7 @@ const Campaign = (() => {
       for (const [i, mk] of S.marches.entries()) {
         if (mk.go || mk.t1 == null) continue;
         let alive = 0; for (const z of E) if (z.k === K_ZOM && !z.dead && z.mk === i + 1) alive++;
+        if (mk.total && mk.n < mk.total) continue;   // erst wenn die ganze Welle gestartet ist
         if (mk.arr >= .8 * alive || simT >= mk.t1 + 180) mk.go = true;
       }
     }   // Sammelpunkt erreicht: Welle losgeschickt
@@ -341,6 +342,12 @@ const Campaign = (() => {
   function tickLand(m) {
     if (S.civFree && RULES.civNoGate) RULES.civNoGate = false;
     for (let k = 0; k < 20; k++) { const id = 'south' + k; if (!S.fired[id] && simT >= 600 + k * 6) { S.fired[id] = 1; spawnWave(PF_SOUTH(k), false); } }
+    if (S.fired.evacGo) {   // nach Evakuierungsbeginn: Strom aus dem Nordwesten (40 x 50, alle 10 s) und 500 aus dem Osten nach 8:00
+      if (S.evacGoT == null) S.evacGoT = simT;
+      const toPad = id => ({ id, route: 0, routes: [[]], gather: { x: S.pad.x, y: S.pad.y, r: 50 }, noWait: true, toEvac: true, dur: 1800 });
+      for (let k = 0; k < 40; k++) { const id = 'nw' + k; if (!S.fired[id] && simT >= S.evacGoT + k * 10) { S.fired[id] = 1; spawnWave({ t: 0, n: 50, x: 45, y: 45, r: 30, msg: k === 0 ? '⚠ Ein endloser Strom von Zombies ergießt sich aus dem Nordwesten auf den Landeplatz zu!' : null, march: toPad('pfNW') }, false); } }
+      if (!S.fired.east500 && simT >= S.evacGoT + 480) { S.fired.east500 = 1; spawnWave({ t: 0, n: 500, x: WW - 30, y: 950, r: 380, msg: '⚠ 500 Zombies stürmen aus dem Osten heran!', march: toPad('pfE') }, false); SFX.alarm(); }
+    }
     if ((S.lstep = (S.lstep || 0) + 1) % 30) return;
     if (!S.padSafe) {
       if (countZAround(S.pad.x, S.pad.y, PAD_R) === 0) { if ((S.padT = (S.padT || 0) + 1) >= 10) { S.padSafe = true; banner('✓ Landeplatz gesichert – die Evakuierung kann gestartet werden!', 14000); SFX.ui(); } } else S.padT = 0;
