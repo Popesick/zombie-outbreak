@@ -1813,8 +1813,17 @@ function autosave() { if (phase === 'run' && S && !loading) saveSlot(0); }
 let loading = false;
 setInterval(() => { if (speed > 0 || finished) autosave(); }, 20000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) autosave(); });
+function toggleFs() {
+  const d = document, el = d.documentElement;
+  if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+  else { const f = el.requestFullscreen || el.webkitRequestFullscreen; if (f) { const r = f.call(el); if (r && r.catch) r.catch(() => {}); } }
+}
+function syncFs() { const on = document.fullscreenElement || document.webkitFullscreenElement; $('bFs').textContent = on ? '⛶ Vollbild beenden' : '⛶ Vollbild'; setTimeout(() => window.dispatchEvent(new Event('resize')), 100); }
+$('bFs').onclick = toggleFs;
+document.addEventListener('fullscreenchange', syncFs); document.addEventListener('webkitfullscreenchange', syncFs);
 window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'f' || e.key === 'F') { toggleFs(); return; }
   if (e.key === ' ') { e.preventDefault(); setSpeed(speed ? 0 : 1); }
   else if (e.key === '1') setSpeed(1); else if (e.key === '2') setSpeed(2); else if (e.key === '3' || e.key === '4') setSpeed(4);
 });
