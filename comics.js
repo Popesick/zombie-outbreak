@@ -157,6 +157,12 @@ const Comic = (() => {
       { s: 'squad', img: 'img/comic/m3_win_4.webp', cap: 'Zumindest so lange... bis plötzlich dieses Stöhnen um uns herum zu hören war.' },
       { s: 'horde', img: 'img/comic/m3_win_5.webp', cap: 'Der Wandertag war vorbei. Wir entsicherten unsere Gewehre... und marschierten weiter. Jetzt waren wir wieder in der Welt der Untoten angekommen.' }
     ],
+    m5_win: [
+      { s: 'squad', img: 'img/comic/m5_win_1.webp', cap: 'Wir konnten die Wellen erfolgreich abwehren. Wellen, die es laut unserer Aufklärung... gar nicht hätte geben dürfen! Und doch hatten sie uns beinahe überrannt.' },
+      { s: 'squad', img: 'img/comic/m5_win_2.webp', cap: 'Noch während wir uns sammelten... und zum Weitermarsch vorbereiteten... drang plötzlich Kampflärm an unsere Stellung.' },
+      { s: 'burning', img: 'img/comic/m5_win_3.webp', cap: 'Die Sicherheitszone! Das Flüchtlingslager... wurde angegriffen!' },
+      { s: 'horde', img: 'img/comic/m5_win_4.webp', cap: 'Wir hatten keine Zeit, uns auszuruhen. Wir mussten unsere Truppen unterstützen!' }
+    ],
     m3_lose: [
       { s: 'burning', cap: 'Pfaffenhofen fiel. Wer konnte, floh weiter nach Süden.' },
       { s: 'horde', cap: 'Die Seuche ließ sich nicht aufhalten. Noch nicht.' }

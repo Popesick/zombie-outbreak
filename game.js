@@ -1649,7 +1649,7 @@ function setTxt(el, t) { if (el.textContent !== t) el.textContent = t; }
 function updateUnitList() {
   const box = $('units'); if (phase !== 'run') { box.style.display = 'none'; return; }
   box.style.display = 'flex';
-  const us = E.filter(u => friendly(u) && !u.lock);
+  const us = E.filter(u => friendly(u) && !u.lock && !u.fort);
   us.sort((a, b) => a.k - b.k || a.id - b.id);
   const groups = new Map();
   for (const u of us) { const key = u.sq && u.k !== K_TRK ? 's' + u.sq : 'u' + u.id; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(u); }
@@ -1926,7 +1926,7 @@ function init() {
   setupMap('moosburg');
   applyMapMode(); syncSliders(); refreshResume(); resize(); fitCam(); setSpeed(0);
   addEventListener('resize', resize);
-  const COMIC_NAMES = { prologue: 'Prolog', m1_win: 'Mission 1 – Sieg (Outro)', m1_lose: 'Mission 1 – Niederlage', m2_win: 'Mission 2 – Sieg', m2_lose: 'Mission 2 – Niederlage', ap_win: 'Mission 3 – Sieg (Flughafen)', m3_intro: 'Mission 4 – Intro', m3_win: 'Mission 4 – Sieg', m3_lose: 'Mission 4 – Niederlage' };
+  const COMIC_NAMES = { prologue: 'Prolog', m5_win: 'Mission 5 – Sieg (Weg nach Kelheim)', m1_win: 'Mission 1 – Sieg (Outro)', m1_lose: 'Mission 1 – Niederlage', m2_win: 'Mission 2 – Sieg', m2_lose: 'Mission 2 – Niederlage', ap_win: 'Mission 3 – Sieg (Flughafen)', m3_intro: 'Mission 4 – Intro', m3_win: 'Mission 4 – Sieg', m3_lose: 'Mission 4 – Niederlage' };
   const comicList = () => modal('<h2>Intros &amp; Comics</h2><div class="btns" style="flex-direction:column">' + Object.keys(Comic.SEQ).map(k => `<button data-c="${k}">▶ ${COMIC_NAMES[k] || k}</button>`).join('') + '<button id="cBack">Zurück</button></div>', () => {
     $('cBack').onclick = closeModal;
     document.querySelectorAll('#mbox button[data-c]').forEach(b => b.onclick = () => { closeModal(); Comic.play(b.dataset.c, () => { Music.play('menu'); comicList(); }); });

@@ -513,7 +513,7 @@ const Campaign = (() => {
       while (simT >= b.nx[i] && b.nx[i] < BT_END) {
         b.nx[i] += 10; if (b.live > BT_CAP) continue;
         const n = simT >= BT_DBL ? 200 : 100, id = 'bt' + i, g = nearestWalkCell(a.tail[0], a.tail[1], 90) || a.tail;
-        spawnWave({ t: 0, n, x: g[0], y: g[1], r: 45, march: { id, route: 0, routes: [[]], gather: { x: a.head[0], y: a.head[1], r: 55 }, noWait: true, pre: true, dur: 3000 } }, false);
+        spawnWave({ t: 0, n, x: g[0], y: g[1], r: 45, march: { id, route: 0, routes: [[]], gather: { x: a.head[0], y: a.head[1], r: 55 }, noWait: true, pre: true, spd: 2, dur: 3000 } }, false);
         const mkr = S.marches.find(q => q.id === id); if (mkr) mkr.until = simT + 900; b.live += n;
       }
     });
