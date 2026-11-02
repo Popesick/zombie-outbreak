@@ -144,7 +144,8 @@ const Campaign = (() => {
     ,{
       id: 'm6', map: 'm6', kind: 'battle', name: 'Die Schlacht um Kelheim', sub: 'Kelheim an der Donau', pop: 2000, armed: 6, acc: 35, zs: 50,
       start: () => { const a = KH(760, 945), b = KH(740, 930), c = KH(785, 955); return { sol: [{ x: a[0], y: a[1] }, { x: c[0], y: c[1] }], pol: [{ x: b[0], y: b[1] }, { x: c[0] - 14, y: c[1] + 10 }] }; },
-      evac: () => { const p = KH(1150, 470); return { x: p[0], y: p[1], at: 1e9 }; },
+      evac: () => ({ x: 3450, y: 1190, at: 1200 }), noHeli: true, evacMsg: '📡 Evakuierungszone am Ostende der Insel: Alle Zivilisten fliehen dorthin!',   // Ostende der Insel; ab 20:00 laufen die Zivilisten dorthin (keine Hubschrauber)
+      airOff: [600, 1500],
       spawns: () => [],
       lure: () => ({ x: 0, y: 0, t: 1e9, dur: 0 }),
       hordeAt: 1e9, hordeFocus: 0, hordeQuiet: true,
@@ -152,7 +153,7 @@ const Campaign = (() => {
       civZone: { discs: [[960, 480], [1050, 470], [1130, 450], [1200, 490], [1270, 540], [1350, 590], [1440, 650], [1520, 710], [1060, 540], [1160, 560]].map(([x, y]) => { const p = KH(x, y); return { x: p[0], y: p[1], r: 120 }; }) },
       civLine: (x, y) => inPoly(x, y, KZ),
       battle: {
-        south: 300, north: 360, zone: KZ, inside: KH(1049, 442),
+        south: 300, north: 360, airOff: [600, 1500], zone: KZ, inside: KH(1049, 442),
         walls: [[[858, 350], [838, 420], [832, 480], [840, 545], [856, 602]], [[884, 358], [868, 430], [860, 500], [862, 550], [872, 590]], [[897, 362], [884, 440], [880, 500], [884, 540], [893, 570]]].map(l => l.map(p => KH(...p))),
         bridges: [[1142, 375], [1332, 510], [1215, 630], [1597, 737], [1587, 803]].map(p => KH(...p)),
         arrows: [   // [Start, Ziel] je Pfeil; t0 = Beginn der Schübe (Sekunden)
@@ -165,7 +166,7 @@ const Campaign = (() => {
       barricades: 36,
       primary: { pts: 3000 }, secondary: { civLoss: 100, pts: 1500 },
       goal: ['Halte Kelheim 30 Minuten lang. Rücke von „P“ nach Norden in die gesicherte Zone vor und hilf, die Brücken und die Mauern zu verteidigen.', 'Verliere höchstens 100 der 2000 Zivilisten in der Zone.'],
-      info: ['Die Halbinsel ist durch drei Mauerreihen im Westen und blockierte Brücken (mit Toren) gesichert – Mauern, Tore und alle platzierten Einheiten gehören nicht zu deinem Inventar und sind nicht steuerbar (unbegrenzte Munition)', 'Zwischen der ersten und zweiten Mauerreihe: MGs, Trucks und Soldaten. Jede Brücke: zwei MGs und zwei GSG-9-Einheiten', 'Aus dem Westen strömen Zombies auf die Mauer zu, ab 5:00 aus dem Süden, ab 6:00 aus dem Norden und Nordosten. Je Pfeil 100 Zombies alle 10 Sekunden, ab 5:00 sogar 200', 'Luftschläge dünnen die Angreifer aus, Gunships entlasten zufällig bedrohte Abschnitte', 'Nach 28:00 enden die Wellen, nach 30:00 löschen Gunships alle übrigen Zombies aus', 'Aus Leistungsgründen sind höchstens ca. 3200 Zombies gleichzeitig auf der Karte']
+      info: ['Die Halbinsel ist durch drei Mauerreihen im Westen und blockierte Brücken (mit Toren) gesichert – Mauern, Tore und alle platzierten Einheiten gehören nicht zu deinem Inventar und sind nicht steuerbar (unbegrenzte Munition)', 'Zwischen der ersten und zweiten Mauerreihe: MGs, Trucks und Soldaten. Jede Brücke: zwei MGs und zwei GSG-9-Einheiten', 'Aus dem Westen strömen Zombies auf die Mauer zu, ab 5:00 aus dem Süden, ab 6:00 aus dem Norden und Nordosten. Je Pfeil 100 Zombies alle 10 Sekunden, ab 5:00 sogar 200', 'Luftschläge dünnen die Angreifer aus, Gunships entlasten zufällig bedrohte Abschnitte', 'Ab 5:00 verdoppeln sich die Wellen, ab 15:00 und ab 20:00 jeweils noch einmal. Ab 20:00 fliehen alle Zivilisten zur Evakuierungszone am Ostende der Insel', 'Von 10:00 bis 25:00 ist die gesamte Luftunterstützung gesperrt (auch deine eigene)', 'Nach 28:00 enden die Wellen, nach 30:00 löschen Gunships alle übrigen Zombies aus', 'Aus Leistungsgründen sind höchstens ca. 3600 bis 4900 Zombies gleichzeitig auf der Karte']
     }
   ];
 
@@ -216,7 +217,7 @@ const Campaign = (() => {
       evacCap: m.evacCap, evacEvery: m.evacEvery, civNorth: m.civNorth, civZone: m.civZone ? { ...m.civZone } : null, civNoGate: !!m.civNoGate, civLine: m.civLine || null, noHeli: !!m.noHeli, rushAfter: lastSpawnT(m), mode: 'campaign', missionId: m.id, up: { ...u }, tools, ammo: true, xp: true, zmix: true, baseAcc: .35,
       barLimit: m.barricades + 12 * lv('morebar'), barHpMul: 2 * (lv('barhp') ? 2 : 1),
       gateOk: !!lv('gate'), scan: !!lv('scan'), canSil: !!lv('sil'), canSnipe: !!lv('snipe'), canMp: !!lv('mp'), canSg: !!lv('sg'), squadPlus: lv('squad') ? 1 : 0, polPlus: lv('third') ? 1 : 0, supMul: 2 ** lv('supqty'), garr, ammoMul: lv('ammo') ? 2 : 1,
-      spawn: () => spawnMission(m), tick: () => tick(m), hud: c => hud(m, c), checkEnd: c => checkEnd(m, c), onEnd: msg => finish(m, msg)
+      airOff: m.airOff ? () => simT >= m.airOff[0] && simT < m.airOff[1] : null, spawn: () => spawnMission(m), tick: () => tick(m), hud: c => hud(m, c), checkEnd: c => checkEnd(m, c), onEnd: msg => finish(m, msg)
     };
     return R;
   }
@@ -545,23 +546,28 @@ const Campaign = (() => {
     if (!S.fired.b300 && simT >= BT_DBL) { S.fired.b300 = 1; banner('⚠ Die Wellen schwellen an: ab jetzt 200 Zombies alle 10 Sekunden aus jeder Richtung!', 12000); SFX.alarm(); }
     if (!S.fired.bS && simT >= K.south) { S.fired.bS = 1; banner('⚠ Eine Welle aus dem Süden rollt an – die Brücke im Süden ist bedroht!', 12000); SFX.alarm(); }
     if (!S.fired.bN && simT >= K.north) { S.fired.bN = 1; banner('⚠ Jetzt auch aus dem Norden und Nordosten! Haltet alle Brücken!', 12000); SFX.alarm(); }
+    if (!S.fired.bAir0 && simT >= K.airOff[0]) { S.fired.bAir0 = 1; banner('📻 Das Hauptquartier meldet: Flugzeuge und Kampfhubschrauber müssen aufgetankt werden und stehen vorerst nicht mehr zur Verfügung.', 14000); SFX.alarm(); }
+    if (!S.fired.bAir1 && simT >= K.airOff[1]) { S.fired.bAir1 = 1; banner('📻 Das Hauptquartier hat die Luftunterstützung wieder freigegeben.', 12000); SFX.ui(); }
+    if (!S.fired.b900 && simT >= 900) { S.fired.b900 = 1; banner('⚠ Die Zombieströme verdoppeln sich erneut!', 10000); SFX.alarm(); }
+    if (!S.fired.b1200 && simT >= 1200) { S.fired.b1200 = 1; banner('⚠ Die Zombieströme verdoppeln sich noch einmal – alle Zivilisten fliehen zur Evakuierungszone im Osten!', 12000); SFX.alarm(); }
     if (!S.fired.bEnd && simT >= BT_END) { S.fired.bEnd = 1; banner('📻 Die Wellen ebben ab – haltet durch, bis die Gunships eintreffen!', 12000); SFX.ui(); }
     K.arrows.forEach((a, i) => {   // jeder Pfeil: Schub alle 10 s (Obergrenze für gleichzeitig lebende Zombies)
       while (simT >= b.nx[i] && b.nx[i] < BT_END) {
         b.nx[i] += 10;
-        const n = simT >= BT_DBL ? 200 : 100, id = 'bt' + i, g = nearestWalkCell(a.tail[0], a.tail[1], 90) || a.tail, started = K.arrows.filter(q => simT >= q.t0).length;
-        if (b.la[i] + n > Math.max(400, Math.floor(BT_CAP / started))) continue;   // Obergrenze je Pfeil: jede Richtung bekommt ihren Anteil
+        const n = 100 * (simT >= 1200 ? 8 : simT >= 900 ? 4 : simT >= BT_DBL ? 2 : 1), id = 'bt' + i, g = nearestWalkCell(a.tail[0], a.tail[1], 90) || a.tail, started = K.arrows.filter(q => simT >= q.t0).length;
+        if (b.la[i] + n > Math.max(400, Math.floor(BT_CAP * (simT >= 1200 ? 1.35 : simT >= 900 ? 1.15 : 1) / started))) continue;   // Obergrenze je Pfeil: jede Richtung bekommt ihren Anteil
         const e0 = E.length;
         spawnWave({ t: 0, n, x: g[0], y: g[1], r: 45, march: { id, route: 0, routes: [[]], gather: { x: a.head[0], y: a.head[1], r: 55 }, noWait: true, pre: true, spd: 2, aim: a.aim, aimJ: a.aimJ, dur: 3000 } }, false);
         const mkr = S.marches.find(q => q.id === id); if (mkr) mkr.until = simT + 900; b.live += n; b.la[i] += n; for (let k = e0; k < E.length; k++) E[k].ar = i + 1;
       }
     });
-    if (simT >= b.gunT && simT < BT_FIN) {   // Gunship zur Entlastung des am stärksten bedrängten Abschnitts
+    const airOk = !(simT >= K.airOff[0] && simT < K.airOff[1]);
+    if (simT >= b.gunT && simT < BT_FIN && airOk) {   // Gunship zur Entlastung des am stärksten bedrängten Abschnitts
       b.gunT = simT + rnd(25, 45);
       let bp = null, bc = -1; for (const h of b.hot) { let c = 0; for (const z of E) if (z.k === K_ZOM && !z.dead && Math.abs(z.x - h[0]) < 50 && Math.abs(z.y - h[1]) < 50) c++; if (c > bc) { bc = c; bp = h; } }
       if (bp && bc > 0) { const [sx, sy] = edgeEntry(bp[0], bp[1]); fx.push({ type: 'heli', kind: 'gunship', x: sx, y: sy, tx: bp[0], ty: bp[1], ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); toast('🚁 Gunship greift ein – bedrohter Abschnitt wird entlastet', 3000); }
     }
-    if (simT >= b.bombT && simT < BT_FIN) {   // Luftschlag auf die dichteste Zombieansammlung (nicht nahe eigener Stellungen)
+    if (simT >= b.bombT && simT < BT_FIN && airOk) {   // Luftschlag auf die dichteste Zombieansammlung (nicht nahe eigener Stellungen)
       b.bombT = simT + rnd(14, 28);
       const Z = E.filter(z => z.k === K_ZOM && !z.dead); let bp = null, bc = 24;
       for (let t = 0; t < 40 && Z.length; t++) {

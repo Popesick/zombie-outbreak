@@ -265,6 +265,7 @@ function toolGate(tool) {
   if (t.at != null && !(tool === 'garrison' && RULES.garr && S && (S.used.garrison || 0) < RULES.garr)) {   // gekaufte Garnisonen sind sofort verfügbar
     if (simT < t.at) { locked = true; label = 'ab ' + fmtClock(t.at); why = 'Verfügbar ab ' + fmtClock(t.at) + ' Spielzeit'; } }
   else if (t.pct != null) { const pc = lostPct(); if (pc < t.pct) { locked = true; label = 'ab ' + t.pct + ' % (' + pc.toFixed(0) + ')'; why = `Erst verfügbar, wenn ${t.pct} % der Bevölkerung tot oder verwandelt sind (aktuell ${pc.toFixed(0)} %)`; } }
+  if (RULES.airOff && ['strike', 'gunship', 'supply', 'flare'].includes(tool) && RULES.airOff()) { locked = true; label = 'gesperrt'; why = 'Luftunterstützung gesperrt: Flugzeuge und Kampfhubschrauber müssen aufgetankt werden'; }   // Kampagne (Kelheim)
   const used = S && S.used[tool] || 0, left = t.max != null ? t.max - used : 99;
   return { hidden: false, locked, label, why, left, max: t.max, cd: t.cd || 0 };
 }
