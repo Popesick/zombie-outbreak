@@ -265,7 +265,7 @@ function toolGate(tool) {
   if (t.at != null && !(tool === 'garrison' && RULES.garr && S && (S.used.garrison || 0) < RULES.garr)) {   // gekaufte Garnisonen sind sofort verfügbar
     if (simT < t.at) { locked = true; label = 'ab ' + fmtClock(t.at); why = 'Verfügbar ab ' + fmtClock(t.at) + ' Spielzeit'; } }
   else if (t.pct != null) { const pc = lostPct(); if (pc < t.pct) { locked = true; label = 'ab ' + t.pct + ' % (' + pc.toFixed(0) + ')'; why = `Erst verfügbar, wenn ${t.pct} % der Bevölkerung tot oder verwandelt sind (aktuell ${pc.toFixed(0)} %)`; } }
-  if (RULES.airOff && ['strike', 'gunship', 'supply', 'flare'].includes(tool) && RULES.airOff()) { locked = true; label = 'gesperrt'; why = 'Luftunterstützung gesperrt: Flugzeuge und Kampfhubschrauber müssen aufgetankt werden'; }   // Kampagne (Kelheim)
+  if (RULES.airOff && ['strike', 'gunship', 'flare'].includes(tool) && RULES.airOff()) { locked = true; label = 'gesperrt'; why = 'Luftunterstützung gesperrt: Flugzeuge und Kampfhubschrauber müssen aufgetankt werden'; }   // Kampagne (Kelheim)
   const used = S && S.used[tool] || 0, left = t.max != null ? t.max - used : 99;
   return { hidden: false, locked, label, why, left, max: t.max, cd: t.cd || 0 };
 }
@@ -783,7 +783,7 @@ function stepZombie(e) {
       if (!f || f.t <= 0 || e.fzT <= 0 || Math.hypot(f.x - e.x, f.y - e.y) < 10) { e.st = 0; e.wt = 0; return; }
       fieldDescend(e, f.D, f.x, f.y, sp, true); return;
     }
-    if (e.fz === 'goto') { e.fzT -= DT; if (!e.gt || e.fzT <= 0) { e.st = 0; e.wt = 0; return; } moveTo(e, e.gt[0], e.gt[1], sp, true); return; }
+    if (e.fz === 'goto') { e.fzT -= DT; if (!e.gt || e.fzT <= 0) { e.st = 0; e.wt = 0; return; } const gf = e.gk && MF.get(e.gk); if (gf) fieldDescend(e, gf.D, gf.x, gf.y, sp, true); else if (!e.gk) moveTo(e, e.gt[0], e.gt[1], sp, true); return; }
     if (e.fz === 'seek' || e.fz === 'pad') {
       const pd = e.fz === 'pad', t = pd ? S.padT : S.seek, D = pd ? ZF.pad : ZF.seek; e.fzT -= DT;
       if (!t || !D || e.fzT <= 0) { e.st = 0; e.wt = 0; return; }
@@ -799,7 +799,7 @@ function stepZombie(e) {
       let f = MF.get(key);
       if (!f && mk.pre) return;   // Feld wird im Hintergrund berechnet: bis dahin abwarten
       if (!f) { const q = nearestWalkCell(wp[0], wp[1], 80) || wp; MF.set(key, f = { x: q[0], y: q[1], D: computeField(q[0], q[1], true) }); }   // Wegpunkt auf begehbaren Grund legen (Felder gemeinsam genutzt)
-      if (Math.hypot(e.x - f.x, e.y - f.y) < (fin ? mk.gather.r : 30)) { if (fin && mk.noWait) { e.mk = 0; e.st = 0; e.wt = 0; if (mk.aim && Math.random() < .98) { const j = mk.aimJ || 10; e.gt = [mk.aim[0] + rnd(-j, j), mk.aim[1] + rnd(-j, j)]; } if (mk.toEvac && S.evac && ZF.evac) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; } } else if (fin) { e.mw = 1; mk.arr++; if (mk.t1 == null) mk.t1 = simT; } else e.mi = (e.mi || 0) + 1; return; }
+      if (Math.hypot(e.x - f.x, e.y - f.y) < (fin ? mk.gather.r : 30)) { if (fin && mk.noWait) { e.mk = 0; e.st = 0; e.wt = 0; if (mk.aim && Math.random() < .98) { const j = mk.aimJ || 10; e.gt = [mk.aim[0] + rnd(-j, j), mk.aim[1] + rnd(-j, j)]; e.gk = mk.aimKey; } if (mk.toEvac && S.evac && ZF.evac) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; } } else if (fin) { e.mw = 1; mk.arr++; if (mk.t1 == null) mk.t1 = simT; } else e.mi = (e.mi || 0) + 1; return; }
       fieldDescend(e, f.D, f.x, f.y, sp * (mk.spd || 1.6), true); return;
     }
     e.fzT -= DT; const lure = e.fz === 'lure', tg = lure ? S.lure : S.evac;

@@ -166,7 +166,7 @@ const Campaign = (() => {
       barricades: 36,
       primary: { pts: 3000 }, secondary: { civLoss: 100, pts: 1500 },
       goal: ['Halte Kelheim 30 Minuten lang. Rücke von „P“ nach Norden in die gesicherte Zone vor und hilf, die Brücken und die Mauern zu verteidigen.', 'Verliere höchstens 100 der 2000 Zivilisten in der Zone.'],
-      info: ['Die Halbinsel ist durch drei Mauerreihen im Westen und blockierte Brücken (mit Toren) gesichert – Mauern, Tore und alle platzierten Einheiten gehören nicht zu deinem Inventar und sind nicht steuerbar (unbegrenzte Munition)', 'Zwischen der ersten und zweiten Mauerreihe: MGs, Trucks und Soldaten. Jede Brücke: zwei MGs und zwei GSG-9-Einheiten', 'Aus dem Westen strömen Zombies auf die Mauer zu, ab 5:00 aus dem Süden, ab 6:00 aus dem Norden und Nordosten. Je Pfeil 100 Zombies alle 10 Sekunden, ab 5:00 sogar 200', 'Luftschläge dünnen die Angreifer aus, Gunships entlasten zufällig bedrohte Abschnitte', 'Ab 5:00 verdoppeln sich die Wellen, ab 15:00 und ab 20:00 jeweils noch einmal. Ab 20:00 fliehen alle Zivilisten zur Evakuierungszone am Ostende der Insel', 'Von 10:00 bis 25:00 ist die gesamte Luftunterstützung gesperrt (auch deine eigene)', 'Nach 28:00 enden die Wellen, nach 30:00 löschen Gunships alle übrigen Zombies aus', 'Aus Leistungsgründen sind höchstens ca. 3600 bis 4900 Zombies gleichzeitig auf der Karte']
+      info: ['Die Halbinsel ist durch drei Mauerreihen im Westen und blockierte Brücken (mit Toren) gesichert – Mauern, Tore und alle platzierten Einheiten gehören nicht zu deinem Inventar und sind nicht steuerbar (unbegrenzte Munition)', 'Zwischen der ersten und zweiten Mauerreihe: MGs, Trucks und Soldaten. Jede Brücke: zwei MGs und zwei GSG-9-Einheiten', 'Aus dem Westen strömen Zombies auf die Mauer zu, ab 5:00 aus dem Süden, ab 6:00 aus dem Norden und Nordosten. Je Pfeil 100 Zombies alle 10 Sekunden, ab 5:00 sogar 200', 'Luftschläge dünnen die Angreifer aus, Gunships entlasten zufällig bedrohte Abschnitte', 'Ab 5:00 verdoppeln sich die Wellen, ab 15:00 und ab 20:00 jeweils noch einmal. Ab 20:00 fliehen alle Zivilisten zur Evakuierungszone am Ostende der Insel', 'Von 10:00 bis 25:00 sind Flugzeuge und Kampfhubschrauber gesperrt (auch deine Luftschläge, Gunships und Signalbomben) – Versorgungsabwürfe bleiben möglich', 'Nach 28:00 enden die Wellen, nach 30:00 löschen Gunships alle übrigen Zombies aus', 'Aus Leistungsgründen sind höchstens ca. 3600 bis 4900 Zombies gleichzeitig auf der Karte']
     }
   ];
 
@@ -333,7 +333,7 @@ const Campaign = (() => {
     if (w.march) {
       S.marches = S.marches || [];
       let m = S.marches.find(q => q.id === w.march.id);
-      if (!m) S.marches.push(m = { id: w.march.id, routes: w.march.routes, gather: w.march.gather, spd: w.march.spd, pre: w.march.pre, noWait: w.march.noWait, toEvac: w.march.toEvac, aim: w.march.aim, aimJ: w.march.aimJ, until: simT + (w.march.dur || 900), total: w.march.total || 0, focus: w.march.focus, arr: 0, n: 0, t1: null, go: false });
+      if (!m) S.marches.push(m = { id: w.march.id, routes: w.march.routes, gather: w.march.gather, spd: w.march.spd, pre: w.march.pre, noWait: w.march.noWait, toEvac: w.march.toEvac, aim: w.march.aim, aimKey: w.march.aimKey, aimJ: w.march.aimJ, until: simT + (w.march.dur || 900), total: w.march.total || 0, focus: w.march.focus, arr: 0, n: 0, t1: null, go: false });
       m.n += w.n; mkId = S.marches.indexOf(m) + 1;
     }
     for (let i = 0; i < w.n; i++) {
@@ -529,7 +529,7 @@ const Campaign = (() => {
     }
     const sam = []; for (let f = 0; f <= 1; f += .01) sam.push({ p: polyAt(K.walls[0], f), j: 45 });
     for (const v of S.battle.bv) sam.push({ p: v, j: 8 });
-    for (const a of K.arrows) { let bs = null, bd = 1e18; for (const c of sam) { const d = (c.p[0] - a.head[0]) ** 2 + (c.p[1] - a.head[1]) ** 2; if (d < bd) { bd = d; bs = c; } } a.aim = bs.p; a.aimJ = bs.j; }
+    for (const a of K.arrows) { let bs = null, bd = 1e18; for (const c of sam) { const d = (c.p[0] - a.head[0]) ** 2 + (c.p[1] - a.head[1]) ** 2; if (d < bd) { bd = d; bs = c; } } a.aim = bs.p; a.aimJ = bs.j; a.aimKey = bs.p[0] + ',' + bs.p[1]; }
     { const R1 = K.walls[0];   // 3 x 300 Zombies von Anfang an 50 / 100 / 150 m westlich der ersten Mauer, über die ganze Länge verteilt
       for (let i = 0; i < 900; i++) {
         const dist = 50 * (1 + (i / 300 | 0)), f = Math.random(), c = polyAt(R1, f), a = polyAt(R1, Math.max(0, f - .02)), b = polyAt(R1, Math.min(1, f + .02));
@@ -537,7 +537,8 @@ const Campaign = (() => {
         const p = randWalk(c[0] + nx * dist, c[1] + ny * dist, 10) || randWalk(c[0] + nx * dist, c[1] + ny * dist, 40) || [c[0] + nx * dist, c[1] + ny * dist];
         const z = spawnZombie(p[0], p[1], 0); S.spawned++; if (z && Math.random() < .98) z.gt = [c[0] + rnd(-6, 6), c[1] + rnd(-6, 6)];   // 98 % laufen auf die Mauer zu
       } }
-    zpDirty = false; K.arrows.forEach((a, i) => { const q = put(a.head[0], a.head[1], 80); queueField('mf', a.head[0] + ',' + a.head[1], q[0], q[1]); });   // Wegfelder im Hintergrund vorberechnen
+    zpDirty = false; K.arrows.forEach((a, i) => { const q = put(a.head[0], a.head[1], 80); queueField('mf', a.head[0] + ',' + a.head[1], q[0], q[1]); });
+    { const done = new Set(); for (const a of K.arrows) if (!done.has(a.aimKey)) { done.add(a.aimKey); const q = put(a.aim[0], a.aim[1], 30); queueField('mf', a.aimKey, q[0], q[1]); } }   // Wegfelder für den Endanlauf (Sperre / Mauer)   // Wegfelder im Hintergrund vorberechnen
   }
   function tickBattle(m) {
     const K = m.battle, b = S.battle, stp = S.btstep = (S.btstep || 0) + 1;
@@ -557,7 +558,7 @@ const Campaign = (() => {
         const n = 100 * (simT >= 1200 ? 8 : simT >= 900 ? 4 : simT >= BT_DBL ? 2 : 1), id = 'bt' + i, g = nearestWalkCell(a.tail[0], a.tail[1], 90) || a.tail, started = K.arrows.filter(q => simT >= q.t0).length;
         if (b.la[i] + n > Math.max(400, Math.floor(BT_CAP * (simT >= 1200 ? 1.35 : simT >= 900 ? 1.15 : 1) / started))) continue;   // Obergrenze je Pfeil: jede Richtung bekommt ihren Anteil
         const e0 = E.length;
-        spawnWave({ t: 0, n, x: g[0], y: g[1], r: 45, march: { id, route: 0, routes: [[]], gather: { x: a.head[0], y: a.head[1], r: 55 }, noWait: true, pre: true, spd: 2, aim: a.aim, aimJ: a.aimJ, dur: 3000 } }, false);
+        spawnWave({ t: 0, n, x: g[0], y: g[1], r: 45, march: { id, route: 0, routes: [[]], gather: { x: a.head[0], y: a.head[1], r: 55 }, noWait: true, pre: true, spd: 2, aim: a.aim, aimKey: a.aimKey, aimJ: a.aimJ, dur: 3000 } }, false);
         const mkr = S.marches.find(q => q.id === id); if (mkr) mkr.until = simT + 900; b.live += n; b.la[i] += n; for (let k = e0; k < E.length; k++) E[k].ar = i + 1;
       }
     });
