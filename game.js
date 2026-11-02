@@ -978,6 +978,7 @@ function computeEvacField() {
   evacDirty = false; evLast = simT;
   if (!evD) evD = new Float64Array(GW * GH);
   evD.fill(1e9);
+  const zl = RULES.civLine && !S.civFree && RULES.civLine(S.evac.x, S.evac.y) ? RULES.civLine : null;
   const s0 = cellIdx(S.evac.x, S.evac.y); hN = 0; evD[s0] = 0; hpush(s0, 0);
   while (hN > 0) {
     const f = hF[0], cur = hpop();
@@ -986,6 +987,7 @@ function computeEvacField() {
     for (const [dx, dy, m] of NB) {
       const nx = cx + dx, ny = cy + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
       const ni = ny * GW + nx, c = cost(ni, false); if (!c) continue;
+      if (zl && !zl((nx + .5) * CELL, (ny + .5) * CELL)) continue;   // Zivilisten bleiben im abgesperrten Bereich
       if (dx && dy && (!cost(cy * GW + nx, false) || !cost(ny * GW + cx, false))) continue;
       const nd = f + c * m; if (nd < evD[ni]) { evD[ni] = nd; hpush(ni, nd); }
     }
@@ -1305,16 +1307,29 @@ function useTool(tool, x, y, x2, y2) {
 
 // ───────────────────────── Speichern / Laden ─────────────────────────
 const SAVE_KEY = n => 'zos_moosburg_slot' + n;
+function slimS() {   // Sperrzonen-Raster (Kelheim) nicht roh speichern: als Lauflängen
+  const b = S.battle; if (!b || !b.zone) return S;
+  const z = b.zone, r = []; let c = z[0], n = 0;
+  for (let i = 0; i < z.length; i++) { if (z[i] === c) n++; else { r.push(n); c = z[i]; n = 1; } }
+  r.push(n);
+  return { ...S, battle: { ...b, zone: undefined, zrle: [z[0], r] } };
+}
+function zoneFromRle(b) {
+  if (!b || !b.zrle) return;
+  const zs = new Uint8Array(GW * GH); let v = b.zrle[0], p = 0;
+  for (const n of b.zrle[1]) { if (v) zs.fill(1, p, p + n); p += n; v ^= 1; }
+  b.zone = zs; delete b.zrle; RULES.civLine = (x, y) => zs[cellIdx(x, y)] === 1;
+}
 function serialize() {
   return {
-    v: 2, ts: Date.now(), simT, cfg, markers, S, cooldown, fx: fx.map(f => ({ ...f })), map: curMap, mode: RULES.mode, mission: RULES.missionId || null, up: RULES.up || null,
+    v: 2, ts: Date.now(), simT, cfg, markers, S: slimS(), cooldown, fx: fx.map(f => ({ ...f })), map: curMap, mode: RULES.mode, mission: RULES.missionId || null, up: RULES.up || null,
     E: E.filter(e => !e.dead).map(e => [e.k, +e.x.toFixed(1), +e.y.toFixed(1), e.hp, +e.inc.toFixed(1), e.ammo, e.acc, e.armed ? 1 : 0, e.b, e.brave ? 1 : 0, +e.inT.toFixed(1), e.hmx, e.hmy, e.ds, +e.dt.toFixed(1), e.g, e.ord ? 1 : 0, e.sq, e.kills, e.lvl, e.ammoMax || 0, e.snipe ? 1 : 0, e.sil ? 1 : 0, e.zsp || 0, e.lx0 ? 1 : 0, e.mp ? 1 : 0, e.sg ? 1 : 0, e.ams || null, e.gsg || 0, e.pis || 0, e.pg ? 1 : 0, e.upMul || 0, e.lock ? 1 : 0, e.pisMax || 0]),
     bar: BAR.filter(Boolean).map(b => ({ cells: b.cells, hp: b.hp, max: b.max, x: b.x, y: b.y, gates: b.gates || [], pre: b.pre ? 1 : 0 })),
     siege: B.filter(b => b.siege > 0).map(b => [b.idx, b.siege])
   };
 }
 function deserialize(d) {
-  cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; S.used = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0, ...S.used }; S.ev = S.ev || { civ: 0, pol: 0, mil: 0, trk: 0 }; S.plans = S.plans || []; S.sirens = S.sirens || []; S.planId = S.planId || 0; if (S.evacT == null) S.evacT = 10; evacDirty = !!S.evac; simT = d.simT; cooldown = d.cooldown; finished = false;
+  cfg = { ...DEFAULTS, ...d.cfg }; markers = d.markers || []; S = d.S; zoneFromRle(S.battle); S.used = { barricade: 0, strike: 0, supply: 0, garrison: 0, evac: 0, truck: 0, ...S.used }; S.ev = S.ev || { civ: 0, pol: 0, mil: 0, trk: 0 }; S.plans = S.plans || []; S.sirens = S.sirens || []; S.planId = S.planId || 0; if (S.evacT == null) S.evacT = 10; evacDirty = !!S.evac; simT = d.simT; cooldown = d.cooldown; finished = false;
   noises = []; tracers = []; fx = d.fx || []; selected.clear(); barId.fill(0); gate.fill(0); BAR = [null];
   for (const b of B) { b.occ = []; b.siege = 0; }
   E = d.E.map(a => { const e = mk(a[0], a[1], a[2]); e.hp = a[3]; e.inc = a[4]; e.ammo = a[5]; e.acc = a[6]; e.armed = !!a[7]; e.b = a[8]; e.brave = !!a[9]; e.inT = a[10]; e.hmx = a[11]; e.hmy = a[12]; e.ds = a[13] || 0; e.dt = a[14] || 0; e.g = a[15] || 0; e.ord = !!a[16]; e.sq = a[17] || 0; e.kills = a[18] || 0; e.lvl = a[19] || 1; e.ammoMax = a[20] || 0; e.snipe = !!a[21]; e.sil = !!a[22]; if (a[23]) e.zsp = a[23]; e.mp = !!a[25]; e.sg = !!a[26]; if (a[27]) e.ams = a[27]; if (a[28]) { e.gsg = a[28]; e.pis = a[29] || 0; e.pg = !!a[30]; e.pisMax = a[33] || 0; } e.upMul = a[31] || 0; e.lock = !!a[32]; if (e.g > gidN) gidN = e.g; if (e.sq > gidN) gidN = e.sq; if (e.b >= 0 && B[e.b]) { e.st = 4; B[e.b].occ.push(e); } else e.b = -1; return e; });
@@ -1961,4 +1976,4 @@ function init() {
   requestAnimationFrame(frame);
 }
 init();
-window.__game = { stopPower, toMenu, get E() { return E; }, get S() { return S; }, cfg, cam, counts, step, setSpeed, startRun, newSim, useTool, B, commandMove, selected, get fx() { return fx; }, findPath, cost, cellIdx, get BAR() { return BAR; }, get type() { return type; }, get gate() { return gate; }, get barId() { return barId; } };
+window.__game = { get evD() { return evD; }, computeEvacField, stopPower, toMenu, get E() { return E; }, get S() { return S; }, cfg, cam, counts, step, setSpeed, startRun, newSim, useTool, B, commandMove, selected, get fx() { return fx; }, findPath, cost, cellIdx, get BAR() { return BAR; }, get type() { return type; }, get gate() { return gate; }, get barId() { return barId; } };

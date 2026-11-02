@@ -522,6 +522,11 @@ const Campaign = (() => {
       const Q = [c0]; zs[c0] = 1; for (let h = 0; h < Q.length; h++) { const i = Q[h], x = i % GW, y = i / GW | 0; for (const j of [x > 0 ? i - 1 : -1, x < GW - 1 ? i + 1 : -1, y > 0 ? i - GW : -1, y < GH - 1 ? i + GW : -1]) if (j >= 0 && !zs[j] && wk(j)) { zs[j] = 1; Q.push(j); } }
       S.battle.zone = zs; RULES.civLine = (x, y) => zs[cellIdx(x, y)] === 1;
       const open = Q.filter(i => type[i] <= T_ROAD);
+      if (S.pad && !zs[cellIdx(S.pad.x, S.pad.y)]) {   // Sammelpunkt muss im abgesperrten Bereich liegen
+        const ev = m.evac(); let bi = -1, bd = 1e18;
+        for (const i of open) { const d = ((i % GW + .5) * CELL - ev.x) ** 2 + (((i / GW | 0) + .5) * CELL - ev.y) ** 2; if (d < bd) { bd = d; bi = i; } }
+        if (bi >= 0) { S.pad = { x: (bi % GW + .5) * CELL, y: ((bi / GW | 0) + .5) * CELL }; S.evacPre = S.pad; }
+      }
       for (const e of E) { if (e.k !== K_CIV || e.dead || zs[cellIdx(e.x, e.y)]) continue;
         const bb = e.st === 4 && B[e.b]; if (bb && [0, 1, -1].some(dx => [0, 1, -1].some(dy => zs[cellIdx(bb.ex + dx * CELL, bb.ey + dy * CELL)]))) continue;   // Gebäude in der Zone
         if (bb) { bb.occ = bb.occ.filter(o => o !== e); e.st = 0; e.b = -1; }
@@ -555,8 +560,9 @@ const Campaign = (() => {
     K.arrows.forEach((a, i) => {   // jeder Pfeil: Schub alle 10 s (Obergrenze für gleichzeitig lebende Zombies)
       while (simT >= b.nx[i] && b.nx[i] < BT_END) {
         b.nx[i] += 10;
-        const n = 100 * (simT >= 1200 ? 8 : simT >= 900 ? 4 : simT >= BT_DBL ? 2 : 1), id = 'bt' + i, g = nearestWalkCell(a.tail[0], a.tail[1], 90) || a.tail, started = K.arrows.filter(q => simT >= q.t0).length;
-        if (b.la[i] + n > Math.max(400, Math.floor(BT_CAP * (simT >= 1200 ? 1.35 : simT >= 900 ? 1.15 : 1) / started))) continue;   // Obergrenze je Pfeil: jede Richtung bekommt ihren Anteil
+        const want = 100 * (simT >= 1200 ? 8 : simT >= 900 ? 4 : simT >= BT_DBL ? 2 : 1), id = 'bt' + i, g = nearestWalkCell(a.tail[0], a.tail[1], 90) || a.tail, started = K.arrows.filter(q => simT >= q.t0).length;
+        const room = Math.max(400, Math.floor(BT_CAP * (simT >= 1200 ? 1.35 : simT >= 900 ? 1.15 : 1) / started)) - b.la[i];   // Obergrenze je Pfeil: jede Richtung bekommt ihren Anteil; es wird nur noch das aufgefüllt, was frei ist
+        const n = Math.min(want, room); if (n < 25) continue;
         const e0 = E.length;
         spawnWave({ t: 0, n, x: g[0], y: g[1], r: 45, march: { id, route: 0, routes: [[]], gather: { x: a.head[0], y: a.head[1], r: 55 }, noWait: true, pre: true, spd: 2, aim: a.aim, aimKey: a.aimKey, aimJ: a.aimJ, dur: 3000 } }, false);
         const mkr = S.marches.find(q => q.id === id); if (mkr) mkr.until = simT + 900; b.live += n; b.la[i] += n; for (let k = e0; k < E.length; k++) E[k].ar = i + 1;
