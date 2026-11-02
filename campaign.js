@@ -51,6 +51,9 @@ const Campaign = (() => {
   const PF_SOUTH_SPOTS = [[1000, 1850], [820, 1850], [640, 1840], [460, 1790], [300, 1710], [160, 1620]];
   const PF_SOUTH = k => { const [x, y] = PF_SOUTH_SPOTS[k % PF_SOUTH_SPOTS.length]; return { t: 0, n: 100, x, y, r: 90, msg: k === 0 ? '⚠ 2000 Zombies strömen aus dem Süden und Südwesten auf das nördliche Tor zu!' : null, march: { id: 'pfS', route: 0, routes: [[]], gather: { x: 1255, y: 702, r: 30 }, total: 2000, focus: .8, dur: 3600 } }; };
   const PF_NORTH2 = { t: 0, n: 2000, x: 600, y: 50, r: 320, fast: true, msg: '⚠ Der Norden ist geräumt – 2000 weitere Zombies strömen aus dem Norden!', march: { ...PF_MARCH, id: 'pfN2' } };
+  // Kelheim (Mission 6): Koordinaten aus dem Lageplan (Google-Maps-Screenshot, 2000 x 1020 px) → Welt (1 px = 1,85 Karteneinheiten, Stauchung 50 %)
+  const KH = (x, y) => [Math.min(3665, Math.max(30, (x + 32) * 1.85)), Math.min(1855, Math.max(30, (y - 118) * 1.85))];   // Versatz (32 / -118 px) aus dem Abgleich mit der OSM-Karte
+  const KZ = [[892, 384], [1135, 382], [1335, 515], [1595, 732], [1590, 806], [1400, 737], [1215, 652], [1100, 600], [1000, 582], [890, 592]].map(p => KH(...p));   // gesicherte Zone (Halbinsel)
   const MIS = [
     {
       id: 'm1', map: 'm1', name: 'Die Isarbrücke', sub: 'Moosburg Südost', pop: 750, armed: 6, acc: 35, zs: 50,
@@ -137,6 +140,32 @@ const Campaign = (() => {
       primary: { pts: 2500 }, secondary: { clear: true, pts: 1000 },
       goal: ['Erreiche die Evakuierungsstelle am Kloster Weltenburg im Norden, sichere sie (200 m im Umkreis zombiefrei) und halte sie 5 Minuten lang.', 'Töte alle Zombies.'],
       info: ['Die Karte ist zu Beginn frei von Zombies – Start im Süden bei Abensberg, Ziel im Norden an der Donau', 'Je weiter ihr vorrückt, desto mehr Untote werden auf euch aufmerksam', 'Der Weg ist lang: Trucks, Versorgung und Luftschläge stehen von Anfang an bereit', 'Die Karte ist zur besseren Spielbarkeit auf 35 % gestaucht']
+    }
+    ,{
+      id: 'm6', map: 'm6', kind: 'battle', name: 'Die Schlacht um Kelheim', sub: 'Kelheim an der Donau', pop: 2000, armed: 6, acc: 35, zs: 50,
+      start: () => { const a = KH(760, 945), b = KH(740, 930), c = KH(785, 955); return { sol: [{ x: a[0], y: a[1] }, { x: c[0], y: c[1] }], pol: [{ x: b[0], y: b[1] }, { x: c[0] - 14, y: c[1] + 10 }] }; },
+      evac: () => { const p = KH(1150, 470); return { x: p[0], y: p[1], at: 1e9 }; },
+      spawns: () => [],
+      lure: () => ({ x: 0, y: 0, t: 1e9, dur: 0 }),
+      hordeAt: 1e9, hordeFocus: 0, hordeQuiet: true,
+      hold: null,
+      civZone: { discs: [[960, 480], [1050, 470], [1130, 450], [1200, 490], [1270, 540], [1350, 590], [1440, 650], [1520, 710], [1060, 540], [1160, 560]].map(([x, y]) => { const p = KH(x, y); return { x: p[0], y: p[1], r: 120 }; }) },
+      civLine: (x, y) => inPoly(x, y, KZ),
+      battle: {
+        south: 300, north: 360, zone: KZ,
+        walls: [[[858, 350], [838, 420], [832, 480], [840, 545], [856, 602]], [[884, 358], [868, 430], [860, 500], [862, 550], [872, 590]], [[897, 362], [884, 440], [880, 500], [884, 540], [893, 570]]].map(l => l.map(p => KH(...p))),
+        bridges: [[1142, 375], [1332, 510], [1215, 630], [1597, 737], [1587, 803]].map(p => KH(...p)),
+        arrows: [   // [Start, Ziel] je Pfeil; t0 = Beginn der Schübe (Sekunden)
+          { tail: [30, 155], head: [812, 288], t0: 30 }, { tail: [30, 350], head: [808, 420], t0: 30 }, { tail: [0, 655], head: [808, 545], t0: 30 },
+          { tail: [205, 1000], head: [800, 600], t0: 300 }, { tail: [800, 990], head: [1205, 672], t0: 300 },
+          { tail: [930, 100], head: [850, 292], t0: 360 }, { tail: [1250, 115], head: [1150, 350], t0: 360 }, { tail: [1630, 130], head: [1355, 478], t0: 360 }, { tail: [1865, 140], head: [1600, 700], t0: 360 }
+        ].map(a => ({ tail: KH(...a.tail), head: KH(...a.head), t0: a.t0 }))
+      },
+      tools: { supply: { at: 0, max: 6, cd: 20 }, strike: { at: 0, max: 5, cd: 8 }, garrison: { at: 240, max: 2, cd: 30 }, truck: { at: 0, max: 2, cd: 4 } },
+      barricades: 36,
+      primary: { pts: 3000 }, secondary: { civLoss: 100, pts: 1500 },
+      goal: ['Halte Kelheim 30 Minuten lang. Rücke von „P“ nach Norden in die gesicherte Zone vor und hilf, die Brücken und die Mauern zu verteidigen.', 'Verliere höchstens 100 der 2000 Zivilisten in der Zone.'],
+      info: ['Die Halbinsel ist durch drei Mauerreihen im Westen und blockierte Brücken (mit Toren) gesichert – Mauern, Tore und alle platzierten Einheiten gehören nicht zu deinem Inventar und sind nicht steuerbar (unbegrenzte Munition)', 'Zwischen der ersten und zweiten Mauerreihe: MGs, Trucks und Soldaten. Jede Brücke: zwei MGs und zwei GSG-9-Einheiten', 'Aus dem Westen strömen Zombies auf die Mauer zu, ab 5:00 aus dem Süden, ab 6:00 aus dem Norden und Nordosten. Je Pfeil 100 Zombies alle 10 Sekunden, ab 5:00 sogar 200', 'Luftschläge dünnen die Angreifer aus, Gunships entlasten zufällig bedrohte Abschnitte', 'Nach 28:00 enden die Wellen, nach 30:00 löschen Gunships alle übrigen Zombies aus', 'Aus Leistungsgründen sind höchstens ca. 3200 Zombies gleichzeitig auf der Karte']
     }
   ];
 
@@ -291,6 +320,7 @@ const Campaign = (() => {
     if (m.ring) buildRing(m.ring);
     if (m.seals) buildSeals(m);
     if (m.station) buildStation(m);
+    if (m.battle) buildBattle(m);
     for (const t of m.turrets || []) { const q = nearestWalkCell(t.x, t.y, 30) || [t.x, t.y], e = placeTurret(q[0], q[1]); e.ds = 2; e.dt = 0; e.auto = true; e.acc = .6; e.ammo = e.ammoMax = 1e9; }
     { const ev = m.evac(), p = randWalk(ev.x, ev.y, 25) || randWalk(ev.x, ev.y, 80) || [ev.x, ev.y]; S.pad = { x: p[0], y: p[1] }; S.evacPre = S.pad; }
     if (m.kind === 'trek') { S.padT = { x: S.pad.x, y: S.pad.y }; zpDirty = true; trekPrewarm(m); }
@@ -349,6 +379,7 @@ const Campaign = (() => {
     }
     if (m.kind === 'land') tickLand(m);
     if (m.kind === 'trek') tickTrek(m);
+    if (m.kind === 'battle') tickBattle(m);
     if (m.station && (S.sstep = (S.sstep || 0) + 1) % 30 === 0) {   // Wache übernehmen, sobald eine eigene Einheit nah genug ist
       const lk = E.filter(e => e.lock && !e.dead);
       if (lk.length && UL.some(u => !u.lock && (u.k === K_POL || u.k === K_SOL || u.k === K_SEN) && lk.some(l => (l.x - u.x) ** 2 + (l.y - u.y) ** 2 < m.station.r ** 2))) { for (const l of lk) l.lock = false; toast('👮 Die Einsatzkräfte der Polizeiwache stehen unter deinem Kommando'); SFX.ui(); }
@@ -422,6 +453,109 @@ const Campaign = (() => {
     document.getElementById('bEnd').style.display = simT > 30 ? '' : 'none';
   }
 
+  // ── Mission 6 „Kelheim“: tobende Schlacht um die Halbinsel (30 Minuten halten) ──
+  const BT_CAP = 3200, BT_DBL = 300, BT_END = 1680, BT_FIN = 1800, BT_LOSS = 100;
+  const polyAt = (ln, f) => {
+    let L = 0; for (let i = 1; i < ln.length; i++) L += Math.hypot(ln[i][0] - ln[i - 1][0], ln[i][1] - ln[i - 1][1]);
+    let h = L * f; for (let i = 1; i < ln.length; i++) { const l = Math.hypot(ln[i][0] - ln[i - 1][0], ln[i][1] - ln[i - 1][1]); if (h <= l || i === ln.length - 1) { const t = Math.min(1, h / (l || 1)); return [ln[i - 1][0] + (ln[i][0] - ln[i - 1][0]) * t, ln[i - 1][1] + (ln[i][1] - ln[i - 1][1]) * t]; } h -= l; }
+  };
+  function wallCells(ln) {   // Mauer entlang eines Linienzugs, drei Zellen dick, lückenlos
+    const set = new Set();
+    for (let i = 1; i < ln.length; i++) {
+      const [x0, y0] = ln[i - 1], [x1, y1] = ln[i], n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 2);
+      for (let k = 0; k <= n; k++) {
+        const cx = (x0 + (x1 - x0) * k / n) / CELL | 0, cy = (y0 + (y1 - y0) * k / n) / CELL | 0;
+        for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = cx + dx, y = cy + dy; if (x >= 0 && y >= 0 && x < GW && y < GH) set.add(y * GW + x); }
+      }
+    }
+    return [...set];
+  }
+  function buildBattle(m) {
+    const K = m.battle, zone = K.zone, hot = [], hp3 = n0 => { for (let i = n0; i < BAR.length; i++) { BAR[i].hp *= 3; BAR[i].max = BAR[i].hp; } };
+    S.battle = { nx: K.arrows.map(a => a.t0), gunT: 70, bombT: 50, hot, purge: 0, done: false };
+    const put = (x, y, r) => nearestWalkCell(x, y, r || 14) || [x, y];
+    const turret = (x, y) => { const q = put(x, y), e = placeTurret(q[0], q[1]); e.ds = 2; e.dt = 0; e.auto = true; e.fort = true; e.acc = .6; e.ammo = e.ammoMax = 1e9; };
+    const squad = (k, x, y, n) => { const id = ++gidN; for (let i = 0; i < n; i++) { const q = put(x + rnd(-5, 5), y + rnd(-5, 5), 10), e = unitFrom(k, q[0], q[1], id, 0, i); e.lock = e.ord = e.fort = true; e.ammoMax = e.ammo = 1e9; if (e.gsg) e.pisMax = e.pis = 1e9; } };
+    const truck = (x, y) => { const q = put(x, y), e = mk(K_TRK, q[0], q[1]); e.acc = .6; e.armed = true; e.ord = e.lock = e.fort = true; e.hmx = q[0]; e.hmy = q[1]; e.hp = 8; e.ammoMax = e.ammo = 1e9; E.push(e); };
+    for (const ln of K.walls) {   // drei Mauerreihen, in der Mitte je ein Tor
+      const g = polyAt(ln, .5), n0 = BAR.length;
+      addPre(wallCells(ln), c => Math.hypot((c % GW + .5) * CELL - g[0], ((c / GW | 0) + .5) * CELL - g[1]) < 9); hp3(n0);
+      hot.push(polyAt(ln, .2), g, polyAt(ln, .8));
+    }
+    const mid = K.walls[0].map((p, i) => [(p[0] + K.walls[1][i][0]) / 2, (p[1] + K.walls[1][i][1]) / 2]);   // Kampfraum zwischen Reihe 1 und 2
+    for (const f of [.08, .24, .4, .58, .76, .92]) { const p = polyAt(mid, f); turret(p[0], p[1]); }
+    for (const f of [.16, .5, .84]) { const p = polyAt(mid, f); truck(p[0], p[1]); }
+    for (const f of [.32, .66, .9]) { const p = polyAt(mid, f); squad('sol', p[0], p[1], 4); }
+    for (const bp of K.bridges) {   // Brücken: Sperre mit Tor, dahinter zwei MGs und zwei GSG-9-Einheiten
+      let best = null, bd = 110 * 110;
+      for (const pass of [1, 0]) { if (best) break; for (const r of MD.roads) { if (pass && !r.br) continue; for (let i = 0; i < r.p.length; i += 2) { const d = (r.p[i] - bp[0]) ** 2 + (r.p[i + 1] - bp[1]) ** 2; if (d < bd) { bd = d; best = [r, i]; } } } }
+      const v = best ? [best[0].p[best[1]], best[0].p[best[1] + 1]] : bp;
+      let tx = 1, ty = 0;
+      if (best) { const p = best[0].p, i0 = Math.max(0, best[1] - 4), i1 = Math.min(p.length - 2, best[1] + 4), l = Math.hypot(p[i1] - p[i0], p[i1 + 1] - p[i0 + 1]) || 1; tx = (p[i1] - p[i0]) / l; ty = (p[i1 + 1] - p[i0 + 1]) / l; }
+      const nx = -ty, ny = tx, set = new Set();
+      for (let o = -18; o <= 18; o += 1.5) for (let s = -5; s <= 5; s += 2) { const x = v[0] + nx * o + tx * s, y = v[1] + ny * o + ty * s; if (x > 1 && y > 1 && x < WW - 1 && y < WH - 1) set.add(cellIdx(x, y)); }
+      const n0 = BAR.length; addPre([...set], c => Math.abs(((c % GW + .5) * CELL - v[0]) * nx + (((c / GW | 0) + .5) * CELL - v[1]) * ny) <= 4.5); hp3(n0);
+      const sg = inPoly(v[0] + tx * 16, v[1] + ty * 16, zone) ? 1 : inPoly(v[0] - tx * 16, v[1] - ty * 16, zone) ? -1 : 1;
+      for (const o of [-7, 7]) turret(v[0] + tx * sg * 14 + nx * o, v[1] + ty * sg * 14 + ny * o);
+      for (const [d, o] of [[22, -5], [22, 5]]) squad('gsg', v[0] + tx * sg * d + nx * o, v[1] + ty * sg * d + ny * o, 3);
+      hot.push(v);
+    }
+    zpDirty = false; K.arrows.forEach((a, i) => { const q = put(a.head[0], a.head[1], 80); queueField('mf', a.head[0] + ',' + a.head[1], q[0], q[1]); });   // Wegfelder im Hintergrund vorberechnen
+  }
+  function tickBattle(m) {
+    const K = m.battle, b = S.battle, stp = S.btstep = (S.btstep || 0) + 1;
+    if (stp % 20 === 0) { let n = 0; for (const e of E) if (e.k === K_ZOM && !e.dead) n++; b.live = n; }
+    if (!S.fired.b300 && simT >= BT_DBL) { S.fired.b300 = 1; banner('⚠ Die Wellen schwellen an: ab jetzt 200 Zombies alle 10 Sekunden aus jeder Richtung!', 12000); SFX.alarm(); }
+    if (!S.fired.bS && simT >= K.south) { S.fired.bS = 1; banner('⚠ Eine Welle aus dem Süden rollt an – die Brücke im Süden ist bedroht!', 12000); SFX.alarm(); }
+    if (!S.fired.bN && simT >= K.north) { S.fired.bN = 1; banner('⚠ Jetzt auch aus dem Norden und Nordosten! Haltet alle Brücken!', 12000); SFX.alarm(); }
+    if (!S.fired.bEnd && simT >= BT_END) { S.fired.bEnd = 1; banner('📻 Die Wellen ebben ab – haltet durch, bis die Gunships eintreffen!', 12000); SFX.ui(); }
+    K.arrows.forEach((a, i) => {   // jeder Pfeil: Schub alle 10 s (Obergrenze für gleichzeitig lebende Zombies)
+      while (simT >= b.nx[i] && b.nx[i] < BT_END) {
+        b.nx[i] += 10; if (b.live > BT_CAP) continue;
+        const n = simT >= BT_DBL ? 200 : 100, id = 'bt' + i, g = nearestWalkCell(a.tail[0], a.tail[1], 90) || a.tail;
+        spawnWave({ t: 0, n, x: g[0], y: g[1], r: 45, march: { id, route: 0, routes: [[]], gather: { x: a.head[0], y: a.head[1], r: 55 }, noWait: true, pre: true, dur: 3000 } }, false);
+        const mkr = S.marches.find(q => q.id === id); if (mkr) mkr.until = simT + 900; b.live += n;
+      }
+    });
+    if (simT >= b.gunT && simT < BT_FIN) {   // Gunship zur Entlastung des am stärksten bedrängten Abschnitts
+      b.gunT = simT + rnd(25, 45);
+      let bp = null, bc = -1; for (const h of b.hot) { let c = 0; for (const z of E) if (z.k === K_ZOM && !z.dead && Math.abs(z.x - h[0]) < 50 && Math.abs(z.y - h[1]) < 50) c++; if (c > bc) { bc = c; bp = h; } }
+      if (bp && bc > 0) { const [sx, sy] = edgeEntry(bp[0], bp[1]); fx.push({ type: 'heli', kind: 'gunship', x: sx, y: sy, tx: bp[0], ty: bp[1], ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); toast('🚁 Gunship greift ein – bedrohter Abschnitt wird entlastet', 3000); }
+    }
+    if (simT >= b.bombT && simT < BT_FIN) {   // Luftschlag auf die dichteste Zombieansammlung (nicht nahe eigener Stellungen)
+      b.bombT = simT + rnd(14, 28);
+      const Z = E.filter(z => z.k === K_ZOM && !z.dead); let bp = null, bc = 24;
+      for (let t = 0; t < 40 && Z.length; t++) {
+        const z = Z[Math.random() * Z.length | 0]; let c = 0; for (const o of Z) if (Math.abs(o.x - z.x) < 35 && Math.abs(o.y - z.y) < 35) c++;
+        if (c > bc && !E.some(f => friendly(f) && !f.dead && Math.hypot(f.x - z.x, f.y - z.y) < 60)) { bc = c; bp = z; }
+      }
+      if (bp) { const an = Math.random() * 6.283, dx = Math.cos(an), dy = Math.sin(an); fx.push({ type: 'jet', x: bp.x - dx * 1400, y: bp.y - dy * 1400, vx: dx * 230, vy: dy * 230, a: an, tx: bp.x, ty: bp.y, lead: 276, dropped: false }); }
+    }
+    if (!b.purge && simT >= BT_FIN) {   // 30:00 – Gunships löschen alle überlebenden Zombies aus
+      b.purge = simT; banner('🚁 30 Minuten gehalten! Gunships im Anflug – alle verbliebenen Zombies werden ausgelöscht.', 14000); SFX.alarm(); Music.play('hope');
+      const Z = E.filter(z => z.k === K_ZOM && !z.dead);
+      for (let k = 0; k < 6; k++) { const z = Z.length ? Z[Math.random() * Z.length | 0] : null, p = z ? [z.x, z.y] : [WW / 2, WH / 2], [sx, sy] = edgeEntry(p[0], p[1]); fx.push({ type: 'heli', kind: 'gunship', x: sx, y: sy, tx: p[0], ty: p[1], ex: sx, ey: sy, ph: 0, t: 0, a: 0 }); }
+    }
+    if (b.purge && !b.done) {
+      const Z = E.filter(z => z.k === K_ZOM && !z.dead), age = simT - b.purge;
+      if (age > 4) { const k = Math.ceil(Z.length / Math.max(1, 20 - age) / 4); for (let i = 0; i < k && Z.length; i++) { const z = Z.splice(Math.random() * Z.length | 0, 1)[0]; tracers.push({ x1: z.x + rnd(-30, 30), y1: z.y - 60, x2: z.x, y2: z.y, t: .1 }); z.dead = true; S.kills++; } }
+      if (!Z.length && age > 4 || age > 40) { for (const z of E) if (z.k === K_ZOM && !z.dead) { z.dead = true; S.kills++; } b.done = true; }
+    }
+  }
+  const civAlive = () => { let n = 0; for (const e of E) if (!e.dead && e.k === K_CIV && e.inc < 0) n++; return n; };
+  function evalBattle(m, c) {
+    const b = S.battle || {}, lost = Math.max(0, (S.civ0 || m.pop) - civAlive());
+    return { R: civAlive(), cleared: !!b.done, primary: !!b.done, priFrac: Math.min(1, simT / BT_FIN), secondary: !!b.done && lost <= BT_LOSS, lost, kills: S.kills, killFrac: S.spawned ? Math.min(1, S.kills / S.spawned) : 0 };
+  }
+  function hudBattle(m, c, o, box) {
+    const b = S.battle || {}, left = Math.max(0, BT_FIN - simT), ph = simT < m.battle.south ? 'Ansturm von Westen' : simT < m.battle.north ? 'Westen + Süden' : simT < BT_END ? 'Ansturm aus allen Richtungen' : simT < BT_FIN ? 'Die Wellen ebben ab' : 'Gunships räumen auf';
+    const html = `<h3>${m.name}</h3><div class="ev">Zeit ${fmtClock(simT)} · ${ph}</div>
+      <div class="o"><b class="${o.primary ? 'ok' : ''}">${o.primary ? '✓ ' : ''}Primär:</b> ${fmtClock(BT_FIN)} aushalten<div class="${o.primary ? 'ok' : ''}">${o.primary ? '✓ Geschafft' : '○ noch ' + fmtClock(left)}</div><div class="bar"><i style="width:${Math.min(100, simT / BT_FIN * 100)}%"></i></div></div>
+      <div class="o"><b class="${o.secondary ? 'ok' : ''}">${o.secondary ? '✓ ' : ''}Sekundär:</b> höchstens ${BT_LOSS} Zivilisten verlieren<div class="${o.lost > BT_LOSS ? 'ev' : ''}">${o.lost > BT_LOSS ? '✗' : '○'} Verloren: <b>${o.lost}</b> / ${BT_LOSS} · gerettet in der Zone: ${o.R}</div></div>`;
+    if (box.dataset.h !== html) { box.innerHTML = html; box.dataset.h = html; }
+    document.getElementById('bEnd').style.display = simT > 30 ? '' : 'none';
+  }
+
   // ── Pfaffenhofen: Landeplatz sichern, dann Evakuierung per Schaltfläche ──
   const PAD_R = 80;
   function tickLand(m) {
@@ -454,7 +588,7 @@ const Campaign = (() => {
   }
 
   // ── Ziele & Punkte ─────────────────────────────────────────────────────
-  function lastSpawnT(m) { if (m.kind === 'trek') return 1e9; return Math.max(...m.spawns().map(w => w.t)); }
+  function lastSpawnT(m) { if (m.kind === 'trek' || m.kind === 'battle') return 1e9; return Math.max(...m.spawns().map(w => w.t)); }
   function rescued(c) { return S.ev.civ; }
   function airCiv() { let n = 0; for (const e of E) if (!e.dead && e.k === K_CIV && e.inc < 0) n++; return n; }
   function evalAir(m, c) {   // Flughafen: alle Zivilisten müssen m.primary.hold Sekunden überleben
@@ -465,6 +599,7 @@ const Campaign = (() => {
   function evalObj(m, c) {
     if (m.primary.hold) return evalAir(m, c);
     if (m.kind === 'trek') return evalTrek(m, c);
+    if (m.kind === 'battle') return evalBattle(m, c);
     if (m.kind === 'land') return evalLand(m, c);
     const cleared = c.zom === 0 && c.inf === 0 && simT >= lastSpawnT(m) + 5;
     const R = rescued(c) + (cleared ? c.civ : 0);
@@ -480,6 +615,12 @@ const Campaign = (() => {
     if (!S.unitsStart) S.unitsStart = E.filter(u => friendly(u) && u.k !== K_TRK && u.k !== K_TUR).length;
     if (c.civ + c.pol + c.mil + c.trk === 0) return endGame('Mission beendet – keine Überlebenden auf der Karte.');
     if (m.primary.hold && airCiv() === 0) return endGame(S.ev.civ > 0 ? 'Evakuierung abgeschlossen.' : 'Alle Zivilisten im Flughafen sind gefallen.');
+    if (m.kind === 'battle') {
+      if (S.battle && S.battle.done) return endGame('Sieg – Kelheim gehalten! Die Gunships haben die letzten Untoten ausgelöscht.');
+      if (!E.some(u => friendly(u) && !u.fort && !u.dead && (u.k === K_SOL || u.k === K_POL || u.k === K_SEN || u.k === K_TRK))) return endGame('Alle Einsatzkräfte sind gefallen.');
+      if (civAlive() === 0) return endGame('Alle Zivilisten in der Zone sind gefallen.');
+      return;
+    }
     if (m.kind === 'trek') { if (evalTrek(m, c).cleared && S.trek.primary) return endGame('Sieg – Evakuierungsstelle gesichert und alle Zombies ausgeschaltet!'); return; }
     if (m.kind === 'land') {
       if (!S.padSafe && simT >= m.primary.land) return endGame('Der Landeplatz wurde nicht rechtzeitig gesichert.');
@@ -493,6 +634,7 @@ const Campaign = (() => {
     const o = evalObj(m, c), pri = m.primary.civ;
     if (m.primary.hold) return hudAir(m, c, o, box);
     if (m.kind === 'trek') return hudTrek(m, c, o, box);
+    if (m.kind === 'battle') return hudBattle(m, c, o, box);
     if (m.kind === 'land') return hudLand(m, c, o, box);
     const evs = []; const up = (name, t) => { if (simT < t && t < 1e8) evs.push(`${name} in ${fmtClock(t - simT)}`); };
     const ev = m.evac(); up('📡 Evakuierungssignal', ev.at); up('💥 Luftschläge', m.tools.strike.at); if (m.tools.garrison) up('🪖 Verstärkung', m.tools.garrison.at); up('⚠ Horde stürmt', m.hordeAt);
@@ -533,7 +675,7 @@ const Campaign = (() => {
     const c = counts(), o = evalObj(m, c), cleared = o.cleared;
     // Überlebende (auf der Karte oder evakuiert) gehen ins Roster
     const surv = [...(S.evU || [])];
-    for (const u of E) if (friendly(u) && (u.k === K_POL || u.k === K_SOL || u.k === K_SEN)) surv.push({ k: u.gsg ? 'gsg' : u.k === K_POL ? 'pol' : 'sol', kills: u.kills, sq: u.sq });
+    for (const u of E) if (friendly(u) && !u.fort && (u.k === K_POL || u.k === K_SOL || u.k === K_SEN)) surv.push({ k: u.gsg ? 'gsg' : u.k === K_POL ? 'pol' : 'sol', kills: u.kills, sq: u.sq });
     const grp = new Map(); for (const s of surv) { if (!grp.has(s.sq)) grp.set(s.sq, { k: s.k, m: [] }); grp.get(s.sq).m.push(s.kills); }
     const ev = S.ev, people = ev.civ + ev.pol * 5 + ev.mil * 10 + (cleared ? c.civ + c.pol * 5 + c.mil * 10 : 0);
     const priPts = Math.round(m.primary.pts * o.priFrac);
@@ -542,6 +684,7 @@ const Campaign = (() => {
     if (m.secondary.clear === true) { secPts = o.secondary ? m.secondary.pts : Math.round(m.secondary.pts * o.killFrac * .5); secTxt = o.secondary ? '✓ Alle Zombies getötet' : `✗ ${Math.round(o.killFrac * 100)} % der Zombies getötet`; } else
     if (m.secondary.bridge != null) { secPts = (o.bridge ? m.secondary.bridge : 0) + Math.round(m.secondary.clear * (cleared ? 1 : o.killFrac)); secTxt = `${o.bridge ? '✓' : '✗'} Brücke gehalten · ${cleared ? '✓' : '✗'} alle Zombies getötet`; }
     else if (m.secondary.noLoss) { secPts = o.secondary ? m.secondary.pts : Math.round(m.secondary.pts * Math.max(0, 1 - o.ulost / Math.max(1, S.unitsStart || 1)) * .5); secTxt = o.secondary ? '✓ Keine Einsatzkraft verloren' : `✗ ${o.ulost} Einsatzkräfte verloren`; }
+    else if (m.secondary.civLoss != null) { secPts = o.secondary ? m.secondary.pts : Math.round(m.secondary.pts * Math.max(0, 1 - Math.max(0, o.lost - m.secondary.civLoss) / 300) * (o.primary ? .5 : .25)); secTxt = `${o.secondary ? '✓' : '✗'} ${o.lost} Zivilisten verloren (höchstens ${m.secondary.civLoss})`; }
     else if (m.secondary.kills != null) { secPts = Math.round(m.secondary.pts * Math.min(1, S.kills / m.secondary.kills)); secTxt = `${S.kills} / ${m.secondary.kills} Zombies eliminiert`; }
     else { secPts = o.secondary ? m.secondary.pts : Math.round(m.secondary.pts * Math.max(0, o.unitFrac - .2) / (m.secondary.units - .2) * .5); secTxt = `${Math.round(o.unitFrac * 100)} % der Einsatzkräfte überlebt (Ziel ${m.secondary.units * 100} %)`; }
     const total = people + priPts + secPts;
@@ -562,7 +705,7 @@ const Campaign = (() => {
     };
     const html = `<h2>${o.primary ? (o.secondary ? 'Mission erfüllt' : 'Primärziel erreicht') : 'Mission gescheitert'}</h2><p class="stars">${'★'.repeat(starN)}${'☆'.repeat(3 - starN)}</p><p>${msg}</p>
       <table>
-      <tr><td>Primär: ${m.kind === 'trek' ? (o.primary ? '✓ Evakuierungsstelle gesichert' : '✗ Evakuierungsstelle nicht gesichert') : m.kind === 'land' ? (o.primary ? '✓ Landeplatz gesichert' : '✗ Landeplatz nicht gesichert') : m.primary.hold ? o.R + ' von ' + (S.civ0 || m.pop) + ' Zivilisten am Leben' + (o.primary ? ' (20 Minuten überlebt)' : '') : o.R + ' von ' + m.primary.civ + ' Zivilisten gerettet'} (${Math.round(o.priFrac * 100)} %)</td><td>+${priPts}</td></tr>
+      <tr><td>Primär: ${m.kind === 'battle' ? (o.primary ? '✓ 30 Minuten gehalten' : '✗ Stellung gefallen') : m.kind === 'trek' ? (o.primary ? '✓ Evakuierungsstelle gesichert' : '✗ Evakuierungsstelle nicht gesichert') : m.kind === 'land' ? (o.primary ? '✓ Landeplatz gesichert' : '✗ Landeplatz nicht gesichert') : m.primary.hold ? o.R + ' von ' + (S.civ0 || m.pop) + ' Zivilisten am Leben' + (o.primary ? ' (20 Minuten überlebt)' : '') : o.R + ' von ' + m.primary.civ + ' Zivilisten gerettet'} (${Math.round(o.priFrac * 100)} %)</td><td>+${priPts}</td></tr>
       <tr><td>Sekundär: ${secTxt}</td><td>+${secPts}</td></tr>
       <tr><td>Gerettete/überlebende Personen (1 / 5 / 10 Punkte)</td><td>+${people}</td></tr>
       <tr><td><b>Summe</b></td><td><b>${total}</b></td></tr>
