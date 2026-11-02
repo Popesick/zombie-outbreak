@@ -529,11 +529,11 @@ const Campaign = (() => {
     const sam = []; for (let f = 0; f <= 1; f += .01) sam.push({ p: polyAt(K.walls[0], f), j: 45 });
     for (const v of S.battle.bv) sam.push({ p: v, j: 8 });
     for (const a of K.arrows) { let bs = null, bd = 1e18; for (const c of sam) { const d = (c.p[0] - a.head[0]) ** 2 + (c.p[1] - a.head[1]) ** 2; if (d < bd) { bd = d; bs = c; } } a.aim = bs.p; a.aimJ = bs.j; }
-    { const R1 = K.walls[0];   // 600 Zombies stehen von Anfang an 50 m westlich der ersten Mauer, über die ganze Länge verteilt
-      for (let i = 0; i < 600; i++) {
-        const f = Math.random(), c = polyAt(R1, f), a = polyAt(R1, Math.max(0, f - .02)), b = polyAt(R1, Math.min(1, f + .02));
+    { const R1 = K.walls[0];   // 3 x 300 Zombies von Anfang an 50 / 100 / 150 m westlich der ersten Mauer, über die ganze Länge verteilt
+      for (let i = 0; i < 900; i++) {
+        const dist = 50 * (1 + (i / 300 | 0)), f = Math.random(), c = polyAt(R1, f), a = polyAt(R1, Math.max(0, f - .02)), b = polyAt(R1, Math.min(1, f + .02));
         let nx = b[1] - a[1], ny = -(b[0] - a[0]); const l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l; if (nx > 0) { nx = -nx; ny = -ny; }
-        const p = randWalk(c[0] + nx * 50, c[1] + ny * 50, 10) || randWalk(c[0] + nx * 50, c[1] + ny * 50, 40) || [c[0] + nx * 50, c[1] + ny * 50];
+        const p = randWalk(c[0] + nx * dist, c[1] + ny * dist, 10) || randWalk(c[0] + nx * dist, c[1] + ny * dist, 40) || [c[0] + nx * dist, c[1] + ny * dist];
         const z = spawnZombie(p[0], p[1], 0); S.spawned++; if (z && Math.random() < .98) z.gt = [c[0] + rnd(-6, 6), c[1] + rnd(-6, 6)];   // 98 % laufen auf die Mauer zu
       } }
     zpDirty = false; K.arrows.forEach((a, i) => { const q = put(a.head[0], a.head[1], 80); queueField('mf', a.head[0] + ',' + a.head[1], q[0], q[1]); });   // Wegfelder im Hintergrund vorberechnen
