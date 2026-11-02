@@ -321,10 +321,10 @@ function spawnCivilianZone(inside) {   // Kampagne: alle Zivilisten innerhalb ei
   if (z.discs) {   // mehrere Kreisgebiete (gleichmäßig verteilt)
     const d = z.discs[z.dn = ((z.dn || 0) + 1) % z.discs.length];
     if (inside) {
-      const bs = d.bs || (d.bs = B.filter(b => Math.hypot(b.ex - d.x, b.ey - d.y) < d.r)), b = bs.length ? bs[Math.random() * bs.length | 0] : null;
+      const bs = d.bs || (d.bs = B.filter(b => Math.hypot(b.ex - d.x, b.ey - d.y) < d.r && (!RULES.civLine || RULES.civLine(b.ex, b.ey)))), b = bs.length ? bs[Math.random() * bs.length | 0] : null;
       if (b && b.occ.length < b.cap) { e = mk(K_CIV, b.ex, b.ey); e.st = 4; e.b = b.idx; e.inT = rnd(10, 90); b.occ.push(e); }
     }
-    if (!e) { const p = randWalk(d.x, d.y, d.r) || randWalk(d.x, d.y, d.r * 2) || [d.x, d.y]; e = mk(K_CIV, p[0], p[1]); }
+    if (!e) { let p = null; for (let t = 0; t < 60 && !p; t++) { const q = randWalk(d.x, d.y, d.r) || randWalk(d.x, d.y, d.r * 2); if (q && (!RULES.civLine || RULES.civLine(q[0], q[1]))) p = q; } p = p || [d.x, d.y]; e = mk(K_CIV, p[0], p[1]); }
     e.brave = Math.random() < .5; if (Math.random() * 100 < cfg.armed) arm(e);
     E.push(e); return;
   }
@@ -735,6 +735,7 @@ function thinkZombie(e) {
       if (mk && mk.go && S.evac && ZF.evac && (mk.focus == null || Math.random() < mk.focus)) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; return; }
     } else { e.st = 7; e.fz = 'march'; e.fzT = 2; return; }
   }
+  if (e.gt) { e.st = 7; e.fz = 'goto'; e.fzT = 2; return; }   // Kampagne (Schlacht): am Marschziel angekommen → zur Mauer / Sperre
   if (e.pd && S.padT && Math.hypot(e.x - S.padT.x, e.y - S.padT.y) < 30) { e.pd = 0; e.sk = Math.random() < .95; }   // am Ziel angekommen: ausschwärmen, 95 % zu den Einsatzkräften
   if (e.pd && S.padT && ZF.pad) { e.st = 7; e.fz = 'pad'; e.fzT = 2; return; }   // Kampagne (Trek): 100 % zum Zielpunkt
   if (e.sk && S.seek && ZF.seek) { e.st = 7; e.fz = 'seek'; e.fzT = 2; return; }   // Kampagne (Trek): Zug zu den Einsatzkräften
@@ -781,6 +782,7 @@ function stepZombie(e) {
       if (!f || f.t <= 0 || e.fzT <= 0 || Math.hypot(f.x - e.x, f.y - e.y) < 10) { e.st = 0; e.wt = 0; return; }
       fieldDescend(e, f.D, f.x, f.y, sp, true); return;
     }
+    if (e.fz === 'goto') { e.fzT -= DT; if (!e.gt || e.fzT <= 0) { e.st = 0; e.wt = 0; return; } moveTo(e, e.gt[0], e.gt[1], sp, true); return; }
     if (e.fz === 'seek' || e.fz === 'pad') {
       const pd = e.fz === 'pad', t = pd ? S.padT : S.seek, D = pd ? ZF.pad : ZF.seek; e.fzT -= DT;
       if (!t || !D || e.fzT <= 0) { e.st = 0; e.wt = 0; return; }
@@ -796,7 +798,7 @@ function stepZombie(e) {
       let f = MF.get(key);
       if (!f && mk.pre) return;   // Feld wird im Hintergrund berechnet: bis dahin abwarten
       if (!f) { const q = nearestWalkCell(wp[0], wp[1], 80) || wp; MF.set(key, f = { x: q[0], y: q[1], D: computeField(q[0], q[1], true) }); }   // Wegpunkt auf begehbaren Grund legen (Felder gemeinsam genutzt)
-      if (Math.hypot(e.x - f.x, e.y - f.y) < (fin ? mk.gather.r : 30)) { if (fin && mk.noWait) { e.mk = 0; e.st = 0; e.wt = 0; if (mk.toEvac && S.evac && ZF.evac) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; } } else if (fin) { e.mw = 1; mk.arr++; if (mk.t1 == null) mk.t1 = simT; } else e.mi = (e.mi || 0) + 1; return; }
+      if (Math.hypot(e.x - f.x, e.y - f.y) < (fin ? mk.gather.r : 30)) { if (fin && mk.noWait) { e.mk = 0; e.st = 0; e.wt = 0; if (mk.aim && Math.random() < .98) { const j = mk.aimJ || 10; e.gt = [mk.aim[0] + rnd(-j, j), mk.aim[1] + rnd(-j, j)]; } if (mk.toEvac && S.evac && ZF.evac) { e.st = 7; e.fz = 'evac'; e.fzT = rnd(20, 40); e.path = null; } } else if (fin) { e.mw = 1; mk.arr++; if (mk.t1 == null) mk.t1 = simT; } else e.mi = (e.mi || 0) + 1; return; }
       fieldDescend(e, f.D, f.x, f.y, sp * (mk.spd || 1.6), true); return;
     }
     e.fzT -= DT; const lure = e.fz === 'lure', tg = lure ? S.lure : S.evac;

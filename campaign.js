@@ -152,7 +152,7 @@ const Campaign = (() => {
       civZone: { discs: [[960, 480], [1050, 470], [1130, 450], [1200, 490], [1270, 540], [1350, 590], [1440, 650], [1520, 710], [1060, 540], [1160, 560]].map(([x, y]) => { const p = KH(x, y); return { x: p[0], y: p[1], r: 120 }; }) },
       civLine: (x, y) => inPoly(x, y, KZ),
       battle: {
-        south: 300, north: 360, zone: KZ,
+        south: 300, north: 360, zone: KZ, inside: KH(1049, 442),
         walls: [[[858, 350], [838, 420], [832, 480], [840, 545], [856, 602]], [[884, 358], [868, 430], [860, 500], [862, 550], [872, 590]], [[897, 362], [884, 440], [880, 500], [884, 540], [893, 570]]].map(l => l.map(p => KH(...p))),
         bridges: [[1142, 375], [1332, 510], [1215, 630], [1597, 737], [1587, 803]].map(p => KH(...p)),
         arrows: [   // [Start, Ziel] je Pfeil; t0 = Beginn der Schübe (Sekunden)
@@ -332,7 +332,7 @@ const Campaign = (() => {
     if (w.march) {
       S.marches = S.marches || [];
       let m = S.marches.find(q => q.id === w.march.id);
-      if (!m) S.marches.push(m = { id: w.march.id, routes: w.march.routes, gather: w.march.gather, spd: w.march.spd, pre: w.march.pre, until: simT + (w.march.dur || 900), total: w.march.total || 0, focus: w.march.focus, arr: 0, n: 0, t1: null, go: false });
+      if (!m) S.marches.push(m = { id: w.march.id, routes: w.march.routes, gather: w.march.gather, spd: w.march.spd, pre: w.march.pre, noWait: w.march.noWait, toEvac: w.march.toEvac, aim: w.march.aim, aimJ: w.march.aimJ, until: simT + (w.march.dur || 900), total: w.march.total || 0, focus: w.march.focus, arr: 0, n: 0, t1: null, go: false });
       m.n += w.n; mkId = S.marches.indexOf(m) + 1;
     }
     for (let i = 0; i < w.n; i++) {
@@ -454,7 +454,7 @@ const Campaign = (() => {
   }
 
   // ── Mission 6 „Kelheim“: tobende Schlacht um die Halbinsel (30 Minuten halten) ──
-  const BT_CAP = 3200, BT_DBL = 300, BT_END = 1680, BT_FIN = 1800, BT_LOSS = 100;
+  const BT_CAP = 3600, BT_DBL = 300, BT_END = 1680, BT_FIN = 1800, BT_LOSS = 100;
   const polyAt = (ln, f) => {
     let L = 0; for (let i = 1; i < ln.length; i++) L += Math.hypot(ln[i][0] - ln[i - 1][0], ln[i][1] - ln[i - 1][1]);
     let h = L * f; for (let i = 1; i < ln.length; i++) { const l = Math.hypot(ln[i][0] - ln[i - 1][0], ln[i][1] - ln[i - 1][1]); if (h <= l || i === ln.length - 1) { const t = Math.min(1, h / (l || 1)); return [ln[i - 1][0] + (ln[i][0] - ln[i - 1][0]) * t, ln[i - 1][1] + (ln[i][1] - ln[i - 1][1]) * t]; } h -= l; }
@@ -472,12 +472,18 @@ const Campaign = (() => {
   }
   function buildBattle(m) {
     const K = m.battle, zone = K.zone, hot = [], hp3 = n0 => { for (let i = n0; i < BAR.length; i++) { BAR[i].hp *= 3; BAR[i].max = BAR[i].hp; } };
-    S.battle = { nx: K.arrows.map(a => a.t0), gunT: 70, bombT: 50, hot, purge: 0, done: false };
+    S.battle = { nx: K.arrows.map(a => a.t0), gunT: 70, bombT: 50, hot, bv: [], purge: 0, done: false };
     const put = (x, y, r) => nearestWalkCell(x, y, r || 14) || [x, y];
     const turret = (x, y) => { const q = put(x, y), e = placeTurret(q[0], q[1]); e.ds = 2; e.dt = 0; e.auto = true; e.fort = true; e.acc = .6; e.ammo = e.ammoMax = 1e9; };
     const squad = (k, x, y, n) => { const id = ++gidN; for (let i = 0; i < n; i++) { const q = put(x + rnd(-5, 5), y + rnd(-5, 5), 10), e = unitFrom(k, q[0], q[1], id, 0, i); e.lock = e.ord = e.fort = true; e.ammoMax = e.ammo = 1e9; if (e.gsg) e.pisMax = e.pis = 1e9; } };
     const truck = (x, y) => { const q = put(x, y), e = mk(K_TRK, q[0], q[1]); e.acc = .6; e.armed = true; e.ord = e.lock = e.fort = true; e.hmx = q[0]; e.hmy = q[1]; e.hp = 8; e.ammoMax = e.ammo = 1e9; E.push(e); };
-    for (const ln of K.walls) {   // drei Mauerreihen, in der Mitte je ein Tor
+    const toWater = (ln, atEnd) => {   // Mauerende bis ins Wasser verlängern, damit die Mauer von Ufer zu Ufer reicht
+      const a = ln[atEnd ? ln.length - 2 : 1], b = ln[atEnd ? ln.length - 1 : 0]; let dx = b[0] - a[0], dy = b[1] - a[1]; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+      let x = b[0], y = b[1]; for (let d = 0; d < 320; d += 3) { x = b[0] + dx * d; y = b[1] + dy * d; if (x < 2 || y < 2 || x > WW - 2 || y > WH - 2) break; if (type[cellIdx(x, y)] === T_WATER) { x += dx * 10; y += dy * 10; break; } }
+      return [x, y];
+    };
+    for (let ln of K.walls) {   // drei Mauerreihen, in der Mitte je ein Tor
+      ln = [toWater(ln, false), ...ln, toWater(ln, true)];
       const g = polyAt(ln, .5), n0 = BAR.length;
       addPre(wallCells(ln), c => Math.hypot((c % GW + .5) * CELL - g[0], ((c / GW | 0) + .5) * CELL - g[1]) < 9); hp3(n0);
       hot.push(polyAt(ln, .2), g, polyAt(ln, .8));
@@ -486,35 +492,68 @@ const Campaign = (() => {
     for (const f of [.08, .24, .4, .58, .76, .92]) { const p = polyAt(mid, f); turret(p[0], p[1]); }
     for (const f of [.16, .5, .84]) { const p = polyAt(mid, f); truck(p[0], p[1]); }
     for (const f of [.32, .66, .9]) { const p = polyAt(mid, f); squad('sol', p[0], p[1], 4); }
-    for (const bp of K.bridges) {   // Brücken: Sperre mit Tor, dahinter zwei MGs und zwei GSG-9-Einheiten
-      let best = null, bd = 110 * 110;
-      for (const pass of [1, 0]) { if (best) break; for (const r of MD.roads) { if (pass && !r.br) continue; for (let i = 0; i < r.p.length; i += 2) { const d = (r.p[i] - bp[0]) ** 2 + (r.p[i + 1] - bp[1]) ** 2; if (d < bd) { bd = d; best = [r, i]; } } } }
-      const v = best ? [best[0].p[best[1]], best[0].p[best[1] + 1]] : bp;
-      let tx = 1, ty = 0;
-      if (best) { const p = best[0].p, i0 = Math.max(0, best[1] - 4), i1 = Math.min(p.length - 2, best[1] + 4), l = Math.hypot(p[i1] - p[i0], p[i1 + 1] - p[i0 + 1]) || 1; tx = (p[i1] - p[i0]) / l; ty = (p[i1 + 1] - p[i0 + 1]) / l; }
-      const nx = -ty, ny = tx, set = new Set();
-      for (let o = -18; o <= 18; o += 1.5) for (let s = -5; s <= 5; s += 2) { const x = v[0] + nx * o + tx * s, y = v[1] + ny * o + ty * s; if (x > 1 && y > 1 && x < WW - 1 && y < WH - 1) set.add(cellIdx(x, y)); }
-      const n0 = BAR.length; addPre([...set], c => Math.abs(((c % GW + .5) * CELL - v[0]) * nx + (((c / GW | 0) + .5) * CELL - v[1]) * ny) <= 4.5); hp3(n0);
-      const sg = inPoly(v[0] + tx * 16, v[1] + ty * 16, zone) ? 1 : inPoly(v[0] - tx * 16, v[1] - ty * 16, zone) ? -1 : 1;
-      for (const o of [-7, 7]) turret(v[0] + tx * sg * 14 + nx * o, v[1] + ty * sg * 14 + ny * o);
-      for (const [d, o] of [[22, -5], [22, 5]]) squad('gsg', v[0] + tx * sg * d + nx * o, v[1] + ty * sg * d + ny * o, 3);
-      hot.push(v);
+    const isW = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH && type[y * GW + x] === T_WATER;
+    const isDeck = (cx, cy) => {   // Fahrbahn über Wasser: beidseits (in irgendeiner Richtung) Wasser in der Nähe
+      if (cx < 0 || cy < 0 || cx >= GW || cy >= GH || type[cy * GW + cx] !== T_ROAD) return false;
+      for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) { let a = false, b = false; for (let k = 1; k <= 4; k++) { if (isW(cx + dx * k, cy + dy * k)) a = true; if (isW(cx - dx * k, cy - dy * k)) b = true; } if (a && b) return true; }
+      return false;
+    };
+    for (const bp of K.bridges) {   // Brücken: die gesamte Fahrbahn über dem Wasser wird zur Sperre mit Tor (Zombies kommen nicht durch, Einsatzkräfte schon); dahinter zwei MGs und zwei GSG-9-Einheiten
+      const c0x = bp[0] / CELL | 0, c0y = bp[1] / CELL | 0; let st = null, sd = 1e9;
+      for (let dy = -22; dy <= 22; dy++) for (let dx = -22; dx <= 22; dx++) if (isDeck(c0x + dx, c0y + dy) && dx * dx + dy * dy < sd) { sd = dx * dx + dy * dy; st = [c0x + dx, c0y + dy]; }
+      const cl = st ? [st[1] * GW + st[0]] : [], seenC = new Set(cl);
+      for (let h = 0; h < cl.length; h++) { const cx = cl[h] % GW, cy = cl[h] / GW | 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x = cx + dx, y = cy + dy, i = y * GW + x; if ((dx || dy) && !seenC.has(i) && isDeck(x, y)) { seenC.add(i); cl.push(i); } } }
+      let v = bp, tx = 1, ty = 0, nx = 0, ny = 1;
+      if (cl.length) {
+        const n0 = BAR.length; addPre(cl, () => true); hp3(n0);
+        const P = cl.map(i => [(i % GW + .5) * CELL, ((i / GW | 0) + .5) * CELL]); let mx = 0, my = 0; for (const q of P) { mx += q[0]; my += q[1]; } mx /= P.length; my /= P.length; v = [mx, my];
+        const far = (o) => P.reduce((bq, q) => Math.hypot(q[0] - o[0], q[1] - o[1]) > Math.hypot(bq[0] - o[0], bq[1] - o[1]) ? q : bq, o);
+        const A = far(v), B = far(A), l = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1; tx = (B[0] - A[0]) / l; ty = (B[1] - A[1]) / l; nx = -ty; ny = tx;
+        const ea = [A[0] - tx * 14, A[1] - ty * 14], eb = [B[0] + tx * 14, B[1] + ty * 14], zs = inPoly(ea[0], ea[1], zone) ? A : inPoly(eb[0], eb[1], zone) ? B : A, sg = zs === A ? -1 : 1;
+        for (const o of [-7, 7]) turret(zs[0] + tx * sg * 14 + nx * o, zs[1] + ty * sg * 14 + ny * o);
+        for (const o of [-5, 5]) squad('gsg', zs[0] + tx * sg * 24 + nx * o, zs[1] + ty * sg * 24 + ny * o, 3);
+      }
+      hot.push(v); S.battle.bv.push(v);
     }
+    {   // abgesperrter Bereich = alles, was von innen ohne Durchbrechen der Sperren erreichbar ist; Zivilisten bleiben ausschließlich dort
+      const wk = i => type[i] <= T_ROAD && !barId[i], zs = new Uint8Array(GW * GH); let c0 = cellIdx(K.inside[0], K.inside[1]);
+      if (!wk(c0)) { const q = nearestWalkCell(K.inside[0], K.inside[1], 120); if (q) c0 = cellIdx(q[0], q[1]); }
+      const Q = [c0]; zs[c0] = 1; for (let h = 0; h < Q.length; h++) { const i = Q[h], x = i % GW, y = i / GW | 0; for (const j of [x > 0 ? i - 1 : -1, x < GW - 1 ? i + 1 : -1, y > 0 ? i - GW : -1, y < GH - 1 ? i + GW : -1]) if (j >= 0 && !zs[j] && wk(j)) { zs[j] = 1; Q.push(j); } }
+      S.battle.zone = zs; RULES.civLine = (x, y) => zs[cellIdx(x, y)] === 1;
+      const open = Q.filter(i => type[i] <= T_ROAD);
+      for (const e of E) { if (e.k !== K_CIV || e.dead || zs[cellIdx(e.x, e.y)]) continue;
+        const bb = e.st === 4 && B[e.b]; if (bb && [0, 1, -1].some(dx => [0, 1, -1].some(dy => zs[cellIdx(bb.ex + dx * CELL, bb.ey + dy * CELL)]))) continue;   // Gebäude in der Zone
+        if (bb) { bb.occ = bb.occ.filter(o => o !== e); e.st = 0; e.b = -1; }
+        const i = open[Math.random() * open.length | 0]; e.x = (i % GW + .5) * CELL; e.y = ((i / GW | 0) + .5) * CELL; e.path = null; }
+    }
+    const sam = []; for (let f = 0; f <= 1; f += .01) sam.push({ p: polyAt(K.walls[0], f), j: 45 });
+    for (const v of S.battle.bv) sam.push({ p: v, j: 8 });
+    for (const a of K.arrows) { let bs = null, bd = 1e18; for (const c of sam) { const d = (c.p[0] - a.head[0]) ** 2 + (c.p[1] - a.head[1]) ** 2; if (d < bd) { bd = d; bs = c; } } a.aim = bs.p; a.aimJ = bs.j; }
+    { const R1 = K.walls[0];   // 600 Zombies stehen von Anfang an 50 m westlich der ersten Mauer, über die ganze Länge verteilt
+      for (let i = 0; i < 600; i++) {
+        const f = Math.random(), c = polyAt(R1, f), a = polyAt(R1, Math.max(0, f - .02)), b = polyAt(R1, Math.min(1, f + .02));
+        let nx = b[1] - a[1], ny = -(b[0] - a[0]); const l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l; if (nx > 0) { nx = -nx; ny = -ny; }
+        const p = randWalk(c[0] + nx * 50, c[1] + ny * 50, 10) || randWalk(c[0] + nx * 50, c[1] + ny * 50, 40) || [c[0] + nx * 50, c[1] + ny * 50];
+        const z = spawnZombie(p[0], p[1], 0); S.spawned++; if (z && Math.random() < .98) z.gt = [c[0] + rnd(-6, 6), c[1] + rnd(-6, 6)];   // 98 % laufen auf die Mauer zu
+      } }
     zpDirty = false; K.arrows.forEach((a, i) => { const q = put(a.head[0], a.head[1], 80); queueField('mf', a.head[0] + ',' + a.head[1], q[0], q[1]); });   // Wegfelder im Hintergrund vorberechnen
   }
   function tickBattle(m) {
     const K = m.battle, b = S.battle, stp = S.btstep = (S.btstep || 0) + 1;
-    if (stp % 20 === 0) { let n = 0; for (const e of E) if (e.k === K_ZOM && !e.dead) n++; b.live = n; }
+    if (stp % 20 === 0) { let n = 0; const la = K.arrows.map(() => 0); for (const e of E) if (e.k === K_ZOM && !e.dead) { n++; if (e.ar) la[e.ar - 1]++; } b.live = n; b.la = la; }
+    if (!b.la) b.la = K.arrows.map(() => 0);
     if (!S.fired.b300 && simT >= BT_DBL) { S.fired.b300 = 1; banner('⚠ Die Wellen schwellen an: ab jetzt 200 Zombies alle 10 Sekunden aus jeder Richtung!', 12000); SFX.alarm(); }
     if (!S.fired.bS && simT >= K.south) { S.fired.bS = 1; banner('⚠ Eine Welle aus dem Süden rollt an – die Brücke im Süden ist bedroht!', 12000); SFX.alarm(); }
     if (!S.fired.bN && simT >= K.north) { S.fired.bN = 1; banner('⚠ Jetzt auch aus dem Norden und Nordosten! Haltet alle Brücken!', 12000); SFX.alarm(); }
     if (!S.fired.bEnd && simT >= BT_END) { S.fired.bEnd = 1; banner('📻 Die Wellen ebben ab – haltet durch, bis die Gunships eintreffen!', 12000); SFX.ui(); }
     K.arrows.forEach((a, i) => {   // jeder Pfeil: Schub alle 10 s (Obergrenze für gleichzeitig lebende Zombies)
       while (simT >= b.nx[i] && b.nx[i] < BT_END) {
-        b.nx[i] += 10; if (b.live > BT_CAP) continue;
-        const n = simT >= BT_DBL ? 200 : 100, id = 'bt' + i, g = nearestWalkCell(a.tail[0], a.tail[1], 90) || a.tail;
-        spawnWave({ t: 0, n, x: g[0], y: g[1], r: 45, march: { id, route: 0, routes: [[]], gather: { x: a.head[0], y: a.head[1], r: 55 }, noWait: true, pre: true, spd: 2, dur: 3000 } }, false);
-        const mkr = S.marches.find(q => q.id === id); if (mkr) mkr.until = simT + 900; b.live += n;
+        b.nx[i] += 10;
+        const n = simT >= BT_DBL ? 200 : 100, id = 'bt' + i, g = nearestWalkCell(a.tail[0], a.tail[1], 90) || a.tail, started = K.arrows.filter(q => simT >= q.t0).length;
+        if (b.la[i] + n > Math.max(400, Math.floor(BT_CAP / started))) continue;   // Obergrenze je Pfeil: jede Richtung bekommt ihren Anteil
+        const e0 = E.length;
+        spawnWave({ t: 0, n, x: g[0], y: g[1], r: 45, march: { id, route: 0, routes: [[]], gather: { x: a.head[0], y: a.head[1], r: 55 }, noWait: true, pre: true, spd: 2, aim: a.aim, aimJ: a.aimJ, dur: 3000 } }, false);
+        const mkr = S.marches.find(q => q.id === id); if (mkr) mkr.until = simT + 900; b.live += n; b.la[i] += n; for (let k = e0; k < E.length; k++) E[k].ar = i + 1;
       }
     });
     if (simT >= b.gunT && simT < BT_FIN) {   // Gunship zur Entlastung des am stärksten bedrängten Abschnitts
